@@ -892,9 +892,7 @@ PORTABLEIMPL(int) DES__encrypt(const char* input, size_t cb, const char * key, c
         return -1;
     }
 
-    if (!key) {
-        memcpy(keyBlock, DEFAULT_DES_KEY, sizeof ( void *));
-    }
+    memcpy(keyBlock, (NULL == key) ? DEFAULT_DES_KEY : key, sizeof(keyBlock));
 
     /* 将密钥转换为二进制流 */
     Char8ToBit64(keyBlock, bKey);
@@ -923,9 +921,7 @@ PORTABLEIMPL(int) DES__decrypt(const char* input, size_t cb, const char key[8], 
         return -1;
     }
 
-    if (!key) {
-        memcpy(keyBlock, DEFAULT_DES_KEY, sizeof ( void *));
-    }
+    memcpy(keyBlock, (NULL == key) ? DEFAULT_DES_KEY : key, sizeof(keyBlock));
 
     /* 将密钥转换为二进制流 */
     Char8ToBit64(keyBlock, bKey);
