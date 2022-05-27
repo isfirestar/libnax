@@ -1,0 +1,164 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="mxx.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="ncb.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="network.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="packet.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="tcp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="udp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="io.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="os.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="arp.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libnsp\common\avltree.c">
+      <Filter>libnsp\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libnsp\common\cfifo.c">
+      <Filter>libnsp\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libnsp\common\hash.c">
+      <Filter>libnsp\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libnsp\common\naos.c">
+      <Filter>libnsp\common</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libnsp\win32\clock.c">
+      <Filter>libnsp\win32</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libnsp\win32\ifos.c">
+      <Filter>libnsp\win32</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libnsp\win32\mthread.c">
+      <Filter>libnsp\win32</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libnsp\win32\object.c">
+      <Filter>libnsp\win32</Filter>
+    </ClCompile>
+    <ClCompile Include="..\libnsp\win32\logger.c">
+      <Filter>libnsp\common</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="packet.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="network.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="ncb.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="mxx.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="io.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="os.h">
+      <Filter>Head Files</Filter>
+    </ClInclude>
+    <ClInclude Include="resource.h">
+      <Filter>Resource Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\atom.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\avltree.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\cfifo.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\clist.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\clock.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\compatible.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\compiler.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\hash.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\ifos.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\logger.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\mpool.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\mthread.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\naos.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\nis.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\nisdef.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\object.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\spinlock.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\libnsp\include\sstr.h">
+      <Filter>libnsp\include</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{e9175f53-937c-4e33-8219-e288fba0caad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{a16707b6-a684-4b4b-acaa-1992ace8f714}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Head Files">
+      <UniqueIdentifier>{12651b28-2e80-4568-9b42-8e56d040615b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libnsp">
+      <UniqueIdentifier>{ebf20d76-7a28-4c53-b84f-af148f5646d8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libnsp\include">
+      <UniqueIdentifier>{7e7c259a-173e-4fe9-8c52-60d4dd9bc05e}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libnsp\common">
+      <UniqueIdentifier>{df16bb69-d42d-461a-823c-b022e19b51e5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="libnsp\win32">
+      <UniqueIdentifier>{eded4efa-c355-45a7-b101-916588c67497}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="nshost.rc">
+      <Filter>Resource Files</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>
