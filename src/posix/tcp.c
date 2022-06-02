@@ -43,7 +43,7 @@ const char *TCP_KERNEL_STATE_NAME[TCP_KERNEL_STATE_LIST_SIZE] = {
     "TCP_CLOSING"
 };
 
-static nsp_status_t __tcprefr( objhld_t hld, ncb_t **ncb )
+static nsp_status_t _tcprefr( objhld_t hld, ncb_t **ncb )
 {
     if ( hld < 0 || !ncb) {
         return -EINVAL;
@@ -87,7 +87,7 @@ nsp_status_t tcp_allocate_rx_buffer(ncb_t *ncb)
     return NSP_STATUS_SUCCESSFUL;
 }
 
-static nsp_status_t __tcp_bind(const ncb_t *ncb)
+static nsp_status_t _tcp_bind(const ncb_t *ncb)
 {
     do {
         if (AF_UNIX == ncb->local_addr.sin_family ) {
@@ -108,7 +108,7 @@ static nsp_status_t __tcp_bind(const ncb_t *ncb)
     return NSP_STATUS_SUCCESSFUL;
 }
 
-#define __tcp_invoke(foo)  foo(IPPROTO_TCP)
+#define _tcp_invoke(foo)  foo(IPPROTO_TCP)
 
 /* tcp impls */
 nsp_status_t tcp_init2(int nprocs)
@@ -120,9 +120,9 @@ nsp_status_t tcp_init2(int nprocs)
         return status;
     }
 
-    status = __tcp_invoke(wp_init);
+    status = _tcp_invoke(wp_init);
     if ( !NSP_SUCCESS(status) ) {
-        __tcp_invoke(io_uninit);
+        _tcp_invoke(io_uninit);
     }
 
     return status;
@@ -135,12 +135,12 @@ nsp_status_t tcp_init()
 
 void tcp_uninit()
 {
-    __tcp_invoke(ncb_uninit);
-    __tcp_invoke(io_uninit);
-    __tcp_invoke(wp_uninit);
+    _tcp_invoke(ncb_uninit);
+    _tcp_invoke(io_uninit);
+    _tcp_invoke(wp_uninit);
 }
 
-static void __tcp_create_domain(ncb_t *ncb, const char* domain)
+static void _tcp_create_domain(ncb_t *ncb, const char* domain)
 {
     ncb->sockfd = 0;
 
@@ -158,7 +158,7 @@ static void __tcp_create_domain(ncb_t *ncb, const char* domain)
     mxx_call_ecr("Init domain link:%lld", ncb->hld);
 }
 
-static nsp_status_t __tcp_create(ncb_t *ncb, const char* ipstr, uint16_t port)
+static nsp_status_t _tcp_create(ncb_t *ncb, const char* ipstr, uint16_t port)
 {
     int fd;
 
@@ -210,12 +210,12 @@ HTCPLINK tcp_create(tcp_io_callback_t callback, const char* ipstr, uint16_t port
         status = NSP_STATUS_SUCCESSFUL;
         if (ipstr) {
             if (0 == strncasecmp(ipstr, "IPC:", 4)) {
-                __tcp_create_domain(ncb, &ipstr[4]);
+                _tcp_create_domain(ncb, &ipstr[4]);
                 break;
             }
         }
 
-        status = __tcp_create(ncb, ipstr, port);
+        status = _tcp_create(ncb, ipstr, port);
     } while(0);
 
     objdefr(hld);
@@ -263,7 +263,7 @@ nsp_status_t tcp_settst(HTCPLINK link, const tst_t *tst)
         return posix__makeerror(EINVAL);
     }
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( likely(NSP_SUCCESS(status)) ) {
         ncb->u.tcp.template.cb_ = tst->cb_;
         ncb->u.tcp.template.builder_ = tst->builder_;
@@ -289,7 +289,7 @@ nsp_status_t tcp_settst_r(HTCPLINK link, const tst_t *tst)
         return posix__makeerror(EINVAL);
     }
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( likely(NSP_SUCCESS(status)) ) {
         ncb->u.tcp.prtemplate.cb_ = atom_exchange(&ncb->u.tcp.template.cb_, tst->cb_);
         ncb->u.tcp.prtemplate.builder_ = atom_exchange(&ncb->u.tcp.template.builder_, tst->builder_);
@@ -308,7 +308,7 @@ nsp_status_t tcp_gettst(HTCPLINK link, tst_t *tst)
         return posix__makeerror(EINVAL);
     }
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( likely(NSP_SUCCESS(status)) ) {
         tst->cb_ = ncb->u.tcp.template.cb_;
         tst->builder_ = ncb->u.tcp.template.builder_;
@@ -329,7 +329,7 @@ nsp_status_t tcp_gettst_r(HTCPLINK link, tst_t *tst, tst_t *previous)
         return posix__makeerror(EINVAL);
     }
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( likely(NSP_SUCCESS(status)) ) {
         local.cb_ = atom_exchange(&tst->cb_, ncb->u.tcp.template.cb_);
         local.builder_ = atom_exchange(&tst->builder_, ncb->u.tcp.template.builder_);
@@ -352,7 +352,7 @@ void tcp_destroy(HTCPLINK link)
     ncb_t *ncb;
     nsp_status_t status;
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( !NSP_SUCCESS(status) ) {
         return;
     }
@@ -433,7 +433,7 @@ static int __tcp_check_connection(int sockfd)
 
 #endif
 
-static nsp_status_t __tcp_connect_domain(ncb_t *ncb, const char *domain)
+static nsp_status_t _tcp_connect_domain(ncb_t *ncb, const char *domain)
 {
     nsp_status_t status;
     int retval;
@@ -501,7 +501,7 @@ static nsp_status_t __tcp_connect_domain(ncb_t *ncb, const char *domain)
     return status;
 }
 
-static nsp_status_t __tcp_connect(ncb_t *ncb, const char* ipstr, uint16_t port)
+static nsp_status_t _tcp_connect(ncb_t *ncb, const char* ipstr, uint16_t port)
 {
     struct sockaddr_in addr_to;
     struct tcp_info ktcp;
@@ -538,7 +538,7 @@ static nsp_status_t __tcp_connect(ncb_t *ncb, const char* ipstr, uint16_t port)
         tcp_set_nodelay(ncb, 1);
 
         /* bind on particular local address:port tuple when need. */
-        status = __tcp_bind(ncb);
+        status = _tcp_bind(ncb);
         if ( !NSP_SUCCESS(status) ) {
             break;
         }
@@ -599,12 +599,12 @@ nsp_status_t tcp_connect(HTCPLINK link, const char* ipstr, uint16_t port)
         return posix__makeerror(EINVAL);
     }
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( !NSP_SUCCESS(status) ) {
         return status;
     }
 
-    status = (AF_UNIX == ncb->local_addr.sin_family) ? __tcp_connect_domain(ncb, ipstr) : __tcp_connect(ncb, ipstr, port);
+    status = (AF_UNIX == ncb->local_addr.sin_family) ? _tcp_connect_domain(ncb, ipstr) : _tcp_connect(ncb, ipstr, port);
     objdefr(link);
     if ( !NSP_SUCCESS(status)) {
         objclos(link);
@@ -612,7 +612,7 @@ nsp_status_t tcp_connect(HTCPLINK link, const char* ipstr, uint16_t port)
     return status;
 }
 
-static nsp_status_t __tcp_connect2_domain(ncb_t *ncb, const char *domain)
+static nsp_status_t _tcp_connect2_domain(ncb_t *ncb, const char *domain)
 {
     nsp_status_t status;
     int retval;
@@ -682,7 +682,7 @@ static nsp_status_t __tcp_connect2_domain(ncb_t *ncb, const char *domain)
     return status;
 }
 
-static nsp_status_t __tcp_connect2(ncb_t *ncb, const char* ipstr, uint16_t port)
+static nsp_status_t _tcp_connect2(ncb_t *ncb, const char* ipstr, uint16_t port)
 {
     nsp_status_t status;
     struct tcp_info ktcp;
@@ -727,7 +727,7 @@ static nsp_status_t __tcp_connect2(ncb_t *ncb, const char* ipstr, uint16_t port)
         tcp_set_nodelay(ncb, 1);
 
         /* bind on particular local address:port tuple when need. */
-        status = __tcp_bind(ncb);
+        status = _tcp_bind(ncb);
         if (!NSP_SUCCESS(status)) {
             break;
         }
@@ -799,12 +799,12 @@ nsp_status_t tcp_connect2(HTCPLINK link, const char* ipstr, uint16_t port)
         return posix__makeerror(EINVAL);
     }
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( !NSP_SUCCESS(status) ) {
         return status;
     }
 
-    status = (AF_UNIX == ncb->local_addr.sin_family) ?  __tcp_connect2_domain(ncb, ipstr) : __tcp_connect2(ncb, ipstr, port);
+    status = (AF_UNIX == ncb->local_addr.sin_family) ?  _tcp_connect2_domain(ncb, ipstr) : _tcp_connect2(ncb, ipstr, port);
     objdefr(link);
     if ( !NSP_SUCCESS(status)) {
         objclos(link);
@@ -812,7 +812,7 @@ nsp_status_t tcp_connect2(HTCPLINK link, const char* ipstr, uint16_t port)
     return status;
 }
 
-static nsp_status_t __tcp_listen_domain(ncb_t *ncb, int block)
+static nsp_status_t _tcp_listen_domain(ncb_t *ncb, int block)
 {
     int fd;
     int expect;
@@ -849,7 +849,7 @@ nsp_status_t tcp_listen(HTCPLINK link, int block)
         return posix__makeerror(EINVAL);
     }
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( !NSP_SUCCESS(status) ) {
         return status;
     }
@@ -859,7 +859,7 @@ nsp_status_t tcp_listen(HTCPLINK link, int block)
 
         /* cope with the domain socket situation */
         if (AF_UNIX == ncb->local_addr.sin_family ) {
-            status = __tcp_listen_domain(ncb, block);
+            status = _tcp_listen_domain(ncb, block);
             if ( !NSP_SUCCESS(status) ) {
                 break;
             }
@@ -880,7 +880,7 @@ nsp_status_t tcp_listen(HTCPLINK link, int block)
         ncb_set_reuseaddr(ncb);
 
         /* binding on local adpater before listen */
-        status =  __tcp_bind(ncb);
+        status =  _tcp_bind(ncb);
         if (!NSP_SUCCESS(status)) {
             break;
         }
@@ -941,7 +941,7 @@ nsp_status_t tcp_awaken(HTCPLINK link, const void *pipedata, unsigned int cb)
         return posix__makeerror(EINVAL);
     }
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( !NSP_SUCCESS(status) ) {
         return status;
     }
@@ -967,7 +967,7 @@ nsp_status_t tcp_write(HTCPLINK link, const void *origin, int cb, const nis_seri
     buffer = NULL;
     node = NULL;
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if (!NSP_SUCCESS(status)) {
         return status;
     }
@@ -1115,7 +1115,7 @@ nsp_status_t tcp_getaddr(HTCPLINK link, int type, uint32_t* ipv4, uint16_t* port
     struct sockaddr_in *addr;
     nsp_status_t status;
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( !NSP_SUCCESS(status) ) {
         return status;
     }
@@ -1149,7 +1149,7 @@ nsp_status_t tcp_getipcpath(HTCPLINK link, const char **path)
     ncb_t *ncb;
     nsp_status_t status;
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( !NSP_SUCCESS(status) ) {
         return status;
     }
@@ -1171,7 +1171,7 @@ nsp_status_t tcp_setopt(HTCPLINK link, int level, int opt, const char *val, int 
     ncb_t *ncb;
     nsp_status_t status;
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( !NSP_SUCCESS(status) ) {
         return status;
     }
@@ -1190,7 +1190,7 @@ nsp_status_t tcp_getopt(HTCPLINK link, int level, int opt, char *__restrict val,
     ncb_t *ncb;
     nsp_status_t status;
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if ( !NSP_SUCCESS(status) ) {
         return status;
     }
@@ -1330,7 +1330,7 @@ nsp_status_t tcp_setattr(HTCPLINK link, int attr, int enable)
     ncb_t *ncb;
     nsp_status_t status;
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if (!NSP_SUCCESS(status)) {
         return status;
     }
@@ -1356,7 +1356,7 @@ nsp_status_t tcp_getattr(HTCPLINK link, int attr, int *enabled)
     ncb_t *ncb;
     nsp_status_t status;
 
-    status = __tcprefr(link, &ncb);
+    status = _tcprefr(link, &ncb);
     if (!NSP_SUCCESS(status)) {
         return status;
     }

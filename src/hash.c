@@ -242,7 +242,7 @@ PORTABLEIMPL(int) base64_decode(const char * base64, int base64_len, char * bind
     return j;
 }
 
-PORTABLEIMPL(int) base64__encode(const char *input, int incb, char *output, int *outcb)
+PORTABLEIMPL(int) base64_encode2(const char *input, int incb, char *output, int *outcb)
 {
     char *base64ptr;
 
@@ -263,7 +263,7 @@ PORTABLEIMPL(int) base64__encode(const char *input, int incb, char *output, int 
     return (NULL == base64ptr) ? (-1) : (*outcb);
 }
 
-PORTABLEIMPL(int) base64__decode(const char *input, int incb, char *output, int *outcb)
+PORTABLEIMPL(int) base64_decode2(const char *input, int incb, char *output, int *outcb)
 {
     if ( unlikely(!input || incb <= 0 || !outcb) ) {
         return -1;
@@ -282,6 +282,13 @@ PORTABLEIMPL(int) base64__decode(const char *input, int incb, char *output, int 
 }
 
 /*--------------------------------------------MD5--------------------------------------------*/
+struct __md5ctx {
+    uint32_t state[4];
+    uint32_t count[2];
+    uint8_t buffer[64];
+    uint8_t PADDING[64];
+};
+
 #define S11 7
 #define S12 12
 #define S13 17
@@ -328,22 +335,22 @@ PORTABLEIMPL(int) base64__decode(const char *input, int incb, char *output, int 
                                 }
 
 static
-void MD5__Transform(uint32_t state[4], const uint8_t block[64]);
+void _md5_ransform(uint32_t state[4], const uint8_t block[64]);
 static
-void MD5__Encode(uint8_t *output, const uint32_t *input, uint32_t len);
+void _md5_encode(uint8_t *output, const uint32_t *input, uint32_t len);
 static
-void MD5__Decode(uint32_t *output, const uint8_t *input, uint32_t len);
+void _md5_decode(uint32_t *output, const uint8_t *input, uint32_t len);
 static
-void MD5__memcpy(uint8_t* output, const uint8_t* input, uint32_t len);
+void _md5_memcpy(uint8_t* output, const uint8_t* input, uint32_t len);
 static
-void MD5__memset(uint8_t* output, int value, uint32_t len);
+void _md5_memset(uint8_t* output, int value, uint32_t len);
 
 static
-void MD5__Transform(uint32_t state[4], const uint8_t block[64])
+void _md5_ransform(uint32_t state[4], const uint8_t block[64])
 {
     uint32_t a = state[0], b = state[1], c = state[2], d = state[3], x[16];
 
-    MD5__Decode(x, block, 64);
+    _md5_decode(x, block, 64);
 
     /* Round 1 */
     FF(a, b, c, d, x[0], S11, 0xd76aa478); /* 1 */
@@ -422,11 +429,11 @@ void MD5__Transform(uint32_t state[4], const uint8_t block[64])
     state[2] += c;
     state[3] += d;
 
-    MD5__memset((uint8_t*) x, 0, sizeof ( x));
+    _md5_memset((uint8_t*) x, 0, sizeof ( x));
 }
 
 static
-void MD5__Encode(uint8_t *output, const uint32_t *input, uint32_t len)
+void _md5_encode(uint8_t *output, const uint32_t *input, uint32_t len)
 {
     uint32_t i, j;
 
@@ -439,7 +446,7 @@ void MD5__Encode(uint8_t *output, const uint32_t *input, uint32_t len)
 }
 
 static
-void MD5__Decode(uint32_t *output, const uint8_t *input, uint32_t len)
+void _md5_decode(uint32_t *output, const uint8_t *input, uint32_t len)
 {
     uint32_t i, j;
 
@@ -449,7 +456,7 @@ void MD5__Decode(uint32_t *output, const uint8_t *input, uint32_t len)
 }
 
 static
-void MD5__memcpy(uint8_t* output, const uint8_t* input, uint32_t len)
+void _md5_memcpy(uint8_t* output, const uint8_t* input, uint32_t len)
 {
     uint32_t i;
 
@@ -458,7 +465,7 @@ void MD5__memcpy(uint8_t* output, const uint8_t* input, uint32_t len)
 }
 
 static
-void MD5__memset(uint8_t* output, int value, uint32_t len)
+void _md5_memset(uint8_t* output, int value, uint32_t len)
 {
     uint32_t i;
 
@@ -466,7 +473,7 @@ void MD5__memset(uint8_t* output, int value, uint32_t len)
         ((char *) output)[i] = (char) value;
 }
 
-PORTABLEIMPL(void) MD5__Init(MD5_CTX *md5ctx)
+PORTABLEIMPL(void) md5_init(md5ctx_pt md5ctx)
 {
     md5ctx->count[0] = md5ctx->count[1] = 0;
     md5ctx->state[0] = 0x67452301;
@@ -474,7 +481,7 @@ PORTABLEIMPL(void) MD5__Init(MD5_CTX *md5ctx)
     md5ctx->state[2] = 0x98badcfe;
     md5ctx->state[3] = 0x10325476;
 
-    MD5__memset(md5ctx->PADDING, 0, sizeof ( md5ctx->PADDING));
+    _md5_memset(md5ctx->PADDING, 0, sizeof ( md5ctx->PADDING));
     *md5ctx->PADDING = 0x80;
     /*PADDING = {
      *	0x80, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -483,7 +490,7 @@ PORTABLEIMPL(void) MD5__Init(MD5_CTX *md5ctx)
      * */
 }
 
-PORTABLEIMPL(void) MD5__Update(MD5_CTX *md5ctx, const uint8_t *input, uint32_t inputLen)
+PORTABLEIMPL(void) md5_update(md5ctx_pt md5ctx, const uint8_t *input, uint32_t inputLen)
 {
     uint32_t i, index, partLen;
 
@@ -496,36 +503,40 @@ PORTABLEIMPL(void) MD5__Update(MD5_CTX *md5ctx, const uint8_t *input, uint32_t i
 
     partLen = 64 - index;
     if (inputLen >= partLen) {
-        MD5__memcpy((uint8_t*) & md5ctx->buffer[index],
+        _md5_memcpy((uint8_t*) & md5ctx->buffer[index],
                 (uint8_t*) input, partLen);
-        MD5__Transform(md5ctx->state, md5ctx->buffer);
+        _md5_ransform(md5ctx->state, md5ctx->buffer);
 
         for (i = partLen; i + 63 < inputLen; i += 64)
-            MD5__Transform(md5ctx->state, &input[i]);
+            _md5_ransform(md5ctx->state, &input[i]);
 
         index = 0;
     } else
         i = 0;
 
-    MD5__memcpy((uint8_t*) & md5ctx->buffer[index], (uint8_t*) & input[i], inputLen - i);
+    _md5_memcpy((uint8_t*) & md5ctx->buffer[index], (uint8_t*) & input[i], inputLen - i);
 }
 
-PORTABLEIMPL(void) MD5__Final(MD5_CTX *md5ctx, uint8_t digest[16])
+PORTABLEIMPL(void) md5_final(md5ctx_pt md5ctx, abuff_md5_result_t *digest)
 {
     uint8_t bits[8];
     uint32_t index, padLen;
 
-    MD5__Encode(bits, md5ctx->count, 8);
+    if (!digest) {
+        return;
+    }
+
+    _md5_encode(bits, md5ctx->count, 8);
 
     index = (uint32_t) ((md5ctx->count[0] >> 3) & 0x3f);
     padLen = (index < 56) ? (56 - index) : (120 - index);
-    MD5__Update(md5ctx, md5ctx->PADDING, padLen);
+    md5_update(md5ctx, md5ctx->PADDING, padLen);
 
-    MD5__Update(md5ctx, bits, 8);
-    MD5__Encode(digest, md5ctx->state, 16);
+    md5_update(md5ctx, bits, 8);
+    _md5_encode(digest->ust, md5ctx->state, sizeof(digest->ust));
 
-    MD5__memset((uint8_t*) md5ctx, 0, sizeof ( *md5ctx));
-    MD5__Init(md5ctx);
+    _md5_memset((uint8_t*) md5ctx, 0, sizeof ( *md5ctx));
+    md5_init(md5ctx);
 }
 
 /*--------------------------------------------DES--------------------------------------------*/
@@ -779,7 +790,7 @@ static void DES_XOR(DES_ElemType R[48], DES_ElemType L[48], int count)
 }
 
 /* 交换 */
-static void DES_Swap(DES_ElemType left[32], DES_ElemType right[32])
+static void DES_SWAP(DES_ElemType left[32], DES_ElemType right[32])
 {
     DES_ElemType temp[32];
     memcpy(temp, left, 32);
@@ -812,7 +823,7 @@ static void DES_SBOX(DES_ElemType data[48])
 }
 
 /* 加密单个分组 */
-static void DES_EncryptBlock(const DES_ElemType plainBlock[8], DES_ElemType subKeys[16][48], DES_ElemType cipherBlock[8])
+static void __des_encryptBlock(const DES_ElemType plainBlock[8], DES_ElemType subKeys[16][48], DES_ElemType cipherBlock[8])
 {
     DES_ElemType plainBits[64];
     DES_ElemType copyRight[48];
@@ -837,7 +848,7 @@ static void DES_EncryptBlock(const DES_ElemType plainBlock[8], DES_ElemType subK
         DES_XOR(plainBits, copyRight, 32);
         if (cnt != 15) {
             /* 最终完成左右部的交换 */
-            DES_Swap(plainBits, plainBits + 32);
+            DES_SWAP(plainBits, plainBits + 32);
         }
     }
     /* 逆初始置换（IP^1置换） */
@@ -846,7 +857,7 @@ static void DES_EncryptBlock(const DES_ElemType plainBlock[8], DES_ElemType subK
 }
 
 /* 解密单个分组 */
-static void DES_DecryptBlock(const DES_ElemType cipherBlock[8], DES_ElemType subKeys[16][48], DES_ElemType plainBlock[8])
+static void __des_decryptBlock(const DES_ElemType cipherBlock[8], DES_ElemType subKeys[16][48], DES_ElemType plainBlock[8])
 {
     DES_ElemType cipherBits[64];
     DES_ElemType copyRight[48];
@@ -871,7 +882,7 @@ static void DES_DecryptBlock(const DES_ElemType cipherBlock[8], DES_ElemType sub
         DES_XOR(cipherBits, copyRight, 32);
         if (cnt != 0) {
             /* 最终完成左右部的交换 */
-            DES_Swap(cipherBits, cipherBits + 32);
+            DES_SWAP(cipherBits, cipherBits + 32);
         }
     }
     /* 逆初始置换（IP^1置换） */
@@ -881,7 +892,7 @@ static void DES_DecryptBlock(const DES_ElemType cipherBlock[8], DES_ElemType sub
 
 #define DEFAULT_DES_KEY     ("3uB#*tTy")
 
-PORTABLEIMPL(int) DES__encrypt(const char* input, size_t cb, const char * key, char* output)
+PORTABLEIMPL(int) des_encrypt(const char* input, size_t cb, const abuff_des_key_t *key, char* output)
 {
     DES_ElemType keyBlock[8], bKey[64];
     DES_ElemType subKeys[16][48];
@@ -889,10 +900,10 @@ PORTABLEIMPL(int) DES__encrypt(const char* input, size_t cb, const char * key, c
     size_t length;
 
     if ( unlikely(!input || 0 == cb || !output || 0 != (cb % 8)) ) {
-        return -1;
+        return posix__makeerror(EINVAL);
     }
 
-    memcpy(keyBlock, (NULL == key) ? DEFAULT_DES_KEY : key, sizeof(keyBlock));
+    memcpy(keyBlock, (NULL == key) ? DEFAULT_DES_KEY : key->cst, sizeof(key->cst));
 
     /* 将密钥转换为二进制流 */
     Char8ToBit64(keyBlock, bKey);
@@ -902,7 +913,7 @@ PORTABLEIMPL(int) DES__encrypt(const char* input, size_t cb, const char * key, c
     length = cb;
     offset = 0;
     while (length >= 8) {
-        DES_EncryptBlock(&input[offset], subKeys, &output[offset]);
+        __des_encryptBlock(&input[offset], subKeys, &output[offset]);
         offset += 8;
         length -= 8;
     }
@@ -910,7 +921,7 @@ PORTABLEIMPL(int) DES__encrypt(const char* input, size_t cb, const char * key, c
     return (int)( cb - length);
 }
 
-PORTABLEIMPL(int) DES__decrypt(const char* input, size_t cb, const char key[8], char* output)
+PORTABLEIMPL(int) des_decrypt(const char* input, size_t cb, const abuff_des_key_t *key, char* output)
 {
     DES_ElemType keyBlock[8], bKey[64];
     DES_ElemType subKeys[16][48];
@@ -918,10 +929,10 @@ PORTABLEIMPL(int) DES__decrypt(const char* input, size_t cb, const char key[8], 
     size_t length;
 
     if ( unlikely(!input || 0 == cb || !output || 0 != (cb % 8)) ) {
-        return -1;
+        return posix__makeerror(EINVAL);
     }
 
-    memcpy(keyBlock, (NULL == key) ? DEFAULT_DES_KEY : key, sizeof(keyBlock));
+    memcpy(keyBlock, (NULL == key) ? DEFAULT_DES_KEY : key->cst, sizeof(key->cst));
 
     /* 将密钥转换为二进制流 */
     Char8ToBit64(keyBlock, bKey);
@@ -931,7 +942,7 @@ PORTABLEIMPL(int) DES__decrypt(const char* input, size_t cb, const char key[8], 
     length = cb;
     offset = 0;
     while (length >= 8) {
-        DES_DecryptBlock(&input[offset], subKeys, &output[offset]);
+        __des_decryptBlock(&input[offset], subKeys, &output[offset]);
         offset += 8;
         length -= 8;
     }
@@ -960,13 +971,17 @@ static const int SHA256_KEY[64] = {
     0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
 };
 
-unsigned PORTABLEIMPL(char *) sha256(const unsigned char* str, int orilen, unsigned char out[32])
+PORTABLEIMPL(unsigned char *) sha256(const unsigned char* str, int orilen, abuff_sha256_result_t *out)
 {
     char *cursor, *end, *oriptr;
     int actlen, i, W[64], T1, T2;
     int hash[8];
     int relay[8];
     int *ir;
+
+    if (!str || orilen <= 0 || !out) {
+        return NULL;
+    }
 
     hash[0] = 0x6a09e667;
     hash[1] = 0xbb67ae85;
@@ -1026,9 +1041,9 @@ unsigned PORTABLEIMPL(char *) sha256(const unsigned char* str, int orilen, unsig
 
     zfree(oriptr);
 
-    ir  = (int *)out;
+    ir  = (int *)out->ust;
     for (i = 0; i < 8; i++) {
         ir[i] = naos_chord32(hash[i]);
     }
-    return out;
+    return out->ust;
 }

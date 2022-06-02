@@ -20,12 +20,12 @@ typedef struct spin_lock MUTEX_T;
 #define INCREMENT(n)    __sync_add_and_fetch(n, 1)
 #define DECREMENT(n)    __sync_sub_and_fetch(n, 1)
 
-static void mutex_init(MUTEX_T *mutex)
+static void _mutex_init(MUTEX_T *mutex)
 {
     initial_spinlock(mutex);
 }
 
-static void mutex_uninit(MUTEX_T *mutex)
+static void _mutex_uninit(MUTEX_T *mutex)
 {
     ;
 }
@@ -53,7 +53,7 @@ static struct _object_manager g_objmgr = {
     .roottab = { NULL }, 0, SPIN_LOCK_INITIALIZER,
 };
 
-static int avl_compare_routine(const void *left, const void *right)
+static int _avl_compare_routine(const void *left, const void *right)
 {
     const object_t *lobj, *robj;
 
@@ -74,9 +74,9 @@ static int avl_compare_routine(const void *left, const void *right)
 }
 
 /* table index = (hld % OBJ_HASHTABLE_SIZE) */
-#define __hld2root(hld) ( likely((hld > 0)) ?  &g_objmgr.roottab[ hld & (OBJ_HASHTABLE_SIZE - 1) ] : NULL )
+#define _hld2root(hld) ( likely((hld > 0)) ?  &g_objmgr.roottab[ hld & (OBJ_HASHTABLE_SIZE - 1) ] : NULL )
 
-static nsp_status_t __objtabinst(object_t *obj)
+static nsp_status_t _objtabinst(object_t *obj)
 {
     object_t find;
     struct avltree_node_t **root, *target;
@@ -91,14 +91,14 @@ static nsp_status_t __objtabinst(object_t *obj)
         /* the creator acquire a knowned handle-id */
         if (INVALID_OBJHLD != obj->hld || 0 == obj->hld) {
             /* map root pointer from table */
-            root = __hld2root(obj->hld);
+            root = _hld2root(obj->hld);
             if (unlikely(!root)) {
                 status = ENODEV;
                 break;
             }
 
             find.hld = obj->hld;
-            target = avlsearch(*root, &find.clash, &avl_compare_routine);
+            target = avlsearch(*root, &find.clash, &_avl_compare_routine);
             if (target) {
                 status = EEXIST;
                 break;
@@ -106,7 +106,7 @@ static nsp_status_t __objtabinst(object_t *obj)
         } else {
             /* automatic increase handle number */
             obj->hld = ++g_objmgr.atoid;
-            root = __hld2root(obj->hld);
+            root = _hld2root(obj->hld);
             if (unlikely(!root)) {
                 status = ENODEV;
                 break;
@@ -114,19 +114,19 @@ static nsp_status_t __objtabinst(object_t *obj)
         }
 
         /* insert into hash list and using avl-binary-tree to handle the clash */
-        *root = avlinsert(*root, &obj->clash, &avl_compare_routine);
+        *root = avlinsert(*root, &obj->clash, &_avl_compare_routine);
     } while (0);
 
     UNLOCK(&g_objmgr.mutex);
     return posix__makeerror(status);
 }
 
-static nsp_status_t __objtabrmve(objhld_t hld, object_t **removed)
+static nsp_status_t _objtabrmve(objhld_t hld, object_t **removed)
 {
 	object_t node;
     struct avltree_node_t **root, *rmnode;
 
-    root = __hld2root(hld);
+    root = _hld2root(hld);
     if (unlikely(!root)) {
         return posix__makeerror(ENODEV);
     }
@@ -134,7 +134,7 @@ static nsp_status_t __objtabrmve(objhld_t hld, object_t **removed)
     rmnode = NULL;
 
     node.hld = hld;
-    *root = avlremove(*root, &node.clash, &rmnode, &avl_compare_routine);
+    *root = avlremove(*root, &node.clash, &rmnode, &_avl_compare_routine);
     if (rmnode && removed) {
         *removed = containing_record(rmnode, object_t, clash);
     }
@@ -142,25 +142,25 @@ static nsp_status_t __objtabrmve(objhld_t hld, object_t **removed)
     return ((NULL == rmnode) ? posix__makeerror(ENODEV) : NSP_STATUS_SUCCESSFUL);
 }
 
-static object_t *__objtabsrch(const objhld_t hld)
+static object_t *_objtabsrch(const objhld_t hld)
 {
     object_t node;
     struct avltree_node_t **root, *target;
 
-    root = __hld2root(hld);
+    root = _hld2root(hld);
     if (unlikely(!root)) {
         return NULL;
     }
 
     node.hld = hld;
-    target = avlsearch(*root, &node.clash, &avl_compare_routine);
+    target = avlsearch(*root, &node.clash, &_avl_compare_routine);
     if (!target) {
         return NULL;
     }
     return containing_record(target, object_t, clash);
 }
 
-static void __objtagfree(object_t *target)
+static void _objtagfree(object_t *target)
 {
     /* release the object context and free target memory when object removed from table
         call the unload routine if not null */
@@ -170,23 +170,23 @@ static void __objtagfree(object_t *target)
     zfree( target );
 }
 
-static void __objinit()
+static void _objinit()
 {
     memset(g_objmgr.roottab, 0, sizeof ( g_objmgr.roottab));
     g_objmgr.atoid = 0;
-    mutex_init(&g_objmgr.mutex);
+    _mutex_init(&g_objmgr.mutex);
 }
 
 /* In POSIX, call @objinit is option and NOT necessary */
 PORTABLEIMPL(void) objinit()
 {
     static pthread_once_t once = PTHREAD_ONCE_INIT;
-    pthread_once(&once, &__objinit);
+    pthread_once(&once, &_objinit);
 }
 
 PORTABLEIMPL(void) objuninit()
 {
-    mutex_uninit(&g_objmgr.mutex);
+    _mutex_uninit(&g_objmgr.mutex);
 }
 
 PORTABLEIMPL(objhld_t) objallo3(const struct objcreator *creator)
@@ -226,7 +226,7 @@ PORTABLEIMPL(objhld_t) objallo3(const struct objcreator *creator)
         }
     }
 
-    if (unlikely(!NSP_SUCCESS(__objtabinst(obj)))) {
+    if (unlikely(!NSP_SUCCESS(_objtabinst(obj)))) {
         zfree(obj);
         return INVALID_OBJHLD;
     }
@@ -270,7 +270,7 @@ PORTABLEIMPL(nsp_status_t) objallo4(const struct objcreator *creator, objhld_t *
         }
     }
 
-    status = __objtabinst(obj);
+    status = _objtabinst(obj);
     if (!NSP_SUCCESS(status)) {
         zfree(obj);
         return status;
@@ -307,7 +307,7 @@ PORTABLEIMPL(void *) objrefr(objhld_t hld)
     context = NULL;
 
     LOCK(&g_objmgr.mutex);
-    obj = __objtabsrch(hld);
+    obj = _objtabsrch(hld);
     if (obj) {
 		/* object status CLOSE_WAIT will be ignore for @objrefr operation */
         if (OBJSTAT_NORMAL == obj->status) {
@@ -320,7 +320,7 @@ PORTABLEIMPL(void *) objrefr(objhld_t hld)
     return (void *)context;
 }
 
-unsigned int objrefr2(objhld_t hld, void **out)
+PORTABLEIMPL(unsigned int) objrefr2(objhld_t hld, void **out)
 {
     object_t *obj;
     unsigned int size;
@@ -334,7 +334,7 @@ unsigned int objrefr2(objhld_t hld, void **out)
     size = (unsigned int)-1;
 
     LOCK(&g_objmgr.mutex);
-    obj = __objtabsrch(hld);
+    obj = _objtabsrch(hld);
     if (obj) {
         /* object status CLOSE_WAIT will be ignore for @objrefr operation */
         if (OBJSTAT_NORMAL == obj->status) {
@@ -357,7 +357,7 @@ PORTABLEIMPL(void *) objreff(objhld_t hld)
     context = NULL;
 
     LOCK(&g_objmgr.mutex);
-    obj = __objtabsrch(hld);
+    obj = _objtabsrch(hld);
     if (obj) {
         /* object status CLOSE_WAIT will be ignore for @objrefr operation */
         if (OBJSTAT_NORMAL == obj->status) {
@@ -382,7 +382,7 @@ PORTABLEIMPL(void) objdefr(objhld_t hld)
     removed = NULL;
 
     LOCK(&g_objmgr.mutex);
-    obj = __objtabsrch(hld);
+    obj = _objtabsrch(hld);
     if (obj) {
 		/* in normal, ref-count must be greater than zero. otherwise, we will throw a assert fail*/
 		assert( obj->refcnt > 0 );
@@ -394,14 +394,14 @@ PORTABLEIMPL(void) objdefr(objhld_t hld)
            /* if this object is waitting for close and ref-count decrease equal to zero,
 				close it */
 			if ( ( 0 == obj->refcnt ) && ( OBJSTAT_CLOSEWAIT == obj->status ) ) {
-                __objtabrmve(obj->hld, &removed);
+                _objtabrmve(obj->hld, &removed);
 			}
         }
     }
     UNLOCK(&g_objmgr.mutex);
 
     if (removed) {
-        __objtagfree(removed);
+        _objtagfree(removed);
     }
 }
 
@@ -412,13 +412,13 @@ PORTABLEIMPL(void) objclos(objhld_t hld)
 	removed = NULL;
 
     LOCK(&g_objmgr.mutex);
-	obj = __objtabsrch(hld);
+	obj = _objtabsrch(hld);
     if (obj) {
         /* if this object is already in CLOSE_WAIT status, maybe trying an "double close" operation, do nothing.
            if ref-count large than zero, do nothing during this close operation, actual close will take place when the last count dereference.
            if ref-count equal to zero, close canbe finish immediately */
         if ((0 == obj->refcnt) && (OBJSTAT_NORMAL == obj->status)){
-            __objtabrmve(obj->hld, &removed);
+            _objtabrmve(obj->hld, &removed);
         } else {
             obj->status = OBJSTAT_CLOSEWAIT;
         }
@@ -426,6 +426,6 @@ PORTABLEIMPL(void) objclos(objhld_t hld)
     UNLOCK(&g_objmgr.mutex);
 
     if (removed) {
-        __objtagfree(removed);
+        _objtagfree(removed);
     }
 }

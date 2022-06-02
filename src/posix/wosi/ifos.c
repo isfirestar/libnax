@@ -31,7 +31,7 @@
 /* -lcrypt */
 #include <crypt.h>
 
-static nsp_status_t __ifos_rmdir(const char *dir)
+static nsp_status_t _ifos_rmdir(const char *dir)
 {
     /* > rm -rf dir */
     struct dirent *ent;
@@ -53,7 +53,7 @@ static nsp_status_t __ifos_rmdir(const char *dir)
         crt_sprintf(filename, cchof(filename), "%s/%s", dir, ent->d_name);
 
         if (ifos_isdir(filename)) {
-            status = __ifos_rmdir(filename);
+            status = _ifos_rmdir(filename);
         } else {
             status = ifos_rm(filename);
             if (!NSP_SUCCESS(status)) {
@@ -194,7 +194,7 @@ nsp_status_t ifos_rm(const char *const target)
     }
 
     if (ifos_isdir(target)) {
-        return __ifos_rmdir(target);
+        return _ifos_rmdir(target);
     } else {
         if (0 == remove(target)) {
             return NSP_STATUS_SUCCESSFUL;

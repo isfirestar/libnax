@@ -14,10 +14,10 @@
 
 #define HEIGHT(t) ((t) == NULL ? -1 : (t)->height)
 
-static struct avltree_node_t *__avlsinglerotateleft(struct avltree_node_t *tree);
-static struct avltree_node_t *__avlsinglerotateright(struct avltree_node_t *tree);
-static struct avltree_node_t *__avldoublerotateleft(struct avltree_node_t *tree);
-static struct avltree_node_t *__avldoublerotateright(struct avltree_node_t *tree);
+static struct avltree_node_t *_avlsinglerotateleft(struct avltree_node_t *tree);
+static struct avltree_node_t *_avlsinglerotateright(struct avltree_node_t *tree);
+static struct avltree_node_t *_avldoublerotateleft(struct avltree_node_t *tree);
+static struct avltree_node_t *_avldoublerotateright(struct avltree_node_t *tree);
 
 PORTABLEIMPL(struct avltree_node_t * )
 avlinsert(struct avltree_node_t *tree, struct avltree_node_t *node,
@@ -42,9 +42,9 @@ avlinsert(struct avltree_node_t *tree, struct avltree_node_t *node,
         if (HEIGHT(tree->lchild) - HEIGHT(tree->rchild) == 2) {
             ret = compare(node, tree->lchild);
             if (ret < 0) {
-                tree = __avlsinglerotateleft(tree);
+                tree = _avlsinglerotateleft(tree);
             } else if (ret > 0) {
-                tree = __avldoublerotateleft(tree);
+                tree = _avldoublerotateleft(tree);
             }
         } else {
             tree->height = MAX(HEIGHT(tree->lchild), HEIGHT(tree->rchild)) + 1;
@@ -54,9 +54,9 @@ avlinsert(struct avltree_node_t *tree, struct avltree_node_t *node,
         if (HEIGHT(tree->rchild) - HEIGHT(tree->lchild) == 2) {
             ret = compare(node, tree->rchild);
             if (ret < 0) {
-                tree = __avldoublerotateright(tree);
+                tree = _avldoublerotateright(tree);
             } else if (ret > 0) {
-                tree = __avlsinglerotateright(tree);
+                tree = _avlsinglerotateright(tree);
             }
         } else {
             tree->height = MAX(HEIGHT(tree->lchild), HEIGHT(tree->rchild)) + 1;
@@ -127,7 +127,7 @@ avlremove(struct avltree_node_t *tree, struct avltree_node_t *node, struct avltr
                   / \
                  o   o
              */
-            tree = __avlsinglerotateleft(tree);
+            tree = _avlsinglerotateleft(tree);
         } else if (HEIGHT(tree->lchild->lchild) - HEIGHT(tree->rchild) == 1) {
             /*
                     tree --> o
@@ -136,7 +136,7 @@ avlremove(struct avltree_node_t *tree, struct avltree_node_t *node, struct avltr
                   /
                  o
              */
-            tree = __avlsinglerotateleft(tree);
+            tree = _avlsinglerotateleft(tree);
         } else if (HEIGHT(tree->lchild->rchild) - HEIGHT(tree->rchild) == 1) {
             /*
                     tree --> o
@@ -145,7 +145,7 @@ avlremove(struct avltree_node_t *tree, struct avltree_node_t *node, struct avltr
                     \
                      o
              */
-            tree = __avldoublerotateleft(tree);
+            tree = _avldoublerotateleft(tree);
         }
     } else if (HEIGHT(tree->rchild) - HEIGHT(tree->lchild) == 2) {
         if (HEIGHT(tree->rchild->rchild) - HEIGHT(tree->lchild) == 1
@@ -157,7 +157,7 @@ avlremove(struct avltree_node_t *tree, struct avltree_node_t *node, struct avltr
                      / \
                     o   o
              */
-            tree = __avlsinglerotateright(tree);
+            tree = _avlsinglerotateright(tree);
         } else if (HEIGHT(tree->rchild->rchild) - HEIGHT(tree->lchild) == 1) {
             /*
                     tree --> o
@@ -166,7 +166,7 @@ avlremove(struct avltree_node_t *tree, struct avltree_node_t *node, struct avltr
                        \
                         o
              */
-            tree = __avlsinglerotateright(tree);
+            tree = _avlsinglerotateright(tree);
         } else if (HEIGHT(tree->rchild->lchild) - HEIGHT(tree->lchild) == 1) {
             /*
                     tree --> o
@@ -175,7 +175,7 @@ avlremove(struct avltree_node_t *tree, struct avltree_node_t *node, struct avltr
                       /
                      o
              */
-            tree = __avldoublerotateright(tree);
+            tree = _avldoublerotateright(tree);
         }
     }
     tree->height = MAX(HEIGHT(tree->lchild), HEIGHT(tree->rchild)) + 1;
@@ -236,7 +236,7 @@ PORTABLEIMPL(struct avltree_node_t * ) avlgetmax(struct avltree_node_t *tree)
     return t;
 }
 
-static struct avltree_node_t *__avlsinglerotateleft(struct avltree_node_t *tree)
+static struct avltree_node_t *_avlsinglerotateleft(struct avltree_node_t *tree)
 {
     struct avltree_node_t *newtree;
 
@@ -258,7 +258,7 @@ static struct avltree_node_t *__avlsinglerotateleft(struct avltree_node_t *tree)
     return newtree;
 }
 
-static struct avltree_node_t *__avlsinglerotateright(struct avltree_node_t *tree)
+static struct avltree_node_t *_avlsinglerotateright(struct avltree_node_t *tree)
 {
     struct avltree_node_t *newtree;
 
@@ -280,7 +280,7 @@ static struct avltree_node_t *__avlsinglerotateright(struct avltree_node_t *tree
     return newtree;
 }
 
-static struct avltree_node_t *__avldoublerotateleft(struct avltree_node_t *tree)
+static struct avltree_node_t *_avldoublerotateleft(struct avltree_node_t *tree)
 {
     struct avltree_node_t *newtree;
 
@@ -307,7 +307,7 @@ static struct avltree_node_t *__avldoublerotateleft(struct avltree_node_t *tree)
     return newtree;
 }
 
-static struct avltree_node_t *__avldoublerotateright(struct avltree_node_t *tree)
+static struct avltree_node_t *_avldoublerotateright(struct avltree_node_t *tree)
 {
     struct avltree_node_t *newtree;
 

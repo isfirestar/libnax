@@ -5,8 +5,7 @@
 #include <unordered_map>
 #include <mutex>
 
-#include "icom/nisdef.h"
-#include "icom/nis.h"
+#include "nis.h"
 
 #include "singleton.hpp"
 #include "network_handler.h"

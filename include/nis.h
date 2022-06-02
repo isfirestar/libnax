@@ -22,7 +22,7 @@
    -EPROTOTYPE / -ENOENT : TCP protocol are not support.
    EALREADY: protocol has been initialized before this time invocation.
 */
-PORTABLEAPI(nsp_status_t) tcp_init();
+PORTABLEAPI(nsp_status_t) DEPRECATED("use tcp_init2 or later function instead it") tcp_init();
 PORTABLEAPI(nsp_status_t) tcp_init2(int nprocs);
 PORTABLEAPI(void) tcp_uninit();
 
@@ -184,7 +184,7 @@ PORTABLEAPI(nsp_status_t) tcp_getattr(HTCPLINK link, int cmd, int *enabled);
    -EPROTOTYPE / -ENOENT : UDP protocol are not support.
    EALREADY: protocol has been initialized before this time invocation.
 */
-PORTABLEAPI(nsp_status_t) udp_init();
+PORTABLEAPI(nsp_status_t) DEPRECATED("use udp_init2 instead it") udp_init();
 PORTABLEAPI(nsp_status_t) udp_init2(int nprocs);
 PORTABLEAPI(void) udp_uninit();
 
@@ -374,6 +374,12 @@ PORTABLEAPI(nsp_status_t) nis_getifmac(const char *eth_name, abuff_mac_t *phyadd
  *		in this situation, wild pointer obtained by the first thread may cause application crash.
  *		by use @NI_RISECTX instead, framework shall automatic raise up the reference count of link and then prevent the link closed by any event.
  *		but calling thread has responsibility to explicit invoke @NI_SINKCTX to release the reference count of this link.
+ *
+ *	NI_GETAF()
+ *		on success, return value canbe one of : AF_INET AF_INET6 AF_UNIX, otherwise, -1 returned
+ *  NI_GETPROTO()
+ *		query address family or network protocl which the @link owned
+ *		on success, return value canbe one of : IPPROTO_TCP IPPROTO_UDP IPPROTO_ARP, otherwise, -1 returned
  */
 PORTABLEAPI(int) nis_cntl(objhld_t link, int cmd, ...);
 

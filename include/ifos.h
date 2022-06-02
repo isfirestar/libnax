@@ -53,7 +53,7 @@ PORTABLEAPI(void *) ifos_dlopen2(const char *file, int flags);
 /* in POSIX, "RTLD_NEXT" and "RTLD_DEFAULT" are now supported. define RTLD_NEXT ((void *) -1l), define RTLD_DEFAULT ((void *)0L)*/
 PORTABLEAPI(void *) ifos_dlsym(void* handle, const char* symbol);
 PORTABLEAPI(void) ifos_dlclose(void *handle);
-PORTABLEAPI(const char * ) POSIX_DEPRECATED("retrun pointer unsafe") ifos_dlerror();
+PORTABLEAPI(const char * ) DEPRECATED("retrun pointer unsafe") ifos_dlerror();
 PORTABLEAPI(const char * ) ifos_dlerror2(abuff_128_t *estr);
 
 /* ifos-dir */

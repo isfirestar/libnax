@@ -81,7 +81,7 @@ void *ref_retain(sharedptr_pt sptr)
     return sptr->data;
 }
 
-static int ref_decrease_check(sharedptr_pt sptr, int decrease)
+static int _ref_decrease_check(sharedptr_pt sptr, int decrease)
 {
     int expect;
 
@@ -105,7 +105,7 @@ int ref_close(sharedptr_pt sptr)
 
     expect = SPS_AVAILABLE;
     if (atom_compare_exchange_strong(&sptr->state, &expect, SPS_CLOSING)) {
-        return ref_decrease_check(sptr, 0);
+        return _ref_decrease_check(sptr, 0);
     }
 
     return 0;
@@ -117,5 +117,5 @@ int ref_release(sharedptr_pt sptr)
         return -EINVAL;
     }
 
-    return ref_decrease_check(sptr, 1);
+    return _ref_decrease_check(sptr, 1);
 }

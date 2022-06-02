@@ -11,8 +11,6 @@
 #include <assert.h>
 #include <time.h>
 
-#include "zmalloc.h"
-
 /* windows cl compiler macros:
 _M_IX86 : 32bit processor
 _M_AMD64 : 64bit AMD processor (befor VC2008)
@@ -275,7 +273,11 @@ typedef int nsp_boolean_t;
     #undef EPSINON
 #endif
 
-#define POSIX_DEPRECATED(s) __attribute__((deprecated((s))))
+#if _WIN32
+#define DEPRECATED(s) __declspec(deprecated)
+#else
+#define DEPRECATED(s) __attribute__((deprecated(s)))
+#endif
 
 #define EPSINON  0.000001
 #define is_float_zero(x) (((x) < EPSINON) && ((x) > -EPSINON))

@@ -1,42 +1,14 @@
 ﻿#if !defined OS_UTIL_HEADER_02160616
 #define OS_UTIL_HEADER_02160616
 
-#include <cstring>
-#include <cstdlib>
-#include <cstdio>
-#include <string>
-#include <cstdarg>
-#include <ctime>
-#include <cstdint>
+#include "compiler.h"
+#include "ifos.h"
+#include "threading.h"
+
 #include <atomic>
-
 #include <string>
 
-#if _WIN32
-
-#include <stddef.h>
-#include <Windows.h>
-
-#else
-
-#include <unistd.h>
-#include <fcntl.h>
-#include <dlfcn.h>
-#include <pthread.h>
-#include <syscall.h>
-#include <dirent.h>
-#include <semaphore.h>
-
-#include <signal.h>
-
-#include <sys/time.h>
-#include <sys/syslog.h>
-#include <sys/stat.h>
-#include <sys/types.h>
-#include <sys/stat.h>
-#include <sys/syscall.h>
-#include <sys/sysinfo.h>
-#include <linux/unistd.h>
+#if !_WIN32
 
 #if !defined DUMMYSTRUCTNAME
 #define DUMMYSTRUCTNAME
@@ -72,9 +44,6 @@ typedef union _ULARGE_INTEGER {
 
 #endif
 
-#include "icom/compiler.h"
-#include "icom/posix_ifos.h"
-
 namespace nsp {
 	namespace os {
 
@@ -103,25 +72,25 @@ namespace nsp {
 		template <class T>
 		std::basic_string<T> get_tmpdir();
 		template <class T>
-		int rmfile( const std::basic_string<T> &target );
+		nsp_status_t rmfile( const std::basic_string<T> &target );
 		template<class T>
-		int mkdir( const std::basic_string<T> &dir );
+		nsp_status_t mkdir( const std::basic_string<T> &dir );
 		template <class T>
-		int mkdir_s( const std::basic_string<T> &dir );
+		nsp_status_t mkdir_s( const std::basic_string<T> &dir );
 		template<class T>
-		int is_dir( const std::basic_string<T> &file ); // 返回>0 则是目录, 0则是文件， 负数则是错误
+		bool is_dir( const std::basic_string<T> &file );
 		template<class T>
-		int rmdir_s( const std::basic_string<T> &dir ); // dir 传入不带最后的'/'
+		nsp_status_t rmdir_s( const std::basic_string<T> &dir ); // dir 传入不带最后的'/'
 
-		long gettid();
-		int getpid();
+		pid_t gettid();
+		pid_t getpid();
 
 		int getnprocs();
 
-		int getsysmem( uint64_t &total, uint64_t &free, uint64_t &total_swap, uint64_t &free_swap);
+		nsp_status_t getsysmem( uint64_t &total, uint64_t &free, uint64_t &total_swap, uint64_t &free_swap);
 
 		class waitable_handle {
-			void *posix_waiter_ = nullptr;
+			lwp_event_t *posix_waiter_ = nullptr;
 		public:
 			waitable_handle( int sync = 1 );
 			~waitable_handle();
@@ -140,15 +109,15 @@ namespace nsp {
 			 * ETIMEOUT: 等待超时
 			 * -1: 系统调用失败
 			 */
-			int wait( uint32_t timeo = 0xFFFFFFFF );
+			nsp_status_t wait( uint32_t timeo = 0xFFFFFFFF );
 			void sig();
 			void reset();
 		};
 
 		void pshang();
 
-		template<class T>
-		void attempt_syslog( const std::basic_string<T> &msg, uint32_t err );
+		// template<class T>
+		// void attempt_syslog( const std::basic_string<T> &msg, uint32_t err );
 
 
 		// 获取系统启动到目前时间节点流逝的tick
@@ -156,14 +125,14 @@ namespace nsp {
 		// clock_gettime	返回内核级滴答精度， 单位为     100ns
 		// clock_epoch		返回EPOCH时间， 单位为 100ns
 		uint64_t gettick();
-		uint64_t clock_gettime();
+		uint64_t clock_realtime();
 		uint64_t clock_epoch();
 		uint64_t clock_monotonic();
 
 		// 动态库加载例程 gcc -ldl
 		void *dlopen( const char *file );
 		void* dlsym( void* handle, const char* symbol );
-		int dlclose( void *handle );
+		void dlclose( void *handle );
 	}
 }
 

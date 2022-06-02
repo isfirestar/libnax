@@ -4,7 +4,7 @@
 #include <string>
 #include <cstdint>
 
-#include "icom/compiler.h"
+#include "compiler.h"
 
 #if !defined MAXIMUM_IPV4_STRLEN
 #define MAXIMUM_IPV4_STRLEN     (0x10)

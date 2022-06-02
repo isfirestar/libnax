@@ -2,6 +2,8 @@
 #define MULTITHREADING_H
 
 #include "compiler.h"
+#include "abuff.h"
+#include "zmalloc.h"
 
 #if _WIN32
 
@@ -23,6 +25,16 @@ struct _lwp_t
 struct _mutex_t
 {
     CRITICAL_SECTION handle_;
+};
+
+#define RWLOCK_MODE_FREE        (0)
+#define RWLOCK_MODE_EXCLUSIVE   (1)
+#define RWLOCK_MODE_SHARED      (2)
+
+#include <synchapi.h>
+struct _rwlock_t
+{
+    SRWLOCK handle_;
 };
 
 #else /* POSIX */
@@ -50,10 +62,16 @@ struct _mutex_t
     pthread_mutex_t handle_;
 };
 
+struct _rwlock_t
+{
+    pthread_rwlock_t handle_;
+};
+
 #endif /* _WIN32 */
 
 typedef struct _lwp_t           lwp_t;
 typedef struct _mutex_t         lwp_mutex_t;
+typedef struct _rwlock_t        lwp_rwlock_t;
 
 /* create a new thread with specify priority @priority.
     if @priority less than or equal to zero, create behavior shall be default */
@@ -70,11 +88,13 @@ PORTABLEAPI(nsp_status_t) lwp_yield(lwp_t *tidp);
 
 /* thread affinity management */
 PORTABLEAPI(nsp_status_t) lwp_setaffinity(const lwp_t *lwp, int cpumask);
-
-#if PERMISS_DEPRECATE
-PORTABLEAPI(int) lwp_getaffinity(const lwp_t *lwp);
-#endif
 PORTABLEAPI(nsp_status_t) lwp_getaffinity(const lwp_t *lwp, int *cpumask);
+
+/* thread name */
+/* The  thread name is a meaningful C language string, whose length is restricted to 16 characters, including the terminating null byte ('\0').  */
+typedef abuff_type(16)  abuff_pthread_name_t;
+PORTABLEAPI(nsp_status_t) lwp_setname(const lwp_t *lwp, const abuff_pthread_name_t *name);
+PORTABLEAPI(nsp_status_t) lwp_getname(const lwp_t *lwp, abuff_pthread_name_t *name);
 
 #if _WIN32
 #define lwp_exit(code)
@@ -83,11 +103,11 @@ PORTABLEAPI(nsp_status_t) lwp_getaffinity(const lwp_t *lwp, int *cpumask);
 #endif
 
 #if _WIN32
-typedef int lwp_once_t;
+typedef LONG lwp_once_t;
 #define LWP_ONCE_INIT 0
 inline void lwp_once(lwp_once_t* once, void(*proc)())
 {
-    if (LWP_ONCE_INIT == InterlockedCompareExchange((volatile LONG*)once, 1, 0)) {
+    if (LWP_ONCE_INIT == InterlockedCompareExchange((volatile LONG *)once, 1, 0)) {
         proc();
     }
 }
@@ -109,6 +129,14 @@ PORTABLEAPI(void) lwp_mutex_lock(lwp_mutex_t *mutex);
 PORTABLEAPI(nsp_status_t)  lwp_mutex_trylock(lwp_mutex_t *mutex);
 PORTABLEAPI(nsp_status_t)  lwp_mutex_timedlock(lwp_mutex_t *mutex, uint32_t expires);
 PORTABLEAPI(void) lwp_mutex_unlock(lwp_mutex_t *mutex);
+
+/* for RW-locker */
+PORTABLEAPI(nsp_status_t)  lwp_rwlock_init(lwp_rwlock_t *rwlock);
+PORTABLEAPI(void)  lwp_rwlock_uninit(lwp_rwlock_t *rwlock);
+PORTABLEAPI(nsp_status_t)  lwp_rwlock_rdlock(lwp_rwlock_t *rwlock);
+PORTABLEAPI(nsp_status_t)  lwp_rwlock_wrlock(lwp_rwlock_t *rwlock);
+PORTABLEAPI(void)  lwp_rwlock_rdunlock(lwp_rwlock_t *rwlock);
+PORTABLEAPI(void)  lwp_rwlock_wrunlock(lwp_rwlock_t *rwlock);
 
 enum lwp_event_category
 {
@@ -133,6 +161,20 @@ typedef struct _lwp_event lwp_event_t;
 /* synchronous or notifications event for thread */
 PORTABLEAPI(nsp_status_t) lwp_event_init(lwp_event_t *evo, enum lwp_event_category pattern);
 PORTABLEAPI(void) lwp_event_uninit(lwp_event_t *evo);
+
+#define lwp_init_synchronous_event(evo) lwp_event_init((evo), LWPEC_SYNC)
+#define lwp_init_notification_event(evo) lwp_event_init((evo), LWPEC_NOTIFY)
+
+#define lwp_create_event(evoptr, pattern, status)       do { \
+        (evoptr) = (lwp_event_t *)ztrymalloc(sizeof(*(evoptr)));    \
+        (status) = (NULL == (evoptr)) ? posix__makeerror(ENOMEM) : lwp_event_init((evoptr), (pattern)); \
+    } while(0)
+#define lwp_release_event(evoptr)   do { \
+        lwp_event_uninit((evoptr)); \
+        zfree((evoptr));    \
+    } while(0)
+#define lwp_create_synchronous_event(evoptr, status)    lwp_create_event(evoptr, LWPEC_SYNC, status)
+#define lwp_create_notification_event(evoptr, status)    lwp_create_event(evoptr, LWPEC_NOTIFY, status)
 
 /* definition table of return value cause by @lwp_event_wait:
  *                    NSP_ERROR_STATUS_EQUAL(ETIMEDOUT)     : timeout specified by @expire expire

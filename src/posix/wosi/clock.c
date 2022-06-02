@@ -3,7 +3,7 @@
 /* convert to 100ns */
 static const uint64_t ET_METHOD_NTKRNL = ((uint64_t) ((uint64_t) 1000 * 1000 * 10));
 
-static void __build_wallclock_byepoch(datetime_t *systime)
+static void _build_wallclock_byepoch(datetime_t *systime)
 {
     struct timeval tv_now;
     struct tm tm_now;
@@ -20,7 +20,7 @@ static void __build_wallclock_byepoch(datetime_t *systime)
     systime->low = systime->epoch % ET_METHOD_NTKRNL;
 }
 
-static nsp_status_t __build_wallclock_bydate(datetime_t *systime)
+static nsp_status_t _build_wallclock_bydate(datetime_t *systime)
 {
     struct tm timem;
     uint64_t epoch;
@@ -95,6 +95,40 @@ PORTABLEIMPL(uint64_t) clock_monotonic_raw()
     return  tick;
 }
 
+PORTABLEIMPL(uint64_t) clock_realtime()
+{
+    /* gcc -lrt */
+    struct timespec tsc;
+    uint64_t tick;
+    int fr;
+
+    fr = clock_gettime(CLOCK_REALTIME, &tsc);
+    if ( unlikely( -1 == fr ) ) {
+        return 0;
+    }
+
+    /* force format to 10,000,000 aligned */
+    tick = (uint64_t) tsc.tv_sec * ET_METHOD_NTKRNL + tsc.tv_nsec / 100;
+    return  tick;
+}
+
+PORTABLEIMPL(uint64_t) clock_boottime()
+{
+    /* gcc -lrt */
+    struct timespec tsc;
+    uint64_t tick;
+    int fr;
+
+    fr = clock_gettime(CLOCK_BOOTTIME, &tsc);
+    if ( unlikely( -1 == fr ) ) {
+        return 0;
+    }
+
+    /* force format to 10,000,000 aligned */
+    tick = (uint64_t) tsc.tv_sec * ET_METHOD_NTKRNL + tsc.tv_nsec / 100;
+    return  tick;
+}
+
 PORTABLEIMPL(nsp_status_t) clock_systime(datetime_t *systime)
 {
     if ( unlikely(!systime) ) {
@@ -103,7 +137,7 @@ PORTABLEIMPL(nsp_status_t) clock_systime(datetime_t *systime)
 
     systime->epoch = clock_epoch();
     if ( likely(0 != systime->epoch) ) {
-        __build_wallclock_byepoch(systime);
+        _build_wallclock_byepoch(systime);
         return NSP_STATUS_SUCCESSFUL;
     }
 

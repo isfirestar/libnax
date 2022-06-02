@@ -9,7 +9,7 @@
 #include "atom.h"
 #include "zmalloc.h"
 
-static nsp_status_t __udprefr( objhld_t hld, ncb_t **ncb )
+static nsp_status_t _udprefr( objhld_t hld, ncb_t **ncb )
 {
     if (unlikely( hld < 0 || !ncb)) {
         return posix__makeerror(EINVAL);
@@ -29,7 +29,7 @@ static nsp_status_t __udprefr( objhld_t hld, ncb_t **ncb )
     return posix__makeerror(ENOENT);
 }
 
-#define __udp_invoke(foo)   foo(IPPROTO_UDP)
+#define _udp_invoke(foo)   foo(IPPROTO_UDP)
 
 nsp_status_t udp_init2(int nprocs)
 {
@@ -40,9 +40,9 @@ nsp_status_t udp_init2(int nprocs)
         return status;
     }
 
-    status = __udp_invoke(wp_init);
+    status = _udp_invoke(wp_init);
     if ( !NSP_SUCCESS(status) ) {
-        __udp_invoke(io_uninit);
+        _udp_invoke(io_uninit);
     }
 
     return status;
@@ -55,12 +55,12 @@ nsp_status_t udp_init()
 
 void udp_uninit()
 {
-    __udp_invoke(ncb_uninit);
-    __udp_invoke(io_uninit);
-    __udp_invoke(wp_uninit);
+    _udp_invoke(ncb_uninit);
+    _udp_invoke(io_uninit);
+    _udp_invoke(wp_uninit);
 }
 
-static nsp_status_t __udp_create_domain(ncb_t *ncb, const char* domain)
+static nsp_status_t _udp_create_domain(ncb_t *ncb, const char* domain)
 {
     int fd;
     nsp_status_t status;
@@ -123,7 +123,7 @@ static nsp_status_t __udp_create_domain(ncb_t *ncb, const char* domain)
     return status;
 }
 
-static nsp_status_t __udp_create(ncb_t *ncb, const char* ipstr, uint16_t port, int flag)
+static nsp_status_t _udp_create(ncb_t *ncb, const char* ipstr, uint16_t port, int flag)
 {
     int fd;
     struct sockaddr_in addrlocal;
@@ -225,12 +225,12 @@ HUDPLINK udp_create(udp_io_callback_t callback, const char* ipstr, uint16_t port
     do {
         if (ipstr) {
             if (0 == strncasecmp(ipstr, "IPC:", 4)) {
-                status = __udp_create_domain(ncb, &ipstr[4]);
+                status = _udp_create_domain(ncb, &ipstr[4]);
                 break;
             }
         }
 
-        status = __udp_create(ncb, ipstr, port, flag);
+        status = _udp_create(ncb, ipstr, port, flag);
     } while(0);
 
     objdefr(hld);
@@ -246,7 +246,7 @@ void udp_destroy(HUDPLINK link)
 {
     ncb_t *ncb;
 
-    if (!NSP_SUCCESS(__udprefr(link, &ncb))) {
+    if (!NSP_SUCCESS(_udprefr(link, &ncb))) {
         return;
     }
 
@@ -264,7 +264,7 @@ nsp_status_t udp_awaken(HUDPLINK link, const void *pipedata, unsigned int cb)
         return posix__makeerror(EINVAL);
     }
 
-    status = __udprefr(link, &ncb);
+    status = _udprefr(link, &ncb);
     if (!NSP_SUCCESS(status)) {
         return status;
     }
@@ -292,7 +292,7 @@ nsp_status_t udp_write(HUDPLINK link, const void *origin, unsigned int cb, const
     buffer = NULL;
     node = NULL;
 
-    status = __udprefr(link, &ncb);
+    status = _udprefr(link, &ncb);
     if (!NSP_SUCCESS(status)) {
         return status;
     }
@@ -403,7 +403,7 @@ nsp_status_t udp_getaddr(HUDPLINK link, uint32_t *ipv4, uint16_t *port)
     ncb_t *ncb;
     nsp_status_t status;
 
-    status = __udprefr(link, &ncb);
+    status = _udprefr(link, &ncb);
     if (!NSP_SUCCESS(status)) {
         return status;
     }
@@ -428,7 +428,7 @@ nsp_status_t udp_getipcpath(HUDPLINK link, const char **path)
     ncb_t *ncb;
     nsp_status_t status;
 
-    status = __udprefr(link, &ncb);
+    status = _udprefr(link, &ncb);
     if ( !NSP_SUCCESS(status) ) {
         return status;
     }
@@ -449,7 +449,7 @@ nsp_status_t udp_setopt(HUDPLINK link, int level, int opt, const char *val, unsi
     ncb_t *ncb;
     nsp_status_t status;
 
-    status = __udprefr(link, &ncb);
+    status = _udprefr(link, &ncb);
     if (!NSP_SUCCESS(status)) {
         return status;
     }
@@ -467,7 +467,7 @@ nsp_status_t udp_getopt(HUDPLINK link, int level, int opt, char *val, unsigned i
     ncb_t *ncb;
     nsp_status_t status;
 
-    status = __udprefr(link, &ncb);
+    status = _udprefr(link, &ncb);
     if (!NSP_SUCCESS(status)) {
         return status;
     }
@@ -549,7 +549,7 @@ nsp_status_t udp_joingrp(HUDPLINK link, const char *ipstr, uint16_t port)
         return -EINVAL;
     }
 
-    status = __udprefr(link, &ncb);
+    status = _udprefr(link, &ncb);
     if (!NSP_SUCCESS(status)) {
         return status;
     }
@@ -595,7 +595,7 @@ nsp_status_t udp_dropgrp(HUDPLINK link)
     ncb_t *ncb;
     nsp_status_t status;
 
-    status = __udprefr(link, &ncb);
+    status = _udprefr(link, &ncb);
     if (!NSP_SUCCESS(status)) {
         return status;
     }

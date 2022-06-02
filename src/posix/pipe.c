@@ -8,12 +8,12 @@
 #include "io.h"
 #include "zmalloc.h"
 
-static int pipe_initialize(void *udata, const void *ctx, int ctxcb)
+static int _pipe_initialize(void *udata, const void *ctx, int ctxcb)
 {
 	return 0;
 }
 
-static void pipe_unloader(objhld_t hld, void *udata)
+static void _pipe_unloader(objhld_t hld, void *udata)
 {
 	ncb_t *ncb;
 
@@ -24,7 +24,7 @@ static void pipe_unloader(objhld_t hld, void *udata)
 	}
 }
 
-static nsp_status_t pipe_rx(ncb_t *ncb)
+static nsp_status_t _pipe_rx(ncb_t *ncb)
 {
 	unsigned char pipebuf[PIPE_BUF];
 	int n;
@@ -70,7 +70,7 @@ static nsp_status_t pipe_rx(ncb_t *ncb)
 	return NSP_STATUS_SUCCESSFUL;
 }
 
-static nsp_status_t pipe_tx(ncb_t *ncb)
+static nsp_status_t _pipe_tx(ncb_t *ncb)
 {
 	return NSP_STATUS_SUCCESSFUL;
 }
@@ -104,8 +104,8 @@ nsp_status_t pipe_create(int protocol, int *fdw)
 
 	creator.known = INVALID_OBJHLD;
 	creator.size = sizeof(ncb_t);
-	creator.initializer = &pipe_initialize;
-	creator.unloader = &pipe_unloader;
+	creator.initializer = &_pipe_initialize;
+	creator.unloader = &_pipe_unloader;
 	creator.context = NULL;
 	creator.ctxsize = 0;
     hld = objallo3(&creator);
@@ -124,8 +124,8 @@ nsp_status_t pipe_create(int protocol, int *fdw)
     ncb->protocol = protocol;
 
     /* set data handler function pointer for Rx/Tx */
-    atom_set(&ncb->ncb_read, &pipe_rx);
-    atom_set(&ncb->ncb_write, &pipe_tx);
+    atom_set(&ncb->ncb_read, &_pipe_rx);
+    atom_set(&ncb->ncb_write, &_pipe_tx);
 
     /* attach to epoll */
     if (!NSP_SUCCESS(io_attach(ncb, EPOLLIN))) {

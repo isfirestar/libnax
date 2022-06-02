@@ -3,7 +3,7 @@
 #include "mxx.h"
 #include "fifo.h"
 
-static nsp_status_t __udp_rx(ncb_t *ncb)
+static nsp_status_t _udp_rx(ncb_t *ncb)
 {
     int recvcb;
     struct sockaddr_in remote;
@@ -54,7 +54,7 @@ static nsp_status_t __udp_rx(ncb_t *ncb)
     return NSP_STATUS_SUCCESSFUL;
 }
 
-static nsp_status_t __udp_rx_domain(ncb_t *ncb)
+static nsp_status_t _udp_rx_domain(ncb_t *ncb)
 {
     int recvcb;
     struct sockaddr_un remote;
@@ -110,7 +110,7 @@ nsp_status_t udp_rx(ncb_t *ncb)
     nsp_status_t status;
     nsp_status_t (*rxfn)(ncb_t *);
 
-    rxfn = (AF_UNIX == ncb->local_addr.sin_family) ? &__udp_rx_domain : &__udp_rx;
+    rxfn = (AF_UNIX == ncb->local_addr.sin_family) ? &_udp_rx_domain : &_udp_rx;
     do {
         status = rxfn(ncb);
     } while(NSP_SUCCESS(status));

@@ -85,35 +85,6 @@ nsp_status_t lwp_setaffinity(const lwp_t *lwp, int cpumask)
     return NSP_STATUS_SUCCESSFUL;
 }
 
-#if PERMISS_DEPRECATE
-int lwp_getaffinity(const lwp_t *lwp)
-{
-    int i;
-    cpu_set_t cpuset;
-    int mask;
-    int retval;
-
-    if ( unlikely(!lwp) ) {
-        return posix__makeerror(EINVAL);
-    }
-
-    mask = 0;
-    CPU_ZERO(&cpuset);
-    retval = pthread_getaffinity_np(lwp->pid_, sizeof(cpu_set_t), &cpuset);
-    if ( 0 != retval ) {
-        return posix__makeerror(retval);
-    }
-
-    for (i = 0; i < 32; i++) {
-        if(CPU_ISSET(i, &cpuset)) {
-            mask |= (1 << i);
-        }
-    }
-
-    return mask;
-}
-#endif
-
 nsp_status_t lwp_getaffinity(const lwp_t *lwp, int *cpumask)
 {
     int i;
@@ -143,6 +114,38 @@ nsp_status_t lwp_getaffinity(const lwp_t *lwp, int *cpumask)
     }
 
     return NSP_STATUS_SUCCESSFUL;
+}
+
+nsp_status_t lwp_setname(const lwp_t *lwp, const abuff_pthread_name_t *name)
+{
+    int fr;
+
+    if (!lwp || !name) {
+        return posix__makeerror(EINVAL);
+    }
+
+    fr = pthread_setname_np(lwp->pid_, name->cst);
+    if (0 == fr) {
+        return NSP_STATUS_SUCCESSFUL;
+    }
+
+    return posix__makeerror(fr);
+}
+
+nsp_status_t lwp_getname(const lwp_t *lwp, abuff_pthread_name_t *name)
+{
+    int fr;
+
+    if (!lwp || !name) {
+        return posix__makeerror(EINVAL);
+    }
+
+    fr = pthread_getname_np(lwp->pid_, name->st, sizeof(name->st));
+    if (0 == fr) {
+        return NSP_STATUS_SUCCESSFUL;
+    }
+
+    return posix__makeerror(fr);
 }
 
 nsp_status_t lwp_detach(lwp_t *lwp)
@@ -290,6 +293,72 @@ void lwp_mutex_unlock(lwp_mutex_t *mutex)
     }
 
     pthread_mutex_unlock(&mutex->handle_);
+}
+
+nsp_status_t lwp_rwlock_init(lwp_rwlock_t *rwlock)
+{
+    if (unlikely(!rwlock)) {
+        return posix__makeerror(EINVAL);
+    }
+
+    if (0 == pthread_rwlock_init(&rwlock->handle_, NULL)) {
+        return NSP_STATUS_SUCCESSFUL;
+    }
+
+    return posix__makeerror(errno);
+}
+
+void  lwp_rwlock_uninit(lwp_rwlock_t *rwlock)
+{
+    if (likely(rwlock)) {
+        pthread_rwlock_destroy(&rwlock->handle_);
+    }
+}
+
+nsp_status_t  lwp_rwlock_rdlock(lwp_rwlock_t *rwlock)
+{
+    int fr;
+
+    if (unlikely(!rwlock)) {
+        return posix__makeerror(EINVAL);
+    }
+
+    fr = pthread_rwlock_rdlock(&rwlock->handle_);
+    if (0 == fr) {
+        return NSP_STATUS_SUCCESSFUL;
+    }
+
+    return posix__makeerror(fr);
+}
+
+nsp_status_t lwp_rwlock_wrlock(lwp_rwlock_t *rwlock)
+{
+    int fr;
+
+    if (unlikely(!rwlock)) {
+        return posix__makeerror(EINVAL);
+    }
+
+    fr = pthread_rwlock_wrlock(&rwlock->handle_);
+    if (0 == fr) {
+        return NSP_STATUS_SUCCESSFUL;
+    }
+
+    return posix__makeerror(fr);
+}
+
+void  lwp_rwlock_rdunlock(lwp_rwlock_t *rwlock)
+{
+    if (likely(rwlock)) {
+        pthread_rwlock_unlock(&rwlock->handle_);
+    }
+}
+
+void  lwp_rwlock_wrunlock(lwp_rwlock_t *rwlock)
+{
+    if (likely(rwlock)) {
+        pthread_rwlock_unlock(&rwlock->handle_);
+    }
 }
 
 /*********************************************************************************************************

@@ -10,12 +10,12 @@ struct ckfifo {
     lwp_mutex_t         mutex;   /* relate to memory copy, it's not adapt to spinlock */
 };
 
-static uint32_t __ckfifo_len(const struct ckfifo *ring)
+static uint32_t _ckfifo_len(const struct ckfifo *ring)
 {
     return (ring->in - ring->out);
 }
 
-static uint32_t __ckfifo_get(struct ckfifo *ring, unsigned char *buffer, uint32_t size)
+static uint32_t _ckfifo_get(struct ckfifo *ring, unsigned char *buffer, uint32_t size)
 {
     uint32_t len, n;
 
@@ -27,7 +27,7 @@ static uint32_t __ckfifo_get(struct ckfifo *ring, unsigned char *buffer, uint32_
     return n;
 }
 
-static uint32_t __ckfifo_put(struct ckfifo *ring, const unsigned char *buffer, uint32_t size)
+static uint32_t _ckfifo_put(struct ckfifo *ring, const unsigned char *buffer, uint32_t size)
 {
     uint32_t len, n;
 
@@ -79,7 +79,7 @@ PORTABLEIMPL(uint32_t) ckfifo_len(struct ckfifo *ring)
     }
 
     lwp_mutex_lock(&ring->mutex);
-    len = __ckfifo_len(ring);
+    len = _ckfifo_len(ring);
     lwp_mutex_unlock(&ring->mutex);
     return len;
 }
@@ -93,7 +93,7 @@ PORTABLEIMPL(uint32_t) ckfifo_get(struct ckfifo *ring, void *buffer, uint32_t si
     }
 
     lwp_mutex_lock(&ring->mutex);
-    n = __ckfifo_get(ring, buffer, size);
+    n = _ckfifo_get(ring, buffer, size);
     if (ring->in == ring->out) {
         ring->in = ring->out = 0;
     }
@@ -110,7 +110,7 @@ PORTABLEIMPL(uint32_t) ckfifo_put(struct ckfifo *ring, const void *buffer, uint3
     }
 
     lwp_mutex_lock(&ring->mutex);
-    n = __ckfifo_put(ring, buffer, size);
+    n = _ckfifo_put(ring, buffer, size);
     lwp_mutex_unlock(&ring->mutex);
     return n;
 }

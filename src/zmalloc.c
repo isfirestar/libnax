@@ -114,14 +114,14 @@ void *ztrymalloc_usable(size_t size, size_t *usable) {
 }
 
 /* Allocate memory or panic */
-void *zmalloc(size_t size) {
+PORTABLEIMPL(void *) zmalloc(size_t size) {
     void *ptr = ztrymalloc_usable(size, NULL);
     if (!ptr) zmalloc_oom_handler(size);
     return ptr;
 }
 
 /* Try allocating memory, and return NULL if failed. */
-void *ztrymalloc(size_t size) {
+PORTABLEIMPL(void *) ztrymalloc(size_t size) {
     void *ptr = ztrymalloc_usable(size, NULL);
     return ptr;
 }
@@ -174,14 +174,14 @@ void *ztrycalloc_usable(size_t size, size_t *usable) {
 }
 
 /* Allocate memory and zero it or panic */
-void *zcalloc(size_t size) {
+PORTABLEIMPL(void *) zcalloc(size_t size) {
     void *ptr = ztrycalloc_usable(size, NULL);
     if (!ptr) zmalloc_oom_handler(size);
     return ptr;
 }
 
 /* Try allocating memory, and return NULL if failed. */
-void *ztrycalloc(size_t size) {
+PORTABLEIMPL(void *) ztrycalloc(size_t size) {
     void *ptr = ztrycalloc_usable(size, NULL);
     return ptr;
 }
@@ -245,14 +245,14 @@ void *ztryrealloc_usable(void *ptr, size_t size, size_t *usable) {
 }
 
 /* Reallocate memory and zero it or panic */
-void *zrealloc(void *ptr, size_t size) {
+PORTABLEIMPL(void *) zrealloc(void *ptr, size_t size) {
     ptr = ztryrealloc_usable(ptr, size, NULL);
     if (!ptr && size != 0) zmalloc_oom_handler(size);
     return ptr;
 }
 
 /* Try Reallocating memory, and return NULL if failed. */
-void *ztryrealloc(void *ptr, size_t size) {
+PORTABLEIMPL(void *) ztryrealloc(void *ptr, size_t size) {
     ptr = ztryrealloc_usable(ptr, size, NULL);
     return ptr;
 }
@@ -279,7 +279,7 @@ size_t zmalloc_usable_size(void *ptr) {
 }
 #endif
 
-void zfree(void *ptr) {
+PORTABLEIMPL(void) zfree(void *ptr) {
 #ifndef HAVE_MALLOC_SIZE
     void *realptr;
     size_t oldsize;
@@ -496,7 +496,7 @@ int zmalloc_get_allocator_info(size_t *allocated,
 }
 
 void set_jemalloc_bg_thread(int enable) {
-    /* let jemalloc do purging asynchronously, required when there's no traffic 
+    /* let jemalloc do purging asynchronously, required when there's no traffic
      * after flushdb */
     char val = !!enable;
     je_mallctl("background_thread", NULL, 0, &val, 1);

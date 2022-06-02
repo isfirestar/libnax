@@ -6,7 +6,7 @@
 #include <iomanip>
 #include <cstdint>
 
-#include "icom/logger.h"
+#include "logger.h"
 
 namespace nsp {
     namespace toolkit {
@@ -60,12 +60,12 @@ namespace nsp {
             class loex {
 				char module_[LOG_MODULE_NAME_LEN];
                 char str_[MAXIMUM_LOG_BUFFER_SIZE];
-                enum log__levels level_;
+                enum log_levels level_;
                 //std::streamsize strsize_;
                 static void log_environment_init();
             public:
-                loex( const char *module, enum log__levels level );
-                loex(enum log__levels level);
+                loex( const char *module, enum log_levels level );
+                loex(enum log_levels level);
                 ~loex();
                 loex(const loex &) = delete;
                 loex(const loex &&) = delete;

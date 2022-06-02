@@ -87,6 +87,40 @@ int lwp_getaffinity(const lwp_t *lwp)
     return (int)ProcessAffinityMask;
 }
 
+nsp_status_t lwp_setname(const lwp_t *lwp, const abuff_pthread_name_t *name)
+{
+    HRESULT fr;
+
+    if (!lwp || !name) {
+        return posix__makeerror(EINVAL);
+    }
+
+    fr = SetThreadDescriptionA(lwp->pid_, name->cst);
+    if (SUCCEEDED(fr)) {
+        return NSP_STATUS_SUCCESSFUL;
+    }
+    return posix__makeerror(fr);
+}
+
+nsp_status_t lwp_getname(const lwp_t *lwp, abuff_pthread_name_t *name)
+{
+    HRESULT fr;
+    PSTR pszThreaDescription;
+
+    if (!lwp || !name) {
+        return posix__makeerror(EINVAL);
+    }
+
+    fr = GetThreadDescriptionA(lwp->pid_, &pszThreaDescription);
+    if (SUCCEEDED(fr)) {
+        abuff_strcpy(name, pszThreaDescription);
+        LocalFree(ppszThreaDescription);
+        return NSP_STATUS_SUCCESSFUL;
+    }
+
+    return posix__makeerror(fr);
+}
+
 int lwp_detach(lwp_t *lwp)
 {
     if (!lwp) {
@@ -180,6 +214,55 @@ void lwp_mutex_unlock(lwp_mutex_t *mutex)
 {
     if (mutex) {
         LeaveCriticalSection(&mutex->handle_);
+    }
+}
+
+nsp_status_t lwp_rwlock_init(lwp_rwlock_t *rwlock)
+{
+    if (unlikely(!rwlock)) {
+        return posix__makeerror(EINVAL);
+    }
+
+    InitializeSRWLock(&rwlock->handle_);
+    return NSP_STATUS_SUCCESSFUL;
+}
+
+void  lwp_rwlock_uninit(lwp_rwlock_t *rwlock)
+{
+
+}
+
+nsp_status_t  lwp_rwlock_rdlock(lwp_rwlock_t *rwlock)
+{
+    if (unlikely(!rwlock)) {
+        return posix__makeerror(EINVAL);
+    }
+
+    AcquireSRWLockShared(&rwlock->handle_);
+    return NSP_STATUS_SUCCESSFUL;
+}
+
+nsp_status_t  lwp_rwlock_wrlock(lwp_rwlock_t *rwlock)
+{
+    if (unlikely(!rwlock)) {
+        return posix__makeerror(EINVAL);
+    }
+
+    AcquireSRWLockExclusive(&rwlock->handle_);
+    return NSP_STATUS_SUCCESSFUL;
+}
+
+void  lwp_rwlock_rdunlock(lwp_rwlock_t *rwlock)
+{
+    if (likely(rwlock)) {
+        ReleaseSRWLockShared(&rwlock->handle_);
+    }
+}
+
+void  lwp_rwlock_wrunlock(lwp_rwlock_t *rwlock)
+{
+    if (likely(rwlock)) {
+        ReleaseSRWLockExclusive(&rwlock->handle_);
     }
 }
 

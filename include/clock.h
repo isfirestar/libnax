@@ -19,6 +19,13 @@ typedef struct __datetime_t datetime_t;
 /* obtain the wall clock on current system, in 100ns */
 PORTABLEAPI(uint64_t) clock_monotonic_raw();
 PORTABLEAPI(uint64_t) clock_monotonic();
+
+/* realtime clock */
+PORTABLEAPI(uint64_t) clock_realtime();
+
+/* boot clock */
+PORTABLEAPI(uint64_t) clock_boottime();
+
 /* obtain absolute time elapse from 1970-01-01 00:00:00 000 to the time point of function invoked, in 100ns */
 PORTABLEAPI(uint64_t) clock_epoch();
 

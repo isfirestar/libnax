@@ -3,7 +3,7 @@
 #include "swnet.h"
 #include "os_util.hpp"
 
-#include "icom/logger.h"
+#include "logger.h"
 
 namespace nsp {
     namespace tcpip {
@@ -77,7 +77,7 @@ namespace nsp {
 
         void STDCALL swnet::ecr(const char *host_event, const char *reserved, int rescb) {
             if (host_event) {
-                log__save("nshost", kLogLevel_Trace, kLogTarget_Filesystem, "%s", host_event);
+                log_save("nshost", kLogLevel_Trace, kLogTarget_Filesystem, "%s", host_event);
             }
         }
 

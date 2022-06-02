@@ -65,13 +65,15 @@
 #define crt_strcmp(s1, s2) strcmp(s1, s2)
 #define crt_wcscmp(s1, s2) wcscmp(s1, s2)
 
+PORTABLEAPI(char *) crt_strrev(char *src);
+
 #if __cplusplus
 #define abuff_type(n) struct {   \
     union { \
         char st[n]; \
         unsigned char ust[n];   \
         const char cst[n];  \
-        const unsigned char ucst[n]; \
+        const unsigned char cust[n]; \
     } u = { 0 };  \
 }
 #else
@@ -81,7 +83,7 @@
         char st[n]; \
         unsigned char ust[n];   \
         const char cst[n];  \
-        const unsigned char ucst[n]; \
+        const unsigned char cust[n]; \
     };  \
 } /* aligned_##n##bytes_t */
 #endif
@@ -89,7 +91,7 @@
 #define abuff_raw(abuff)    ((char *)(&(abuff)->st[0]))
 #define abuff_craw(abuff)   ((const char *)(&(abuff)->cst[0]))
 #define abuff_uchar(abuff)   ((unsigned char *)(&(abuff)->ust[0]))
-#define abuff_cuchar(abuff)  ((const unsigned char *)(&(abuff)->ucst[0]))
+#define abuff_cuchar(abuff)  ((const unsigned char *)(&(abuff)->cust[0]))
 #define abuff_size(abuff)   (sizeof(*(abuff)))
 
 #define abuff_strcpy(abuff, src) strncpy((abuff)->st, src, abuff_size((abuff)) - 1)
@@ -116,5 +118,23 @@ typedef abuff_type(1024)  abuff_1024_t;
 typedef abuff_type(2048)  abuff_2048_t;
 typedef abuff_type(4096)  abuff_4096_t;
 typedef abuff_type(8192)  abuff_8192_t;
+
+/* raw string RunTime operation implementation without libc */
+PORTABLEAPI(size_t) rtl_strlen(const char *s);
+PORTABLEAPI(char *) rtl_strcpy(char *dest, const char *src);
+PORTABLEAPI(char *) rtl_strncpy(char *dest, const char *src, size_t n);
+//__attribute_pure__ __nonnull ((1, 2))
+PORTABLEAPI(int) rtl_strcmp(const char *s1, const char *s2);
+PORTABLEAPI(int) rtl_strncmp(const char *s1, const char *s2, size_t n);
+PORTABLEAPI(int) rtl_strcasecmp(const char *s1, const char *s2);
+PORTABLEAPI(int) rtl_strncasecmp(const char *s1, const char *s2, size_t n);
+PORTABLEAPI(char *) rtl_strcat(char *dest, const char *src);
+PORTABLEAPI(char *) rtl_strncat(char *dest, const char *src, size_t n);
+PORTABLEAPI(char *) rtl_strtok(char *str, const char *delim, char **saveptr);
+//__attribute_pure__ __nonnull ((1, 2))
+PORTABLEAPI(char *) rtl_strdup(const char *s, void *(*alloc)(size_t));
+//__attribute_pure__ __nonnull ((1, 2))
+PORTABLEAPI(char *) rtl_strndup(const char *s, size_t n, void *(*alloc)(size_t));
+PORTABLEAPI(void *) rtl_memcpy(void *dest, const void *src, size_t n);
 
 #endif /* !POSIX_STRING_H */

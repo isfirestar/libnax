@@ -40,14 +40,14 @@ struct io_manager {
     enum SharedPtrState tcp_available;
     enum SharedPtrState udp_available;
 };
-static struct io_manager __iomgr = {
+static struct io_manager _iomgr = {
     .tcpio = NULL,
     .udpio = NULL,
     .mutex = { PTHREAD_MUTEX_INITIALIZER },
     .tcp_available = SPS_CLOSED,
     .udp_available = SPS_CLOSED };
 
-static void __io_rdhup(ncb_t *ncb)
+static void _io_rdhup(ncb_t *ncb)
 {
     /* log peer closed */
     mxx_call_ecr( "Lnk:%lld, EPOLLRDHUP", ncb->hld );
@@ -106,7 +106,7 @@ enum EPOLL_EVENTS
   };
 */
 
-static void __iorun(const struct epoll_event *eventptr)
+static void _iorun(const struct epoll_event *eventptr)
 {
     ncb_t *ncb;
     objhld_t hld;
@@ -145,7 +145,7 @@ static void __iorun(const struct epoll_event *eventptr)
          *  2. local peer call shutdown(2) with SHUT_WR and remote peer call shutdown(2) with SHUT_WR
          *  3. remote peer give a RST signal */
         if (eventptr->events & EPOLLRDHUP) {
-            __io_rdhup(ncb);
+            _io_rdhup(ncb);
             break;
         }
 
@@ -194,7 +194,7 @@ static void __iorun(const struct epoll_event *eventptr)
     objdefr(hld);
 }
 
-static void *__epoll_proc(void *argv)
+static void *_epoll_proc(void *argv)
 {
     static const int EP_TIMEDOUT = -1;//1000;
     struct epoll_event evts[EPOLL_SIZE];
@@ -224,7 +224,7 @@ static void *__epoll_proc(void *argv)
         /* at least one signal is awakened,
             otherwise, timeout trigger. */
         for (i = 0; i < sigcnt; i++) {
-            __iorun(&evts[i]);
+            _iorun(&evts[i]);
         }
     }
 
@@ -233,15 +233,15 @@ static void *__epoll_proc(void *argv)
     return NULL;
 }
 
-static enum SharedPtrState *__io_protocol_stat(int protocol)
+static enum SharedPtrState *_io_protocol_stat(int protocol)
 {
     enum SharedPtrState *statpp;
 
     statpp = NULL;
     if (IPPROTO_TCP == protocol) {
-        statpp = &__iomgr.tcp_available;
+        statpp = &_iomgr.tcp_available;
     } else if (IPPROTO_UDP == protocol) {
-        statpp = &__iomgr.udp_available;
+        statpp = &_iomgr.udp_available;
     } else {
         ;
     }
@@ -249,24 +249,24 @@ static enum SharedPtrState *__io_protocol_stat(int protocol)
     return statpp;
 }
 
-static struct io_object_block *__io_retain_obp(int protocol, int available, sharedptr_pt *sptr)
+static struct io_object_block *_io_retain_obp(int protocol, int available, sharedptr_pt *sptr)
 {
     sharedptr_pt *targetpp;
     struct io_object_block *obptr;
 
     targetpp = NULL;
     if (IPPROTO_TCP == protocol) {
-        targetpp = &__iomgr.tcpio;
+        targetpp = &_iomgr.tcpio;
     } else if (IPPROTO_UDP == protocol) {
-        targetpp = &__iomgr.udpio;
+        targetpp = &_iomgr.udpio;
     } else {
         return NULL;
     }
 
     obptr = NULL;
-    lwp_mutex_lock(&__iomgr.mutex);
+    lwp_mutex_lock(&_iomgr.mutex);
     do {
-        if (available != atom_get( __io_protocol_stat(protocol)) ) {
+        if (available != atom_get( _io_protocol_stat(protocol)) ) {
             mxx_call_ecr("Unknown protocol:%d,available:%d", protocol, available);
             break;
         }
@@ -278,12 +278,12 @@ static struct io_object_block *__io_retain_obp(int protocol, int available, shar
 
         obptr = (struct io_object_block *)ref_retain(*sptr);
     } while(0);
-    lwp_mutex_unlock(&__iomgr.mutex);
+    lwp_mutex_unlock(&_iomgr.mutex);
 
     return obptr;
 }
 
-static nsp_status_t __io_init(struct io_object_block *obptr)
+static nsp_status_t _io_init(struct io_object_block *obptr)
 {
     int i;
     struct epoll_object_block *epoptr;
@@ -303,7 +303,7 @@ static nsp_status_t __io_init(struct io_object_block *obptr)
 
         /* @actived is the flag for io thread terminate */
         epoptr->actived = YES;
-        if (lwp_create(&epoptr->lwp, 0, &__epoll_proc, epoptr) < 0) {
+        if (lwp_create(&epoptr->lwp, 0, &_epoll_proc, epoptr) < 0) {
             mxx_call_ecr("Fatal syscall pthread_create(3), error:%d", errno);
             close(epoptr->epfd);
             epoptr->epfd = -1;
@@ -322,7 +322,7 @@ static nsp_status_t __io_init(struct io_object_block *obptr)
     return NSP_STATUS_SUCCESSFUL;
 }
 
-static nsp_status_t __io_exit_epo(struct epoll_object_block *epoptr)
+static nsp_status_t _io_exit_epo(struct epoll_object_block *epoptr)
 {
     struct pipe_package_head pipemsg;
     ssize_t n;
@@ -340,13 +340,13 @@ static nsp_status_t __io_exit_epo(struct epoll_object_block *epoptr)
     return n > 0 ? NSP_STATUS_SUCCESSFUL : NSP_STATUS_FATAL;
 }
 
-static void __io_uninit(struct io_object_block *obptr)
+static void _io_uninit(struct io_object_block *obptr)
 {
     int i;
     struct epoll_object_block *epoptr;
 
     for (i = 0; i < obptr->nprocs; i++) {
-        __io_exit_epo(&obptr->epoptr[i]);
+        _io_exit_epo(&obptr->epoptr[i]);
     }
 
     /* waitting for thread safe terminated */
@@ -374,13 +374,13 @@ nsp_status_t io_init(int protocol, int nprocs)
 
     targetpp = NULL;
     if (IPPROTO_TCP == protocol) {
-        targetpp = &__iomgr.tcpio;
+        targetpp = &_iomgr.tcpio;
     } else if (IPPROTO_UDP == protocol) {
-        targetpp = &__iomgr.udpio;
+        targetpp = &_iomgr.udpio;
     } else {
         return posix__makeerror(EINVAL);
     }
-    statpp = __io_protocol_stat(protocol);
+    statpp = _io_protocol_stat(protocol);
 
     expect = SPS_CLOSED;
     if (!atom_compare_exchange_strong(statpp, &expect, SPS_AVAILABLE)) {
@@ -407,7 +407,7 @@ nsp_status_t io_init(int protocol, int nprocs)
     } else {
         obptr->nprocs = (nprocs < 0) ? 1 : nprocs;
     }
-    status = __io_init(obptr);
+    status = _io_init(obptr);
 
     ref_release(sptr);
 
@@ -426,15 +426,15 @@ void io_uninit(int protocol)
     enum SharedPtrState expect;
     enum SharedPtrState *statpp;
 
-    statpp = __io_protocol_stat(protocol);
+    statpp = _io_protocol_stat(protocol);
     expect = SPS_AVAILABLE;
     if (!atom_compare_exchange_strong(statpp, &expect, SPS_CLOSING)) {
         return;
     }
 
-    obptr = __io_retain_obp(protocol, SPS_CLOSING, &sptr);
+    obptr = _io_retain_obp(protocol, SPS_CLOSING, &sptr);
     if (likely(obptr)) {
-        __io_uninit(obptr);
+        _io_uninit(obptr);
         ref_release(sptr);
     }
     ref_close(sptr);
@@ -500,7 +500,7 @@ nsp_status_t io_attach(void *ncbptr, int mask)
 
     ncb = (ncb_t *)ncbptr;
 
-    obptr = __io_retain_obp(ncb->protocol, SPS_AVAILABLE, &sptr);
+    obptr = _io_retain_obp(ncb->protocol, SPS_AVAILABLE, &sptr);
     if (unlikely(!obptr)) {
         return posix__makeerror(ENOENT);
     }
@@ -609,7 +609,7 @@ nsp_status_t io_pipefd(void *ncbptr, int *pipefd)
     nsp_status_t status;
 
     ncb = (ncb_t *)ncbptr;
-    obptr = __io_retain_obp(ncb->protocol, SPS_AVAILABLE, &sptr);
+    obptr = _io_retain_obp(ncb->protocol, SPS_AVAILABLE, &sptr);
     if (unlikely(!obptr)) {
         return posix__makeerror(ENOENT);
     }

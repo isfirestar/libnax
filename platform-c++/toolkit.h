@@ -1,8 +1,8 @@
 ﻿#if !defined TOOLKIT_HEADER_02160613
 #define TOOLKIT_HEADER_02160613
 
-#include "icom/compiler.h"
-#include "icom/posix_string.h"
+#include "compiler.h"
+#include "abuff.h"
 
 #include <vector>
 #include <string>
@@ -29,28 +29,7 @@ namespace nsp {
             return static_cast<T> ((T) 1 << position);
         }
 
-        template<class T>
-        T *posix_strcpy(T *target, std::size_t cch, const T *src);
-        template<class T>
-        T *posix_strdup(const T *src);
-        template<class T>
-        T *posix_strncpy(T *target, std::size_t cch, const T *src, std::size_t cnt);
-        template<class T>
-        T *posix_strcat(T *target, std::size_t cch, const T *src);
-        template<class T>
-        T *posix_strrev(T *src);
-        template<class T>
-        int posix_vsnprintf(T * const target, std::size_t cch, const T *format, va_list ap);
-        template<class T>
-        int posix_vsprintf(T * const target, std::size_t cch, const T *format, va_list ap);
-        template<class T>
-        int posix_strcasecmp(const T *s1, const T *s2);
-        template<class T>
-        T *posix_strtok(T *s, const T *, T **save);
-
         nsp_boolean_t is_digit_str(const std::string &str);
-        uint32_t ipv4_touint(const char *ipv4str, int method);
-        char *ipv4_tostring(uint32_t ipv4Integer, char * ipv4TextString, uint32_t lengthOfTextCch);
 
         template<class T>
         std::basic_string<T> to_string(const double d);
@@ -121,21 +100,6 @@ namespace nsp {
         // 如果 range_max == range_min, 且非0， 则返回该值
         int random(const int range_min = 0, const int range_max = 0);
 
-        // 对称加解密例程
-        int encrypt(const unsigned char* origin, int oricb, const unsigned char* key, int keycb, unsigned char** out, int* outcb);
-        template<class T>
-        int encrypt(const std::basic_string<T> &origin, const std::basic_string<T> &key, std::string &out);
-        template<class T>
-        int encrypt(const std::vector<T> &origin, const std::vector<T> &key, std::string &out);
-        int encrypt(const char *origin, const char *key, std::string &out);
-
-        int decrypt(const unsigned char* crypt, int cryptcb, const unsigned char* key, int keycb, unsigned char** out, int* outcb);
-        template<class T>
-        int decrypt(const std::string &crypt, const std::basic_string<T> &key, std::basic_string<T> &out);
-        template<class T>
-        int decrypt(const std::string &crypt, const std::vector<T> &key, std::vector<T> &out);
-        int decrypt(const std::string &crypt, const char *key, std::string &out);
-
         // HEX字符串转整型, "1234ABCD" 转换为 0x1234ABCD， 注意高低位结构
 
         template<class T>
@@ -169,24 +133,6 @@ namespace nsp {
 
             return 0;
         }
-
-        // 获取 CRC 码
-        uint32_t crc32(uint32_t crc, const unsigned char *block, uint32_t cb);
-
-        // 获取 MD5 码
-        template<class T>
-        void md5(const T *input, int inputlen, unsigned char digest[16]);
-
-        // base64 编解码
-        int base64_encode(const char *input, int cb, std::string &output);
-        int base64_encode(const std::string &input, std::string &output);
-        int base64_decode(const std::string &input, std::string &output);
-
-		// VFN1/VFN1a
-		template<class T>
-		T vfn1_hash(const unsigned char *hash, int length);
-		template<class T>
-		T vfn1a_hash(const unsigned char *hash, int length);
 
         // 浮点转换
         unsigned short float2fixed(float fFloat);

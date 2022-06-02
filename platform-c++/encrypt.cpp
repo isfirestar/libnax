@@ -1,8 +1,6 @@
 ﻿#include <cstring>
 #include <cstdlib>
 
-#include "zmalloc.h"
-
 namespace nsp {
     namespace toolkit {
         static const unsigned char ENCODE_TABLE[] = {
@@ -48,7 +46,7 @@ namespace nsp {
                 return -1;
             }
 
-            blend = (unsigned char *)ztrymalloc(blend_len);
+            blend = (unsigned char *)malloc(blend_len);
             if (!blend) {
                 return -1;
             }
@@ -67,18 +65,18 @@ namespace nsp {
                 src_len = blend_len + symbol_add;
             }
             page = src_len / 3;
-            src_buffer = (unsigned char *)ztrymalloc(src_len);
+            src_buffer = (unsigned char *)malloc(src_len);
             if (!src_buffer) {
-                zfree(blend);
+                free(blend);
                 return -1;
             }
             memset(src_buffer, 0, src_len);
             memcpy(src_buffer, blend, blend_len);
             dstlen = page * 4;
-            des_buffer = (unsigned char *)ztrymalloc(dstlen);
+            des_buffer = (unsigned char *)malloc(dstlen);
             if (!des_buffer) {
-                zfree(blend);
-                zfree(src_buffer);
+                free(blend);
+                free(src_buffer);
                 return -1;
             }
 
@@ -102,11 +100,11 @@ namespace nsp {
                 des_buffer[dstlen - i] = 0x7E;
             }
 
-            output_buffer = (unsigned char *)ztrymalloc(dstlen);
+            output_buffer = (unsigned char *)malloc(dstlen);
             if (!output_buffer) {
-                zfree(blend);
-                zfree(src_buffer);
-                zfree(des_buffer);
+                free(blend);
+                free(src_buffer);
+                free(des_buffer);
                 return -1;
             }
             memset(output_buffer, 0, dstlen);
@@ -114,9 +112,9 @@ namespace nsp {
             *out = output_buffer;
             *outcb = dstlen;
 
-            zfree(blend);
-            zfree(src_buffer);
-            zfree(des_buffer);
+            free(blend);
+            free(src_buffer);
+            free(des_buffer);
             return 0;
         }
 
@@ -135,7 +133,7 @@ namespace nsp {
                 return -1;
             }
 
-            des_buffer = (unsigned char *)ztrymalloc(dstlen);
+            des_buffer = (unsigned char *)malloc(dstlen);
             if (!des_buffer) {
                 return -1;
             }
@@ -146,13 +144,13 @@ namespace nsp {
 
                 for (j = 0; j < 4; j++) {
                     if ((src[j] >= sizeof ( DECODE_TABLE) / sizeof ( DECODE_TABLE[0])) || src[j] < 0) {
-                        zfree(des_buffer);
+                        free(des_buffer);
                         return -1;
                     }
                     if (src[j] != 0x7E) {
                         src[j] = *(DECODE_TABLE + src[j]);
                         if (-1 == src[j]) {
-                            zfree(des_buffer);
+                            free(des_buffer);
                             return -1;
                         }
                     }
@@ -176,18 +174,18 @@ namespace nsp {
             }
 
             if (0 != dstlen % 2) {
-                zfree(des_buffer);
+                free(des_buffer);
                 return -1;
             }
 
             output_cb = dstlen / 2;
-            output_buffer = (unsigned char *)ztrymalloc(output_cb);
+            output_buffer = (unsigned char *)malloc(output_cb);
             for (output_count = 0; output_count < output_cb; output_count++) {
                 unsigned char out_ctr = (des_buffer[output_count * 2] & 0xAA) | (des_buffer[output_count * 2 + 1] & 0x55);
                 unsigned char key_ctr = (des_buffer[output_count * 2] & 0x55) | (des_buffer[output_count * 2 + 1] & 0xAA);
                 if (key_ctr != (unsigned char) key[output_count % keycb]) {
-                    zfree(des_buffer);
-                    zfree(output_buffer);
+                    free(des_buffer);
+                    free(output_buffer);
                     return -1;
                 }
                 memcpy(&output_buffer[output_count], &out_ctr, 1);
@@ -195,7 +193,7 @@ namespace nsp {
             *out = output_buffer;
             *outcb = output_cb;
 
-            zfree(des_buffer);
+            free(des_buffer);
             return 0;
         }
 

@@ -7,7 +7,7 @@
 #include "io.h"
 #include "atom.h"
 
-static nsp_status_t __tcp_syn_try(ncb_t *ncb_server, int *clientfd)
+static nsp_status_t _tcp_syn_try(ncb_t *ncb_server, int *clientfd)
 {
     struct sockaddr_in addr_income;
     socklen_t addrlen;
@@ -57,7 +57,7 @@ static nsp_status_t __tcp_syn_try(ncb_t *ncb_server, int *clientfd)
     return NSP_STATUS_SUCCESSFUL;
 }
 
-static nsp_status_t __tcp_syn_dpc(ncb_t *ncb_server, ncb_t *ncb)
+static nsp_status_t _tcp_syn_dpc(ncb_t *ncb_server, ncb_t *ncb)
 {
     nsp_status_t status;
 
@@ -117,7 +117,7 @@ static nsp_status_t __tcp_syn_dpc(ncb_t *ncb_server, ncb_t *ncb)
     return status;
 }
 
-static nsp_status_t __tcp_syn(ncb_t *ncb_server)
+static nsp_status_t _tcp_syn(ncb_t *ncb_server)
 {
     ncb_t *ncb;
     objhld_t hld;
@@ -139,7 +139,7 @@ static nsp_status_t __tcp_syn(ncb_t *ncb_server)
     }
 
     /* try syscall connect(2) once, if accept socket fatal, the ncb object willbe destroy */
-    status = __tcp_syn_try(ncb_server, &clientfd);
+    status = _tcp_syn_try(ncb_server, &clientfd);
     if ( NSP_SUCCESS(status)) {
         creator.known = INVALID_OBJHLD;
         creator.size = sizeof(ncb_t);
@@ -162,7 +162,7 @@ static nsp_status_t __tcp_syn(ncb_t *ncb_server)
         mxx_call_ecr("Accepted link:%lld, socket:%d ", hld, clientfd);
 
         /* initial the client ncb object, link willbe destroy on fatal. */
-        status = __tcp_syn_dpc(ncb_server, ncb);
+        status = _tcp_syn_dpc(ncb_server, ncb);
         if ( !NSP_SUCCESS(status) ) {
             objclos(hld);
         }
@@ -177,12 +177,12 @@ nsp_status_t tcp_syn(ncb_t *ncb_server)
     nsp_status_t status;
 
     do {
-        status = __tcp_syn(ncb_server);
+        status = _tcp_syn(ncb_server);
     } while (NSP_SUCCESS(status));
     return status;
 }
 
-static nsp_status_t __tcp_rx(ncb_t *ncb)
+static nsp_status_t _tcp_rx(ncb_t *ncb)
 {
     int recvcb;
     int overplus;
@@ -239,7 +239,7 @@ nsp_status_t tcp_rx(ncb_t *ncb)
 
     /* read receive buffer until it's empty */
     do {
-        status = __tcp_rx(ncb);
+        status = _tcp_rx(ncb);
     }while( NSP_SUCCESS(status) );
     return status;
 }

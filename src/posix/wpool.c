@@ -28,10 +28,10 @@ struct wptask {
     struct list_head link;
 };
 
-static objhld_t __tcphld = -1;
-static objhld_t __udphld = -1;
+static objhld_t _tcphld = -1;
+static objhld_t _udphld = -1;
 
-static void __wp_add_task(struct wptask *task)
+static void _wp_add_task(struct wptask *task)
 {
     struct wpool *wpptr;
 
@@ -47,7 +47,7 @@ static void __wp_add_task(struct wptask *task)
     }
 }
 
-static struct wptask *__wp_get_task(struct wpool *wpptr)
+static struct wptask *_wp_get_task(struct wpool *wpptr)
 {
     struct wptask *task;
 
@@ -68,7 +68,7 @@ static struct wptask *__wp_get_task(struct wpool *wpptr)
     return task;
 }
 
-static nsp_status_t __wp_exec(struct wptask *task)
+static nsp_status_t _wp_exec(struct wptask *task)
 {
     nsp_status_t status;
     ncb_t *ncb;
@@ -105,10 +105,10 @@ static nsp_status_t __wp_exec(struct wptask *task)
             }
         } else {
             /* on success, we need to append task to the tail of @fifo again, until all pending data have been sent
-                in this case, @__wp_run should not free the memory of this task  */
+                in this case, @_wp_run should not free the memory of this task  */
             status = fifo_pop(ncb, NULL);
             if ( NSP_SUCCESS(status) ) {
-                __wp_add_task(task);
+                _wp_add_task(task);
             }
         }
     }
@@ -117,7 +117,7 @@ static nsp_status_t __wp_exec(struct wptask *task)
     return status;
 }
 
-static void *__wp_run(void *p)
+static void *_wp_run(void *p)
 {
     struct wptask *task;
     struct wpool *wpptr;
@@ -135,8 +135,8 @@ static void *__wp_run(void *p)
 
         /* complete all write task when once signal arrived,
             no matter which thread wake up this wait object */
-        while ((NULL != (task = __wp_get_task(wpptr)) ) && wpptr->actived) {
-            status = __wp_exec(task);
+        while ((NULL != (task = _wp_get_task(wpptr)) ) && wpptr->actived) {
+            status = _wp_exec(task);
             if (!NSP_SUCCESS(status)) {
                 zfree(task);
             }
@@ -148,14 +148,14 @@ static void *__wp_run(void *p)
     return NULL;
 }
 
-static nsp_status_t __wp_init(struct wpool *wpptr)
+static nsp_status_t _wp_init(struct wpool *wpptr)
 {
     INIT_LIST_HEAD(&wpptr->tasks);
     lwp_event_init(&wpptr->signal, LWPEC_NOTIFY);
     initial_spinlock(&wpptr->sp);
     wpptr->task_list_size = 0;
     wpptr->actived = 1;
-    if (lwp_create(&wpptr->thread, 0, &__wp_run, (void *)wpptr) < 0 ) {
+    if (lwp_create(&wpptr->thread, 0, &_wp_run, (void *)wpptr) < 0 ) {
         mxx_call_ecr("fatal error occurred syscall pthread_create(3), error:%d", errno);
         return NSP_STATUS_FATAL;
     }
@@ -163,7 +163,7 @@ static nsp_status_t __wp_init(struct wpool *wpptr)
     return NSP_STATUS_SUCCESSFUL;
 }
 
-static void __wp_uninit(objhld_t hld, void *udata)
+static void _wp_uninit(objhld_t hld, void *udata)
 {
     struct wpool *wpptr;
     struct wptask *task;
@@ -179,7 +179,7 @@ static void __wp_uninit(objhld_t hld, void *udata)
         lwp_join(&wpptr->thread, NULL);
 
         /* clear the tasks which too late to deal with */
-        while (NULL != (task = __wp_get_task(wpptr))) {
+        while (NULL != (task = _wp_get_task(wpptr))) {
             zfree(task);
         }
 
@@ -187,8 +187,8 @@ static void __wp_uninit(objhld_t hld, void *udata)
         lwp_event_uninit(&wpptr->signal);
     }
 
-    if (!atom_compare_exchange_strong( &__tcphld, &hld, -1)) {
-        atom_compare_exchange_strong( &__udphld, &hld, -1);
+    if (!atom_compare_exchange_strong( &_tcphld, &hld, -1)) {
+        atom_compare_exchange_strong( &_udphld, &hld, -1);
     }
 }
 
@@ -196,7 +196,7 @@ void wp_uninit(int protocol)
 {
     objhld_t *hldptr;
 
-    hldptr = ((IPPROTO_TCP ==protocol ) ? &__tcphld : ((IPPROTO_UDP == protocol || ETH_P_ARP == protocol) ? &__udphld : NULL));
+    hldptr = ((IPPROTO_TCP ==protocol ) ? &_tcphld : ((IPPROTO_UDP == protocol || ETH_P_ARP == protocol) ? &_udphld : NULL));
     if (hldptr) {
         if (*hldptr >= 0) {
             objclos(*hldptr);
@@ -211,8 +211,8 @@ nsp_status_t wp_init(int protocol)
     objhld_t hld, expect, *hldptr;
     struct objcreator creator;
 
-    hldptr = ((IPPROTO_TCP ==protocol ) ? &__tcphld :
-                ((IPPROTO_UDP == protocol || ETH_P_ARP == protocol) ? &__udphld : NULL));
+    hldptr = ((IPPROTO_TCP ==protocol ) ? &_tcphld :
+                ((IPPROTO_UDP == protocol || ETH_P_ARP == protocol) ? &_udphld : NULL));
     if (!hldptr) {
         return posix__makeerror(EPROTOTYPE);
     }
@@ -226,7 +226,7 @@ nsp_status_t wp_init(int protocol)
     creator.known = INVALID_OBJHLD;
     creator.size = sizeof(struct wpool);
 	creator.initializer = NULL;
-	creator.unloader = &__wp_uninit;
+	creator.unloader = &_wp_uninit;
 	creator.context = NULL;
 	creator.ctxsize = 0;
     hld = objallo3(&creator);
@@ -245,7 +245,7 @@ nsp_status_t wp_init(int protocol)
         return posix__makeerror(ENOENT);
     }
 
-    retval = __wp_init(wpptr);
+    retval = _wp_init(wpptr);
     objdefr(*hldptr);
     return retval;
 }
@@ -261,8 +261,8 @@ nsp_status_t wp_queued(void *ncbptr)
 
     ncb = (ncb_t *)ncbptr;
     protocol = ncb->protocol;
-    hld = ((IPPROTO_TCP == protocol ) ? __tcphld :
-                ((IPPROTO_UDP == protocol || ETH_P_ARP == protocol) ? __udphld : -1));
+    hld = ((IPPROTO_TCP == protocol ) ? _tcphld :
+                ((IPPROTO_UDP == protocol || ETH_P_ARP == protocol) ? _udphld : -1));
     if ( unlikely(hld < 0)) {
         return posix__makeerror(ENOENT);
     }
@@ -280,7 +280,7 @@ nsp_status_t wp_queued(void *ncbptr)
 
         task->hld = ncb->hld;
         task->thread = wpptr;
-        __wp_add_task(task);
+        _wp_add_task(task);
 
         /* use local variable to save the thread object, because @task maybe already freed by handler now */
         lwp_event_awaken(&wpptr->signal);

@@ -10,8 +10,8 @@ static LIST_HEAD(nl_head);
 static pthread_mutex_t nl_head_locker = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
 static int nl_count = 0;
 
-static void __ncb_post_preclose(const ncb_t *ncb);
-static void __ncb_post_closed(const ncb_t *ncb);
+static void _ncb_post_preclose(const ncb_t *ncb);
+static void _ncb_post_closed(const ncb_t *ncb);
 
 /* ncb uninit proc will dereference all ncb object and try to going to close phase.
  */
@@ -88,7 +88,7 @@ void ncb_deconstruct(objhld_t ignore, void *p)
 
     /* post pre close event to calling thread, and than,
         Invalidate the user context pointer, trust calling has been already handled and free @ncb->context  */
-    __ncb_post_preclose(ncb);
+    _ncb_post_preclose(ncb);
     ncb->context = NULL;
 
     /* stop network service:
@@ -135,7 +135,7 @@ void ncb_deconstruct(objhld_t ignore, void *p)
     pthread_mutex_unlock(&nl_head_locker);
 
     /* post close event to calling thread */
-    __ncb_post_closed(ncb);
+    _ncb_post_closed(ncb);
 
     /* set callback function to ineffectiveness */
     ncb->nis_callback = NULL;
@@ -293,7 +293,7 @@ nsp_status_t ncb_query_link_error(const ncb_t *ncb, int *err)
     return posix__makeerror(error);
 }
 
-static void __ncb_post_preclose(const ncb_t *ncb)
+static void _ncb_post_preclose(const ncb_t *ncb)
 {
     nis_event_t c_event;
     tcp_data_t c_data;
@@ -306,7 +306,7 @@ static void __ncb_post_preclose(const ncb_t *ncb)
     }
 }
 
-static void __ncb_post_closed(const ncb_t *ncb)
+static void _ncb_post_closed(const ncb_t *ncb)
 {
     nis_event_t c_event;
 

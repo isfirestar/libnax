@@ -31,12 +31,15 @@
 #ifndef __ZMALLOC_H
 #define __ZMALLOC_H
 
+#include "compiler.h"
 #include <sys/types.h>
 #include <stdlib.h>
 
 /* Double expansion needed for stringification of macro values. */
-#define __xstr(s) __str(s)
+#if !__cplusplus
 #define __str(s) #s
+#define __xstr(s) __str(s)
+#endif
 
 /* We can enable the Redis defrag capabilities only if we are using Jemalloc
  * and the version used is our special version modified for Redis having
@@ -45,13 +48,13 @@
 #define HAVE_DEFRAG
 #endif
 
-void *zmalloc(size_t size);
-void *zcalloc(size_t size);
-void *zrealloc(void *ptr, size_t size);
-void *ztrymalloc(size_t size);
-void *ztrycalloc(size_t size);
-void *ztryrealloc(void *ptr, size_t size);
-void zfree(void *ptr);
+PORTABLEAPI(void *) zmalloc(size_t size);
+PORTABLEAPI(void *) zcalloc(size_t size);
+PORTABLEAPI(void *) zrealloc(void *ptr, size_t size);
+PORTABLEAPI(void *) ztrymalloc(size_t size);
+PORTABLEAPI(void *) ztrycalloc(size_t size);
+PORTABLEAPI(void *) ztryrealloc(void *ptr, size_t size);
+PORTABLEIMPL(void) zfree(void *ptr);
 void *zmalloc_usable(size_t size, size_t *usable);
 void *zcalloc_usable(size_t size, size_t *usable);
 void *zrealloc_usable(void *ptr, size_t size, size_t *usable);

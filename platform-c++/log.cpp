@@ -1,12 +1,12 @@
-﻿#include <mutex>
+﻿#include "log.h"
+
+#include <mutex>
 #include <vector>
 
 #include "singleton.hpp"
-#include "log.h"
-
-#include "icom/logger.h"
-#include "icom/posix_string.h"
-#include "icom/posix_ifos.h"
+#include "logger.h"
+#include "abuff.h"
+#include "ifos.h"
 
 #ifdef _WIN32
 #define snprintf(buffer, size, ...) \
@@ -17,16 +17,24 @@ namespace nsp {
     namespace toolkit {
         namespace xlog {
             /////////////////////// loex ///////////////////////
-            loex::loex(enum log__levels level) : level_(level) {
-                posix__getpename2(module_, sizeof(module_));
+            loex::loex(enum log_levels level) : level_(level)
+            {
+                ifos_path_buffer_t holder;
+                if (NSP_SUCCESS(ifos_getpename(&holder))) {
+                    strcpy(module_, holder.u.st);
+                }
                 str_[0] = 0;
             }
 
-            loex::loex(const char *module, enum log__levels level) : level_(level) {
+            loex::loex(const char *module, enum log_levels level) : level_(level)
+            {
                 if (module) {
-                    posix__strcpy(module_, cchof(module_), module);
+                    crt_strcpy(module_, cchof(module_), module);
                 }else{
-                    posix__getpename2(module_, sizeof(module_));
+                    ifos_path_buffer_t holder;
+                    if (NSP_SUCCESS(ifos_getpename(&holder))) {
+                        strcpy(module_, holder.u.st);
+                    }
                 }
                 str_[0] = 0;
             }
@@ -37,14 +45,14 @@ namespace nsp {
                     if (level_ & kLogLevel_Trace) {
                         target &= ~kLogTarget_Stdout;
                     }
-                    ::log__save(module_, level_, target, "%s", str_);
+                    ::log_save(module_, level_, target, "%s", str_);
                 }
             }
 
             loex &loex::operator<<(const wchar_t *str) {
                 if (str) {
 #if _WIN32
-                    ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%ws", str);
+                    crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%ws", str);
 #endif
                 }
                 return *this;
@@ -52,70 +60,70 @@ namespace nsp {
 
             loex &loex::operator<<(const char *str) {
                 if (str) {
-                    ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%s", str);
+                    crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%s", str);
                 }
                 return *this;
             }
 
             loex &loex::operator<<(int32_t n) {
-                ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%d", n);
+                crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%d", n);
                 return *this;
             }
 
             loex &loex::operator<<(uint32_t n) {
-                ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%u", n);
+                crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%u", n);
                 return *this;
             }
 
             loex &loex::operator<<(int16_t n) {
-                ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%d", n);
+                crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%d", n);
                 return *this;
             }
 
             loex &loex::operator<<(uint16_t n) {
-                ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%u", n);
+                crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%u", n);
                 return *this;
             }
 
             loex &loex::operator<<(int64_t n) {
-                ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), INT64_STRFMT, n);
+                crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), INT64_STRFMT, n);
                 return *this;
             }
 
             loex &loex::operator<<(uint64_t n) {
-                ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), UINT64_STRFMT, n);
+                crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), UINT64_STRFMT, n);
                 return *this;
             }
 
             loex &loex::operator<<(const std::basic_string<char> &str) {
                 if (str.size() > 0) {
-                    ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%s", str.c_str());
+                    crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%s", str.c_str());
                 }
                 return *this;
             }
 
             loex &loex::operator<<(void *ptr) {
-                ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%p", ptr);
+                crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%p", ptr);
                 return *this;
             }
 
             loex &loex::operator<<(void **ptr) {
-                ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%p", ptr);
+                crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%p", ptr);
                 return *this;
             }
 
             loex &loex::operator<<(const hex &ob) {
-                ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%08X", ob.__auto_t);
+                crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%08X", ob.__auto_t);
                 return *this;
             }
 
             loex &loex::operator<<(float f) {
-                ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%g", f);
+                crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%g", f);
                 return *this;
             }
 
             loex &loex::operator<<(double lf) {
-                ::posix__sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%g", lf);
+                crt_sprintf(&str_[strlen(str_)], sizeof ( str_) - strlen(str_), "%g", lf);
                 return *this;
             }
 
