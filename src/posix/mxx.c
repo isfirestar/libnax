@@ -261,6 +261,12 @@ int nis_cntl(objhld_t link, int cmd, ...)
             *(va_arg(ap, void **) ) = context;
             link = INVALID_OBJHLD;
             break;
+        case NI_GETAF:
+            retval = ncb->local_addr.sin_family;
+            break;
+        case NI_GETPROTO:
+            retval = ncb->protocol;
+            break;
         default:
             retval = posix__makeerror(EINVAL);
             break;

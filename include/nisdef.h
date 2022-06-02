@@ -76,6 +76,8 @@ typedef abuff_type(112) abuff_ipc_path_t;   /* a string with maximum length to h
 #define NI_DUPCTX       (7)	/* not used */
 #define NI_RISECTX      (8)
 #define NI_SINKCTX      (9)
+#define NI_GETAF        (10)
+#define NI_GETPROTO     (11)
 
 /* the dotted decimal notation for IPv4 or IPv6 */
 struct nis_inet_addr {
