@@ -48,6 +48,9 @@ struct _ncb {
     /* the file-descriptor of epoll object which binding with @sockfd */
     int epfd;
 
+    /* Rx thread-id binding upon epoll */
+    pid_t rx_tid;
+
     /* the IP protocol type of this ncb, only support these two types:IPPROTO_TCP/IPPROTO_UDP */
     int protocol;
 

@@ -51,7 +51,7 @@ int lwp_create(lwp_t *lwp, int priority, void*(*start_rtn)(void*), void *arg)
 int lwp_self(lwp_t *lwp)
 {
     if (!lwp) {
-        return -EINVAL;
+        return GetCurrentThread();
     }
 
     lwp->pid_ = GetCurrentThread();

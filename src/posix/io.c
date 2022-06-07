@@ -25,6 +25,7 @@ struct epoll_object_block {
     lwp_t lwp;
     lwp_event_t exit;
     int pipefdw;
+    pid_t tid;
 } ;
 
 struct io_object_block {
@@ -206,6 +207,7 @@ static void *_epoll_proc(void *argv)
     assert(NULL != epoptr);
 
     mxx_call_ecr("Lwp for Ep:%d", epoptr->epfd);
+    epoptr->tid = ifos_gettid();
 
     while (YES == epoptr->actived) {
         sigcnt = epoll_wait(epoptr->epfd, evts, EPOLL_SIZE, EP_TIMEDOUT);
@@ -497,6 +499,7 @@ nsp_status_t io_attach(void *ncbptr, int mask)
     nsp_status_t status;
     sharedptr_pt sptr;
     struct io_object_block *obptr;
+    struct epoll_object_block *epoptr;
 
     ncb = (ncb_t *)ncbptr;
 
@@ -516,13 +519,15 @@ nsp_status_t io_attach(void *ncbptr, int mask)
         epevt.events = (EPOLLET | EPOLLRDHUP | EPOLLHUP | EPOLLERR);
     	epevt.events |= mask;
 
-    	ncb->epfd = obptr->epoptr[ncb->hld % obptr->nprocs].epfd;
+        epoptr = &obptr->epoptr[ncb->hld % obptr->nprocs];
+    	ncb->epfd = epoptr->epfd;
         if ( epoll_ctl(ncb->epfd, EPOLL_CTL_ADD, ncb->sockfd, &epevt) < 0 &&
                 errno != EEXIST ) {
             mxx_call_ecr("Fatal syscall epoll_ctl(2),link:%lld,sockfd:%d,epfd:%d,mask:%d,error:%d",
                 ncb->hld, ncb->sockfd, ncb->epfd, mask, errno);
             ncb->epfd = -1;
     	} else {
+            ncb->rx_tid = epoptr->tid;
             mxx_call_ecr("Success associate link:%lld,sockfd:%d,epfd:%d", ncb->hld, ncb->sockfd, ncb->epfd);
         }
     } while(0);
@@ -560,6 +565,8 @@ void io_detach(void *ncbptr)
             mxx_call_ecr("Fatal syscall epoll_ctl(2) link:%lld,sockfd:%d,epfd:%d,mask:%d,error:%d",
                 ncb->hld, ncb->sockfd, ncb->epfd, errno);
         }
+        ncb->epfd = -1;
+        ncb->rx_tid = 0;
     }
 }
 

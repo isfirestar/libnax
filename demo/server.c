@@ -7,8 +7,12 @@ static void on_tcp_received(HTCPLINK link, const unsigned char *data, int size)
 {
     const struct argument *parameter;
     char *resp;
+    pid_t tid;
 
     parameter = arg_get_parameter();
+
+    tid = nis_cntl(link, NI_GETRXTID);
+    assert(tid == ifos_gettid());
 
     resp = NULL;
     nis_cntl(link, NI_GETCTX, &resp);

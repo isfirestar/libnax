@@ -42,7 +42,8 @@ struct _rwlock_t
 /* -lpthread */
 #include <pthread.h>
 
-typedef pthread_t lwp_handle_t;  /* typedef unsigned long int pthread_t; */
+typedef pthread_t lwp_handle_t;  /* typedef unsigned long int pthread_t; but
+                                    typedef int __pid_t */
 
 struct _lwp_t
 {

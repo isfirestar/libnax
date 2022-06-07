@@ -267,6 +267,9 @@ int nis_cntl(objhld_t link, int cmd, ...)
         case NI_GETPROTO:
             retval = ncb->protocol;
             break;
+        case NI_GETRXTID:
+            retval = (int)ncb->rx_tid;
+            break;
         default:
             retval = posix__makeerror(EINVAL);
             break;

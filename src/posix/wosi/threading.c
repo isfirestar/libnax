@@ -33,8 +33,8 @@ nsp_status_t lwp_create(lwp_t *lwp, int priority, void*(*start_rtn)(void*), void
 
 lwp_handle_t lwp_self(lwp_t *lwp)
 {
-    if (unlikely(!lwp)) {
-        return posix__makeerror(EINVAL);
+    if (!lwp) {
+        return pthread_self();
     }
 
     lwp->pid_ = pthread_self();

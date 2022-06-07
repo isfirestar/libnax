@@ -79,7 +79,7 @@ static int _write_log_file(struct log_file_descriptor *file, const void *buf, in
 
 static struct log_file_descriptor *_attach_log_file(const datetime_t *currst, const char *module)
 {
-    char name[128], path[600];
+    char name[64], path[600];
     ifos_path_buffer_t pename;
     int retval;
     struct list_head *pos;

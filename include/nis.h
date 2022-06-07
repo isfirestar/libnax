@@ -380,6 +380,8 @@ PORTABLEAPI(nsp_status_t) nis_getifmac(const char *eth_name, abuff_mac_t *phyadd
  *  NI_GETPROTO()
  *		query address family or network protocl which the @link owned
  *		on success, return value canbe one of : IPPROTO_TCP IPPROTO_UDP IPPROTO_ARP, otherwise, -1 returned
+ *	NI_GETRXTID()
+ *		query the Rx thread-id of @link which bind and managed in epoll or IOCP
  */
 PORTABLEAPI(int) nis_cntl(objhld_t link, int cmd, ...);
 

@@ -40,7 +40,8 @@ static DWORD WINAPI __iorun(LPVOID p)
 
 	epos = (struct epoll_object *)p;
 
-	mxx_call_ecr("epfd:%d LWP:%u startup.", epos->epfd, ifos_gettid());
+	epos->tid = ifos_gettid();
+	mxx_call_ecr("epfd:%d LWP:%u startup.", epos->epfd, epos->tid);
 
 	while ( TRUE ) {
 		ovlp = NULL;
@@ -71,7 +72,7 @@ static DWORD WINAPI __iorun(LPVOID p)
 		}
 	}
 
-	mxx_call_ecr("epfd:%d LWP:%u terminated.", epos->epfd, ifos_gettid());
+	mxx_call_ecr("epfd:%d LWP:%u terminated.", epos->epfd, epos->tid);
 	return 0L;
 }
 
@@ -137,6 +138,7 @@ int ioatth(void *ncbptr)
 	bind_iocp = CreateIoCompletionPort((HANDLE)ncb->sockfd, epos->epfd, (ULONG_PTR)NULL, 0);
 	if ((bind_iocp) && (bind_iocp == epos->epfd)) {
 		mxx_call_ecr("success associate sockfd:%d with epfd:%d, link:%I64d", ncb->sockfd, epos->epfd, ncb->hld);
+		ncb->rx_tid = epos->tid;
 		return 0;
 	}
 

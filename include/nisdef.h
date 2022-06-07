@@ -78,6 +78,7 @@ typedef abuff_type(112) abuff_ipc_path_t;   /* a string with maximum length to h
 #define NI_SINKCTX      (9)
 #define NI_GETAF        (10)    /* obtain address family */
 #define NI_GETPROTO     (11)    /* obtain protocol dependency */
+#define NI_GETRXTID     (12)    /* obtain Rx thread id(which managed in epoll or IOCP)  */
 
 /* the dotted decimal notation for IPv4 or IPv6 */
 struct nis_inet_addr {
@@ -114,16 +115,16 @@ typedef nis_callback_t udp_io_callback_t;
 ---------------------------------------------------------------------------------------------------------------------------------------------------------*/
 
 /*  private protocol template(PPT,) support
-    protocol parse template: tcp_ppt_parser_t
-            @data               data stream
-            @cb                 bytes of data stream
-            @user_data_size     bytes of user data stream (eliminate length of protocol)
-
-    protocol builder template: tcp_ppt_builder_t
-            @data               data stream
-            @cb                 bytes of data stream for build
-
-    Any negative return of PPT templates will terminate the subsequent operation
+ *   protocol parse template: tcp_ppt_parser_t
+ *           @data               data stream
+ *           @cb                 bytes of data stream
+ *           @user_data_size     bytes of user data stream (eliminate length of protocol)
+ *
+ *   protocol builder template: tcp_ppt_builder_t
+ *           @data               data stream
+ *           @cb                 bytes of data stream for build
+ *
+ *   Any negative return of PPT templates will terminate the subsequent operation
  */
 typedef nsp_status_t( STDCALL *tcp_ppt_parser_t)(void *data, int cb, int *user_data_size);
 typedef nsp_status_t( STDCALL *tcp_ppt_builder_t)(void *data, int cb);
