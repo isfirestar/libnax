@@ -34,6 +34,7 @@
 #define crt_wcstok(wcs, delim, saveptr) wcstok_s(wcs, delim, saveptr)
 #define crt_strdup(s) _strdup(s)
 #define crt_wcsdup(s) _wcsdup(s)
+#define crt_strrev(src) _strrev(src)
 
 #else
 
@@ -59,13 +60,12 @@
 #define crt_wcstok(wcs, delim, saveptr) wcstok(wcs, delim, saveptr)
 #define crt_strdup(s) strdup(s) /* -D_POSIX_C_SOURCE >= 200809L */
 #define crt_wcsdup(s) wcsdup(s)
+PORTABLEAPI(char *) crt_strrev(char *src);
 
 #endif /* _WIN32 */
 
 #define crt_strcmp(s1, s2) strcmp(s1, s2)
 #define crt_wcscmp(s1, s2) wcscmp(s1, s2)
-
-PORTABLEAPI(char *) crt_strrev(char *src);
 
 #if __cplusplus
 #define abuff_type(n) struct {   \
