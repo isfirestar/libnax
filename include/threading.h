@@ -82,7 +82,8 @@ PORTABLEAPI(nsp_status_t) lwp_join(lwp_t *lwp, void **retval);
 #define lwp_joinable(lwp)   (((lwp)->pid_ <= 0) ? 0 : (!(lwp)->detached_))
 
 /* retain the thread itself */
-PORTABLEAPI(lwp_handle_t) lwp_self(lwp_t *tidp);
+PORTABLEAPI(lwp_handle_t) lwp_self();
+PORTABLEAPI(lwp_handle_t) lwp_raw(lwp_t *tidp);
 
 /* yield thread */
 PORTABLEAPI(nsp_status_t) lwp_yield(lwp_t *tidp);

@@ -48,14 +48,18 @@ int lwp_create(lwp_t *lwp, int priority, void*(*start_rtn)(void*), void *arg)
     return 0;
 }
 
-int lwp_self(lwp_t *lwp)
+lwp_handle_t lwp_self()
 {
-    if (!lwp) {
-        return GetCurrentThread();
+    return GetCurrentThread();
+}
+
+lwp_handle_t lwp_raw(lwp_t *lwp)
+{
+    if (likely(lwp)) {
+        return lwp->pid_;
     }
 
-    lwp->pid_ = GetCurrentThread();
-    return (int)lwp->pid_;
+    return 0;
 }
 
 int lwp_yield(lwp_t *tidp)

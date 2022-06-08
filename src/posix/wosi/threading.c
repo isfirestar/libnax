@@ -31,14 +31,18 @@ nsp_status_t lwp_create(lwp_t *lwp, int priority, void*(*start_rtn)(void*), void
     return posix__makeerror(retval);
 }
 
-lwp_handle_t lwp_self(lwp_t *lwp)
+lwp_handle_t lwp_self()
 {
-    if (!lwp) {
-        return pthread_self();
+    return pthread_self();
+}
+
+lwp_handle_t lwp_raw(lwp_t *lwp)
+{
+    if (likely(lwp)) {
+        return lwp->pid_;
     }
 
-    lwp->pid_ = pthread_self();
-    return lwp->pid_;
+    return 0;
 }
 
 nsp_status_t lwp_yield(lwp_t *tidp)

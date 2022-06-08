@@ -606,9 +606,6 @@ nsp_status_t tcp_connect(HTCPLINK link, const char* ipstr, uint16_t port)
 
     status = (AF_UNIX == ncb->local_addr.sin_family) ? _tcp_connect_domain(ncb, ipstr) : _tcp_connect(ncb, ipstr, port);
     objdefr(link);
-    if ( !NSP_SUCCESS(status)) {
-        objclos(link);
-    }
     return status;
 }
 
@@ -806,9 +803,6 @@ nsp_status_t tcp_connect2(HTCPLINK link, const char* ipstr, uint16_t port)
 
     status = (AF_UNIX == ncb->local_addr.sin_family) ?  _tcp_connect2_domain(ncb, ipstr) : _tcp_connect2(ncb, ipstr, port);
     objdefr(link);
-    if ( !NSP_SUCCESS(status)) {
-        objclos(link);
-    }
     return status;
 }
 
@@ -908,7 +902,6 @@ nsp_status_t tcp_listen(HTCPLINK link, int block)
          *  ncb object willbe destroy on fatal. */
         status = io_attach(ncb, EPOLLIN);
         if ( !NSP_SUCCESS(status) ) {
-            objclos(link);
             break;
         }
 
