@@ -43,7 +43,6 @@ int lwp_create(lwp_t *lwp, int priority, void*(*start_rtn)(void*), void *arg)
         SetThreadPriority(th, THREAD_PRIORITY_TIME_CRITICAL);
     }
 
-    lwp->detached_ = NO;
     lwp->pid_ = th;
     return 0;
 }
@@ -125,42 +124,43 @@ nsp_status_t lwp_getname(const lwp_t *lwp, abuff_pthread_name_t *name)
     return posix__makeerror(fr);
 }
 
-int lwp_detach(lwp_t *lwp)
+nsp_status_t lwp_detach(lwp_t *lwp)
 {
     if (!lwp) {
         return posix__makeerror(EINVAL);
     }
 
-    if (!lwp->detached_) {
+    if (lwp_joinable(lwp)) {
         if (lwp->pid_) {
             CloseHandle(lwp->pid_);
         }
 
         lwp->pid_ = NULL;
-        lwp->detached_ = YES;
-        return 0;
+        return NSP_STATUS_SUCCESSFUL;
     }
 
     return posix__makeerror(EINVAL);
 }
 
-int lwp_join(lwp_t *lwp, void **retval)
+nsp_boolean_t lwp_joinable(lwp_t *lwp)
+{
+    return (lwp->pid_ != NULL);
+}
+
+nsp_status_t lwp_join(lwp_t *lwp, void **retval)
 {
     if (!lwp) {
-        return -EINVAL;
+        return posix__makeerror(EINVAL);
     }
 
-    if (!lwp->detached_) {
-        if (lwp->pid_) {
-            CloseHandle(lwp->pid_);
-        }
-
-        lwp->pid_ = NULL;
-        lwp->detached_ = YES;
-        return 0;
+    if (!lwp_joinable(lwp)) {
+        return posix__makeerror(ENOENT);
     }
 
-    return -1;
+    WaitForSingleObject(lwp->pid_, INFINITE);
+    CloseHandle(lwp->pid_);
+    lwp->pid_ = NULL;
+    return NSP_STATUS_SUCCESSFUL;
 }
 
 int lwp_setkey(lwp_t *lwp, void *key)

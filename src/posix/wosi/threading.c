@@ -24,6 +24,7 @@ nsp_status_t lwp_create(lwp_t *lwp, int priority, void*(*start_rtn)(void*), void
         pthread_attr_setinheritsched(&lwp->attr, PTHREAD_EXPLICIT_SCHED);
     }
 
+    pthread_attr_setdetachstate(&lwp->attr, PTHREAD_CREATE_JOINABLE);
     retval = pthread_create(&lwp->pid, &lwp->attr, start_rtn, arg);
     return posix__makeerror(retval);
 }
@@ -157,10 +158,11 @@ nsp_status_t lwp_detach(lwp_t *lwp)
         return posix__makeerror(EINVAL);
     }
 
-    if (lwp_joinable(lwp) == PTHREAD_CREATE_JOINABLE) {
+    if (lwp_joinable(lwp)) {
         fr = pthread_detach(lwp->pid);
         if (0 == fr) {
             lwp->pid = 0;
+            pthread_attr_setdetachstate(&lwp->attr, PTHREAD_CREATE_DETACHED);
         }
         return posix__makeerror(fr);
     }
@@ -168,21 +170,21 @@ nsp_status_t lwp_detach(lwp_t *lwp)
     return NSP_STATUS_FATAL;
 }
 
-int lwp_joinable(lwp_t *lwp)
+nsp_boolean_t lwp_joinable(lwp_t *lwp)
 {
     int fr;
     int state;
 
     if (unlikely(!lwp)) {
-        return posix__makeerror(EINVAL);
+        return nsp_false;
     }
 
     fr = pthread_attr_getdetachstate(&lwp->attr, &state);
     if (0 == fr) {
-        return state;
+        return ((state == PTHREAD_CREATE_JOINABLE) && (lwp->pid > 0));
     }
 
-    return posix__makeerror(fr);
+    return nsp_false;
 }
 
 nsp_status_t lwp_join(lwp_t *lwp, void **retval)
@@ -193,7 +195,7 @@ nsp_status_t lwp_join(lwp_t *lwp, void **retval)
         return posix__makeerror(EINVAL);
     }
 
-    if ( lwp_joinable(lwp) == PTHREAD_CREATE_JOINABLE ) {
+    if ( lwp_joinable(lwp) ) {
         fr = pthread_join(lwp->pid, retval);
         if (0 == fr) {
             lwp->pid = 0;

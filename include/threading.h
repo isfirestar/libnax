@@ -13,15 +13,13 @@ typedef HANDLE lwp_handle_t;
 
 struct _lwp_t
 {
-    //nsp_boolean_t detached_;
-    int joinable_;
     HANDLE pid_;
 };
 
 #define LWP_TYPE_DECLARE(name)    \
-            struct _lwp_t name = { .detached_ = NO, .pid_ = NULL }
+            struct _lwp_t name = { .pid_ = NULL }
 #define LWP_TYPE_INIT  \
-            { .detached_ = NO,, .pid_ = NULL }
+            { .pid_ = NULL }
 
 struct _mutex_t
 {
@@ -48,17 +46,16 @@ typedef pthread_t lwp_handle_t;  /* typedef unsigned long int pthread_t; but
 
 struct _lwp_t
 {
-    //nsp_boolean_t detached_;
     pthread_attr_t attr;
     pthread_t pid;
     pthread_key_t  key;
 };
 
-#define LWP_TYPE_DECLARE(name)    \
-            struct _lwp_t name = { .detached_ = NO, .pid_ = 0 }
-
 #define LWP_TYPE_INIT \
-            {.detached_ = NO, .pid_ = 0 }
+           { .pid_ = 0, .key = 0 }
+
+#define LWP_TYPE_DECLARE(name)    \
+            struct _lwp_t name = LWP_TYPE_INIT
 
 struct _mutex_t
 {
@@ -83,7 +80,7 @@ PORTABLEAPI(nsp_status_t) lwp_detach(lwp_t *lwp);
 PORTABLEAPI(nsp_status_t) lwp_join(lwp_t *lwp, void **retval);
 /* on success, return value shall be PTHREAD_CREATE_JOINABLE ro PTHREAD_CREATE_DETACHED.
     otherwise, negative integer value returned */
-PORTABLEAPI(int) lwp_joinable(lwp_t *lwp);
+PORTABLEAPI(nsp_boolean_t) lwp_joinable(lwp_t *lwp);
 //#define lwp_joinable(lwp)   (((lwp)->pid_ <= 0) ? 0 : (!(lwp)->detached_))
 
 /* retain the thread itself */
