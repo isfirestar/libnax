@@ -13,7 +13,8 @@ typedef HANDLE lwp_handle_t;
 
 struct _lwp_t
 {
-    nsp_boolean_t detached_;
+    //nsp_boolean_t detached_;
+    int joinable_;
     HANDLE pid_;
 };
 
@@ -47,9 +48,10 @@ typedef pthread_t lwp_handle_t;  /* typedef unsigned long int pthread_t; but
 
 struct _lwp_t
 {
-    nsp_boolean_t detached_;
-    pthread_t pid_;
-    pthread_key_t  key_;
+    //nsp_boolean_t detached_;
+    pthread_attr_t attr;
+    pthread_t pid;
+    pthread_key_t  key;
 };
 
 #define LWP_TYPE_DECLARE(name)    \
@@ -79,7 +81,10 @@ typedef struct _rwlock_t        lwp_rwlock_t;
 PORTABLEAPI(nsp_status_t) lwp_create(lwp_t *lwp, int priority, void*(*start_rtn)(void*), void *arg);
 PORTABLEAPI(nsp_status_t) lwp_detach(lwp_t *lwp);
 PORTABLEAPI(nsp_status_t) lwp_join(lwp_t *lwp, void **retval);
-#define lwp_joinable(lwp)   (((lwp)->pid_ <= 0) ? 0 : (!(lwp)->detached_))
+/* on success, return value shall be PTHREAD_CREATE_JOINABLE ro PTHREAD_CREATE_DETACHED.
+    otherwise, negative integer value returned */
+PORTABLEAPI(int) lwp_joinable(lwp_t *lwp);
+//#define lwp_joinable(lwp)   (((lwp)->pid_ <= 0) ? 0 : (!(lwp)->detached_))
 
 /* retain the thread itself */
 PORTABLEAPI(lwp_handle_t) lwp_self();
@@ -146,18 +151,28 @@ enum lwp_event_category
     LWPEC_SYNC,
 };
 
+#if _WIN32
 struct _lwp_event
 {
-    enum lwp_event_category sync_; /* as boolean check */
-#if _WIN32
+    enum lwp_event_category sync_;
     HANDLE cond_;
+};
+#define LWP_SYNC_EVENT_INITIALIZER
 #else
+struct _lwp_event
+{
+    enum lwp_event_category sync_;
     pthread_cond_t cond_;
     int pass_;
     lwp_mutex_t mutex_;
     int effective;
-#endif
 };
+#define LWP_SYNC_EVENT_INITIALIZER { .sync_ = LWPEC_SYNC, \
+            .cond_ = PTHREAD_COND_INITIALIZER, \
+            .pass_ = 0, \
+            .mutex_ = { PTHREAD_MUTEX_INITIALIZER, } \
+            .effective = 1, }
+#endif
 typedef struct _lwp_event lwp_event_t;
 
 /* synchronous or notifications event for thread */

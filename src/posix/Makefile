@@ -22,7 +22,7 @@ SYSBITS := $(shell getconf LONG_BIT)
 
 SRCS := $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)*.c))
 INCS := $(addprefix -I, $(INC_DIRS))
-CFLAGS := $(INCS) -Wall -std=gnu99 -D_GNU_SOURCE -fvisibility=hidden -fPIC -Wno-unused-function -D_FILE_OFFSET_BITS=64
+CFLAGS := $(INCS) -Wall -std=gnu99 -D_GNU_SOURCE -fvisibility=hidden -fPIC -Wno-unused-function -D_FILE_OFFSET_BITS=64 -D_X64
 
 MIN_GCC_VERSION = "4.9"
 GCC_VERSION := "`$(CC) -dumpversion`"
@@ -39,19 +39,20 @@ LDFLAGS := -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -pthread -lrt -ldl -lcrypt
 OBJCOPY := objcopy
 
 ifeq ($(arch), i686)
-	CFLAGS  += -m32
+	CFLAGS  += -m32 -D_X86
 	LDFLAGS += -m32
 endif
 
 ifeq ($(arch), $(filter $(arch),arm arm32))
 	CC := arm-seev100-linux-gnueabihf-gcc
 	OBJCOPY := arm-seev100-linux-gnueabihf-objcopy
-	CFLAGS  += -mfloat-abi=hard -mfpu=neon
+	CFLAGS  += -mfloat-abi=hard -mfpu=neon -D_ARM32
 endif
 
 ifeq ($(arch), $(filter $(arch),arm64 aarch64))
 	CC := aarch64-linux-gnu-gcc
 	OBJCOPY := aarch64-linux-gnu-objcopy
+	CFLAGS += -D_ARM64
 endif
 
 ifeq ($(build),debug)

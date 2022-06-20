@@ -9,25 +9,22 @@
 nsp_status_t lwp_create(lwp_t *lwp, int priority, void*(*start_rtn)(void*), void *arg)
 {
     int retval;
-    pthread_attr_t attr;
     struct sched_param param;
 
     if ( unlikely((!lwp || !start_rtn)) ) {
         return posix__makeerror(EINVAL);
     }
 
-    pthread_attr_init(&attr);
-    lwp->detached_ = NO;
+    pthread_attr_init(&lwp->attr);
 
     if (priority > 0) {
-        pthread_attr_setschedpolicy(&attr, SCHED_RR);
+        pthread_attr_setschedpolicy(&lwp->attr, SCHED_RR);
         param.sched_priority = priority;
-        pthread_attr_setschedparam(&attr,&param);
-        pthread_attr_setinheritsched(&attr, PTHREAD_EXPLICIT_SCHED);
+        pthread_attr_setschedparam(&lwp->attr,&param);
+        pthread_attr_setinheritsched(&lwp->attr, PTHREAD_EXPLICIT_SCHED);
     }
 
-    retval = pthread_create(&lwp->pid_, &attr, start_rtn, arg);
-    pthread_attr_destroy(&attr);
+    retval = pthread_create(&lwp->pid, &lwp->attr, start_rtn, arg);
     return posix__makeerror(retval);
 }
 
@@ -39,7 +36,7 @@ lwp_handle_t lwp_self()
 lwp_handle_t lwp_raw(lwp_t *lwp)
 {
     if (likely(lwp)) {
-        return lwp->pid_;
+        return lwp->pid;
     }
 
     return 0;
@@ -72,7 +69,7 @@ nsp_status_t lwp_setaffinity(const lwp_t *lwp, int cpumask)
         }
     }
 
-    retval = pthread_setaffinity_np(lwp->pid_, sizeof(cpu_set_t), &cpuset);
+    retval = pthread_setaffinity_np(lwp->pid, sizeof(cpu_set_t), &cpuset);
     if (0 != retval) {
         return posix__makeerror(retval);
     }
@@ -102,7 +99,7 @@ nsp_status_t lwp_getaffinity(const lwp_t *lwp, int *cpumask)
 
     mask = 0;
     CPU_ZERO(&cpuset);
-    retval = pthread_getaffinity_np(lwp->pid_, sizeof(cpu_set_t), &cpuset);
+    retval = pthread_getaffinity_np(lwp->pid, sizeof(cpu_set_t), &cpuset);
     if ( 0 != retval ) {
         return posix__makeerror(retval);
     }
@@ -128,7 +125,7 @@ nsp_status_t lwp_setname(const lwp_t *lwp, const abuff_pthread_name_t *name)
         return posix__makeerror(EINVAL);
     }
 
-    fr = pthread_setname_np(lwp->pid_, name->cst);
+    fr = pthread_setname_np(lwp->pid, name->cst);
     if (0 == fr) {
         return NSP_STATUS_SUCCESSFUL;
     }
@@ -144,7 +141,7 @@ nsp_status_t lwp_getname(const lwp_t *lwp, abuff_pthread_name_t *name)
         return posix__makeerror(EINVAL);
     }
 
-    fr = pthread_getname_np(lwp->pid_, name->st, sizeof(name->st));
+    fr = pthread_getname_np(lwp->pid, name->st, sizeof(name->st));
     if (0 == fr) {
         return NSP_STATUS_SUCCESSFUL;
     }
@@ -160,16 +157,32 @@ nsp_status_t lwp_detach(lwp_t *lwp)
         return posix__makeerror(EINVAL);
     }
 
-    if (!lwp->detached_ && lwp->pid_) {
-        fr = pthread_detach(lwp->pid_);
+    if (lwp_joinable(lwp) == PTHREAD_CREATE_JOINABLE) {
+        fr = pthread_detach(lwp->pid);
         if (0 == fr) {
-            lwp->detached_ = 1;
-            lwp->pid_ = 0;
+            lwp->pid = 0;
         }
         return posix__makeerror(fr);
     }
 
     return NSP_STATUS_FATAL;
+}
+
+int lwp_joinable(lwp_t *lwp)
+{
+    int fr;
+    int state;
+
+    if (unlikely(!lwp)) {
+        return posix__makeerror(EINVAL);
+    }
+
+    fr = pthread_attr_getdetachstate(&lwp->attr, &state);
+    if (0 == fr) {
+        return state;
+    }
+
+    return posix__makeerror(fr);
 }
 
 nsp_status_t lwp_join(lwp_t *lwp, void **retval)
@@ -180,11 +193,11 @@ nsp_status_t lwp_join(lwp_t *lwp, void **retval)
         return posix__makeerror(EINVAL);
     }
 
-    if ( lwp_joinable(lwp) ) {
-        fr = pthread_join(lwp->pid_, retval);
+    if ( lwp_joinable(lwp) == PTHREAD_CREATE_JOINABLE ) {
+        fr = pthread_join(lwp->pid, retval);
         if (0 == fr) {
-            lwp->detached_ = 1;
-            lwp->pid_ = 0;
+            lwp->pid = 0;
+            pthread_attr_destroy(&lwp->attr);
         }
         return posix__makeerror(fr);
     }
@@ -200,18 +213,18 @@ nsp_status_t lwp_setkey(lwp_t *lwp, void *key)
         return posix__makeerror(EINVAL);
     }
 
-    retval = pthread_key_create(&lwp->key_, NULL);
+    retval = pthread_key_create(&lwp->key, NULL);
     if (0 != retval) {
         return posix__makeerror(retval);
     }
 
-    retval = pthread_setspecific(lwp->key_, key);
+    retval = pthread_setspecific(lwp->key, key);
     return posix__makeerror(retval);
 }
 
 void *lwp_getkey(lwp_t *lwp)
 {
-    return ( (likely(lwp)) ? pthread_getspecific(lwp->key_) : NULL );
+    return ( (likely(lwp)) ? pthread_getspecific(lwp->key) : NULL );
 }
 
 /*********************************************************************************************************
