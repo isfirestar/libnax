@@ -542,7 +542,7 @@ nsp_status_t lwp_event_wait(lwp_event_t *evo, int expire/*ms*/)
     }
 
     /* wait with timeout */
-    if (0 != clock_gettime(CLOCK_MONOTONIC, &abstime)) {
+    if (0 != clock_gettime(CLOCK_REALTIME, &abstime)) {
          return posix__makeerror(errno);
     }
 
