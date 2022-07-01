@@ -155,7 +155,6 @@ static void _iorun(const struct epoll_event *eventptr)
             ncb_read = atom_get(&ncb->ncb_read);
             if ( likely(ncb_read) ) {
                 status = ncb_read(ncb);
-                // if ( !NSP_SUCCESS(status) && !NSP_ERROR_STATUS_EQUAL(status, EAGAIN)) {
                 if (!NSP_SUCCESS_OR_ERROR_EQUAL(status, EAGAIN)) {
                     objclos(ncb->hld);
                 }

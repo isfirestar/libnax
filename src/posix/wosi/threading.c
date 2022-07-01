@@ -5,11 +5,30 @@
 /*********************************************************************************************************
 *****************************************        thread            ***************************************
 **********************************************************************************************************/
+static nsp_status_t lwp_priority_range(int *min, int *max)
+{
+    if (min) {
+        (*min) = sched_get_priority_min(SCHED_RR);
+        if (-1 == (*min)) {
+            return posix__makeerror(errno);
+        }
+    }
+
+    if (max) {
+        (*max) = sched_get_priority_max(SCHED_RR);
+        if (-1 == (*max)) {
+            return posix__makeerror(errno);
+        }
+    }
+
+    return NSP_STATUS_SUCCESSFUL;
+}
 
 nsp_status_t lwp_create(lwp_t *lwp, int priority, void*(*start_rtn)(void*), void *arg)
 {
     int retval;
     struct sched_param param;
+    int minprior, maxprior;
 
     if ( unlikely((!lwp || !start_rtn)) ) {
         return posix__makeerror(EINVAL);
@@ -18,11 +37,20 @@ nsp_status_t lwp_create(lwp_t *lwp, int priority, void*(*start_rtn)(void*), void
     pthread_attr_init(&lwp->attr);
 
     if (priority > 0) {
+        pthread_attr_getschedparam(&lwp->attr, &param);
         pthread_attr_setschedpolicy(&lwp->attr, SCHED_RR);
-        param.sched_priority = priority;
+        if (NSP_SUCCESS(lwp_priority_range(&minprior, &maxprior))) {
+            param.sched_priority = (priority < minprior) ? minprior : ((priority > maxprior) ? maxprior : priority);
+        }
         pthread_attr_setschedparam(&lwp->attr,&param);
-        pthread_attr_setinheritsched(&lwp->attr, PTHREAD_EXPLICIT_SCHED);
+    } else {
+        pthread_attr_setschedpolicy(&lwp->attr, SCHED_OTHER);
     }
+
+    /* pthread_attr_setscope(&lwp->attr, PTHREAD_SCOPE_SYSTEM) */
+
+    /* loop schedule are the modle whcih most time we want */
+    pthread_attr_setinheritsched(&lwp->attr, PTHREAD_EXPLICIT_SCHED);
 
     pthread_attr_setdetachstate(&lwp->attr, PTHREAD_CREATE_JOINABLE);
     retval = pthread_create(&lwp->pid, &lwp->attr, start_rtn, arg);
@@ -126,6 +154,7 @@ nsp_status_t lwp_setname(const lwp_t *lwp, const abuff_pthread_name_t *name)
         return posix__makeerror(EINVAL);
     }
 
+    /* prctl(PR_SET_NAME) */
     fr = pthread_setname_np(lwp->pid, name->cst);
     if (0 == fr) {
         return NSP_STATUS_SUCCESSFUL;
@@ -142,6 +171,7 @@ nsp_status_t lwp_getname(const lwp_t *lwp, abuff_pthread_name_t *name)
         return posix__makeerror(EINVAL);
     }
 
+    /* prctl(PR_GET_NAME) */
     fr = pthread_getname_np(lwp->pid, name->st, sizeof(name->st));
     if (0 == fr) {
         return NSP_STATUS_SUCCESSFUL;

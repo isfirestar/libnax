@@ -36,35 +36,83 @@
 
 #else /* POSIX */
 
+/* Reference GCC 9.3
+ *
+ * The following built-in functions approximately match the requirements for the C++11 memory model.
+ * They are all identified by being prefixed with ‘__atomic’ and most are overloade so that they work with multiple types.
+ *
+ * These functions are intended to replace the legacy ‘__sync’ builtins.
+ * The main difference is that the memory order that is requested is a parameter to the functions.
+ * New code should always use the ‘__atomic’ builtins rather than the ‘__sync’ builtins
+ *
+ * type __atomic_load_n(type *ptr, memory_order order) {
+ *      fence_before(order)
+ *      return *ptr;
+ * }
+ *
+ * void __atomic_store_n(type *ptr, type val, memory_order order) {
+ *      *ptr = vale;
+ *      fence_after(order);
+ * }
+ */
 #define atom_get(ptr)										__atomic_load_n((ptr), __ATOMIC_ACQUIRE)
 #define atom_get64(ptr)										__atomic_load_n((ptr), __ATOMIC_ACQUIRE)
 #define atom_set(ptr,value) 								__atomic_store_n((ptr), (value), __ATOMIC_RELEASE)
 #define atom_set64(ptr,value) 								__atomic_store_n((ptr), (value), __ATOMIC_RELEASE)
 
+/* for @__atomic_xxx_fetch, all memory orders are vaild */
 #define atom_addone(ptr)                  				    __atomic_add_fetch((ptr), 1, __ATOMIC_SEQ_CST)
 #define atom_subone(ptr)                  				    __atomic_sub_fetch((ptr), 1, __ATOMIC_SEQ_CST)
-#define atom_addone64(ptr)                                   __atomic_add_fetch((ptr), 1, __ATOMIC_SEQ_CST)
-#define atom_subone64(ptr)                                   __atomic_sub_fetch((ptr), 1, __ATOMIC_SEQ_CST)
-
+#define atom_addone64(ptr)                                  __atomic_add_fetch((ptr), 1, __ATOMIC_SEQ_CST)
+#define atom_subone64(ptr)                                  __atomic_sub_fetch((ptr), 1, __ATOMIC_SEQ_CST)
 #define atom_increase(ptr, value)                           __atomic_add_fetch((ptr), (value), __ATOMIC_SEQ_CST)
 #define atom_increase64(ptr, value)                         __atomic_add_fetch((ptr), (value), __ATOMIC_SEQ_CST)
 #define atom_decrease(ptr, value)                           __atomic_sub_fetch((ptr), (value), __ATOMIC_SEQ_CST)
 #define atom_decrease64(ptr, value)                         __atomic_sub_fetch((ptr), (value), __ATOMIC_SEQ_CST)
 
-#define atom_exchange(ptr, value)       				    __atomic_exchange_n((ptr), (value), __ATOMIC_SEQ_CST)
-#define atom_exchange64(ptr, value)       					__atomic_exchange_n((ptr), (value), __ATOMIC_SEQ_CST)
-#define atom_exchange_pointer(ptr, value)                   __atomic_exchange_n((ptr), (value), __ATOMIC_SEQ_CST)
+/*
+ *  type __atomic_exchange_n(type *ptr, type val, memory_order order) {
+ *      fence_before(order);
+ *      type n = *ptr;
+ *      *ptr = val;
+ *      fence_after(order);
+ *      return n;
+ * }
+ */
+#define atom_exchange(ptr, value)       				    __atomic_exchange_n((ptr), (value), __ATOMIC_ACQ_REL)
+#define atom_exchange64(ptr, value)       					__atomic_exchange_n((ptr), (value), __ATOMIC_ACQ_REL)
+#define atom_exchange_pointer(ptr, value)                   __atomic_exchange_n((ptr), (value), __ATOMIC_ACQ_REL)
 
+/* these macros use to compatible with windows semantic */
 #define atom_compare_exchange(ptr, oldval,  newval)         __sync_val_compare_and_swap((ptr), (oldval), (newval))
 #define atom_compare_exchange64(ptr, oldval,  newval)       __sync_val_compare_and_swap((ptr), (oldval), (newval))
 #define atom_compare_exchange_pointer(ptr, oldptr, newptr)  __sync_val_compare_and_swap((ptr), (oldptr), (newptr))
 
-#define atom_compare_exchange_strong(ptr, expect, value)    __atomic_compare_exchange_n((ptr), (expect), (value), 0, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED)
-#define atom_compare_exchange_weak(ptr, expect, value)      __atomic_compare_exchange_n((ptr), (expect), (value), 1, __ATOMIC_RELEASE, __ATOMIC_ACQUIRE)
+/*
+ * bool atomic_compare_exchange(
+ *   volatile type *ptr, type *expected, type desired, memory_order succ, memory_order fail)
+ *   {
+ *       fence_beofre(succ); // fence 1
+ *       if (*ptr == *expected) {
+ *           *ptr = desired;
+ *           fence_after(succ);  // fence 2
+ *           return true;
+ *       } else {
+ *           *expected = *ptr; // @strong guarantee this semantic shall be happen, @weak accorading to architecture platform
+ *           fence_after(fail); // fence 3
+ *           return false;
+ *       }
+ *   }
+ *
+ * fence semantic:
+ * fence 1: @release before write
+ * fence 2: meaningless without @__ATOMIC_SEQ_CST
+ * fence 3: @acquire after read
+ */
+#define atom_compare_exchange_strong(ptr, expect, value)    __atomic_compare_exchange_n((ptr), (expect), (value), 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE)
+#define atom_compare_exchange_weak(ptr, expect, value)      __atomic_compare_exchange_n((ptr), (expect), (value), 1, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE)
 
 /*
- * bool __atomic_compare_exchange_n (type *ptr, type *expected, type desired, bool weak, int success_memorder, int failure_memorder)
- *
  * type __sync_lock_test_and_set (type *ptr, type value, ...)
  *          behavior: (type n = *ptr; *ptr = value; return n;)
  *

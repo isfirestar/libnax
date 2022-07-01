@@ -99,7 +99,6 @@ void ncb_deconstruct(objhld_t ignore, void *p)
     io_close(ncb);
 
     /* if this is a domain socket server, we need to unlink target from filesystem */
-    //if (ncb->protocol == IPPROTO_TCP &&
     if ( AF_UNIX == ncb->local_addr.sin_family  &&
         1 == ncb->local_addr.sin_port)
     {
