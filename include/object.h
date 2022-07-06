@@ -3,7 +3,7 @@
 
 #include "compiler.h"
 
-typedef int64_t objhld_t;
+typedef long objhld_t;
 typedef int( STDCALL * objinitfn_t)(void *udata, const void *ctx, int ctxcb);
 typedef void( STDCALL * objuninitfn_t)(objhld_t hld, void *udata);
 

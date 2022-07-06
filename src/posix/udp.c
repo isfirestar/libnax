@@ -64,6 +64,7 @@ static nsp_status_t _udp_create_domain(ncb_t *ncb, const char* domain)
 {
     int fd;
     nsp_status_t status;
+    int expect;
 
     fd = socket(AF_UNIX, SOCK_DGRAM, 0);
     if (unlikely(fd < 0)) {
@@ -71,10 +72,14 @@ static nsp_status_t _udp_create_domain(ncb_t *ncb, const char* domain)
        return posix__makeerror(errno);
     }
 
-    do {
-        /* copy initialize parameters */
-        ncb->sockfd = fd;
+    /* prevent double creation */
+    expect = 0;
+    if (!atom_compare_exchange_strong(&ncb->sockfd, &expect, fd)) {
+        close(fd);
+        return posix__makeerror(EEXIST);
+    }
 
+    do {
         /* local address information redirect to domain pattern */
         ncb->local_addr.sin_addr.s_addr = 0;
         ncb->local_addr.sin_family = AF_UNIX;
@@ -126,6 +131,7 @@ static nsp_status_t _udp_create_domain(ncb_t *ncb, const char* domain)
 static nsp_status_t _udp_create(ncb_t *ncb, const char* ipstr, uint16_t port, int flag)
 {
     int fd;
+    int expect;
     struct sockaddr_in addrlocal;
     socklen_t addrlen;
     nsp_status_t status;
@@ -136,10 +142,13 @@ static nsp_status_t _udp_create(ncb_t *ncb, const char* ipstr, uint16_t port, in
         return posix__makeerror(errno);
     }
 
-    do {
-        /* copy initialize parameters */
-        ncb->sockfd = fd;
+    expect = 0;
+    if (!atom_compare_exchange_strong(&ncb->sockfd, &expect, fd)) {
+        close(fd);
+        return posix__makeerror(EEXIST);
+    }
 
+    do {
         /* setsockopt */
         ncb_set_buffsize(ncb);
         /* allow port reuse(the same port number binding on different IP address) */

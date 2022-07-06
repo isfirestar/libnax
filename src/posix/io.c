@@ -164,7 +164,7 @@ static void _iorun(const struct epoll_event *eventptr)
          *  1. remote peer call close(2) or shutdown(2) with SHUT_WR
          *  2. local peer call shutdown(2) with SHUT_RD
          * EPOLLHUP indicate:
-         *  1. local peer call shutdown(2) with SHUT_RDWR, !!!NOT CLOSE(2)
+         *  1. local peer call shutdown(2) with SHUT_RDWR, !!!NOT close(2)
          *  2. local peer call shutdown(2) with SHUT_WR and remote peer call shutdown(2) with SHUT_WR
          *  3. remote peer give a RST signal */
         if (eventptr->events & EPOLLRDHUP) {

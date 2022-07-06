@@ -140,9 +140,23 @@ void tcp_uninit()
     _tcp_invoke(wp_uninit);
 }
 
-static void _tcp_create_domain(ncb_t *ncb, const char* domain)
+static nsp_status_t _tcp_create_domain(ncb_t *ncb, const char* domain)
 {
-    ncb->sockfd = 0;
+    int fd;
+    int expect;
+
+    fd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
+    if (fd < 0) {
+        mxx_call_ecr("Fatal syscall socket(2) for domain,error:%d", errno);
+        return posix__makeerror(errno);
+    }
+
+    /* prevent double creation */
+    expect = 0;
+    if (!atom_compare_exchange_strong(&ncb->sockfd, &expect, fd)) {
+        close(fd);
+        return posix__makeerror(EEXIST);
+    }
 
     /* local address fill and delay use */
     ncb->local_addr.sin_addr.s_addr = 0;
@@ -156,6 +170,7 @@ static void _tcp_create_domain(ncb_t *ncb, const char* domain)
     strncpy(ncb->domain_addr.sun_path, domain, sizeof(ncb->domain_addr.sun_path) - 1);
 
     mxx_call_ecr("Init domain link:%lld", ncb->hld);
+    return NSP_STATUS_SUCCESSFUL;
 }
 
 static nsp_status_t _tcp_create(ncb_t *ncb, const char* ipstr, uint16_t port)
@@ -458,13 +473,6 @@ static nsp_status_t _tcp_connect_domain(ncb_t *ncb, const char *domain)
             strncpy(ncb->domain_addr.sun_path, &domain[4], sizeof(ncb->domain_addr.sun_path) - 1);
         }
 
-        ncb->sockfd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-        if (ncb->sockfd < 0) {
-            mxx_call_ecr("Fatal syscall socket(2) for domain,error:%d", errno);
-            status = posix__makeerror(errno);
-            break;
-        }
-
         /* syscall @connect can be interrupted by other signal. */
         do {
             retval = connect(ncb->sockfd, (const struct sockaddr *) &ncb->domain_addr, sizeof(ncb->domain_addr));
@@ -628,15 +636,6 @@ static nsp_status_t _tcp_connect2_domain(ncb_t *ncb, const char *domain)
             }
 
             strncpy(ncb->domain_addr.sun_path, domain, sizeof(ncb->domain_addr.sun_path) - 1);
-        }
-
-        status = NSP_STATUS_FATAL;
-
-        ncb->sockfd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-        if (ncb->sockfd < 0) {
-            mxx_call_ecr("Fatal syscall socket(2) for domain,error:%d", errno);
-            status = posix__makeerror(errno);
-            break;
         }
 
         /* for asynchronous connect, set file-descriptor to non-blocked mode first */
@@ -806,32 +805,6 @@ nsp_status_t tcp_connect2(HTCPLINK link, const char* ipstr, uint16_t port)
     return status;
 }
 
-static nsp_status_t _tcp_listen_domain(ncb_t *ncb, int block)
-{
-    int fd;
-    int expect;
-
-    fd = socket(AF_UNIX, SOCK_SEQPACKET, 0);
-    if (fd < 0) {
-        mxx_call_ecr("Fatal syscall socket(2) for domain,error:%d", errno);
-        return posix__makeerror(errno);
-    }
-
-    /* prevent double creation */
-    expect = 0;
-    if (!atom_compare_exchange_strong(&ncb->sockfd, &expect, fd)) {
-        close(fd);
-        return posix__makeerror(EEXIST);
-    }
-
-    /* server host has resposibility to remove the existing domain file on filesystem before create a socket file-descriptor */
-    unlink(ncb->domain_addr.sun_path);
-    /* mark this is a server host */
-    ncb->local_addr.sin_port = 1;
-
-    return NSP_STATUS_SUCCESSFUL;
-}
-
 nsp_status_t tcp_listen(HTCPLINK link, int block)
 {
     ncb_t *ncb;
@@ -853,10 +826,10 @@ nsp_status_t tcp_listen(HTCPLINK link, int block)
 
         /* cope with the domain socket situation */
         if (AF_UNIX == ncb->local_addr.sin_family ) {
-            status = _tcp_listen_domain(ncb, block);
-            if ( !NSP_SUCCESS(status) ) {
-                break;
-            }
+            /* server host has resposibility to remove the existing domain file on filesystem before create a socket file-descriptor */
+            unlink(ncb->domain_addr.sun_path);
+            /* mark this is a server host */
+            ncb->local_addr.sin_port = 1;
         }
 
         /* get the socket status of tcp_info to check the socket tcp statues */

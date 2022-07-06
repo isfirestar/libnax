@@ -1,6 +1,7 @@
 #include "demo.h"
 
 #include "threading.h"
+#include "ifos.h"
 #include "zmalloc.h"
 
 static void on_tcp_received(HTCPLINK link, const unsigned char *data, int size)
@@ -11,7 +12,7 @@ static void on_tcp_received(HTCPLINK link, const unsigned char *data, int size)
 
     parameter = arg_get_parameter();
 
-    tid = nis_cntl(link, NI_GETRXTID);
+    tid = (pid_t)nis_cntl(link, NI_GETRXTID);
     assert(tid == ifos_gettid());
 
     resp = NULL;
