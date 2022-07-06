@@ -50,6 +50,8 @@ static struct io_manager _iomgr = {
 
 static void _io_rdhup(ncb_t *ncb)
 {
+    int rx_pending;
+
     /* log peer closed */
     mxx_call_ecr( "Lnk:%lld, EPOLLRDHUP", ncb->hld );
 
@@ -61,7 +63,27 @@ static void _io_rdhup(ncb_t *ncb)
 
     /* shutdown(2) shall be invoked before this event triggered */
     if (likely(ncb->sockfd > 0)) {
+
+        /* before socket close, we MUST clear data which residual and pending in kernel buffer.
+         * consider of below client behavior:
+         *
+         * fd = socket();
+         * if (connect(fd) == 0) {
+         *      send(fd);
+         *      close(fd);
+         * }
+         *
+         * we can assume most situation, server peer have not enought time to push client sock into EPOLL queue before send and close
+         * therefore, data send from client will pending in kernel buffer.RDHUP will arrived before EPOLLIN, this may cause data drop.
+         * */
+        if (0 == ioctl(ncb->sockfd, FIONREAD, &rx_pending)) {
+            if (rx_pending > 0 && ncb->ncb_read) {
+                ncb->ncb_read(ncb);
+            }
+        }
+
         /* close socket in system layer */
+        shutdown(ncb->sockfd, SHUT_RDWR);
         close(ncb->sockfd);
         ncb->sockfd = -1;
     }
