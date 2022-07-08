@@ -45,6 +45,7 @@
 #include "dict.h"
 #include "zmalloc.h"
 #include "mt19937-64.h"
+#include "hash.h"
 
 /* If our unsigned long type can store a 64 bit number, use a 64 bit PRNG. */
 #if ULONG_MAX >= 0xffffffffffffffff
@@ -82,12 +83,6 @@ void dictSetHashFunctionSeed(uint8_t *seed) {
 uint8_t *dictGetHashFunctionSeed(void) {
     return dict_hash_function_seed;
 }
-
-/* The default hashing function uses SipHash implementation
- * in siphash.c. */
-
-uint64_t siphash(const uint8_t *in, const size_t inlen, const uint8_t *k);
-uint64_t siphash_nocase(const uint8_t *in, const size_t inlen, const uint8_t *k);
 
 uint64_t dictGenHashFunction(const void *key, size_t len) {
     return siphash(key,len,dict_hash_function_seed);

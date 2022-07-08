@@ -75,4 +75,10 @@ PORTABLEAPI(int) des_decrypt(const char* input,size_t cb,const abuff_des_key_t *
 typedef abuff_type(32)  abuff_sha256_result_t;
 PORTABLEAPI(unsigned char*) sha256(const unsigned char* input, int orilen, abuff_sha256_result_t *out);
 
+
+/* The default hashing function uses SipHash implementation
+ * in siphash.c. */
+PORTABLEAPI(uint64_t) siphash(const uint8_t *in, const size_t inlen, const uint8_t *k);
+PORTABLEAPI(uint64_t) siphash_nocase(const uint8_t *in, const size_t inlen, const uint8_t *k);
+
 #endif

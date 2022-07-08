@@ -36,9 +36,9 @@
 #ifndef __DICT_H
 #define __DICT_H
 
+#include "compiler.h"
+
 #include <limits.h>
-#include <stdint.h>
-#include <stdlib.h>
 
 #define DICT_OK 0
 #define DICT_ERR 1
@@ -162,40 +162,40 @@ typedef void (dictScanBucketFunction)(dict *d, dictEntry **bucketref);
 #define dictResumeRehashing(d) (d)->pauserehash--
 
 /* API */
-dict *dictCreate(dictType *type);
-int dictExpand(dict *d, unsigned long size);
-int dictTryExpand(dict *d, unsigned long size);
-int dictAdd(dict *d, void *key, void *val);
-dictEntry *dictAddRaw(dict *d, void *key, dictEntry **existing);
-dictEntry *dictAddOrFind(dict *d, void *key);
-int dictReplace(dict *d, void *key, void *val);
-int dictDelete(dict *d, const void *key);
-dictEntry *dictUnlink(dict *d, const void *key);
-void dictFreeUnlinkedEntry(dict *d, dictEntry *he);
-void dictRelease(dict *d);
-dictEntry * dictFind(dict *d, const void *key);
-void *dictFetchValue(dict *d, const void *key);
-int dictResize(dict *d);
-dictIterator *dictGetIterator(dict *d);
-dictIterator *dictGetSafeIterator(dict *d);
-dictEntry *dictNext(dictIterator *iter);
-void dictReleaseIterator(dictIterator *iter);
-dictEntry *dictGetRandomKey(dict *d);
-dictEntry *dictGetFairRandomKey(dict *d);
-unsigned int dictGetSomeKeys(dict *d, dictEntry **des, unsigned int count);
-void dictGetStats(char *buf, size_t bufsize, dict *d);
-uint64_t dictGenHashFunction(const void *key, size_t len);
-uint64_t dictGenCaseHashFunction(const unsigned char *buf, size_t len);
-void dictEmpty(dict *d, void(callback)(dict*));
-void dictEnableResize(void);
-void dictDisableResize(void);
-int dictRehash(dict *d, int n);
-int dictRehashMilliseconds(dict *d, int ms);
-void dictSetHashFunctionSeed(uint8_t *seed);
-uint8_t *dictGetHashFunctionSeed(void);
-unsigned long dictScan(dict *d, unsigned long v, dictScanFunction *fn, dictScanBucketFunction *bucketfn, void *privdata);
-uint64_t dictGetHash(dict *d, const void *key);
-dictEntry **dictFindEntryRefByPtrAndHash(dict *d, const void *oldptr, uint64_t hash);
+PORTABLEAPI(dict *) dictCreate(dictType *type);
+PORTABLEAPI(int) dictExpand(dict *d, unsigned long size);
+PORTABLEAPI(int) dictTryExpand(dict *d, unsigned long size);
+PORTABLEAPI(int) dictAdd(dict *d, void *key, void *val);
+PORTABLEAPI(dictEntry *) dictAddRaw(dict *d, void *key, dictEntry **existing);
+PORTABLEAPI(dictEntry *) dictAddOrFind(dict *d, void *key);
+PORTABLEAPI(int) dictReplace(dict *d, void *key, void *val);
+PORTABLEAPI(int) dictDelete(dict *d, const void *key);
+PORTABLEAPI(dictEntry *) dictUnlink(dict *d, const void *key);
+PORTABLEAPI(void) dictFreeUnlinkedEntry(dict *d, dictEntry *he);
+PORTABLEAPI(void) dictRelease(dict *d);
+PORTABLEAPI(dictEntry *) dictFind(dict *d, const void *key);
+PORTABLEAPI(void *) dictFetchValue(dict *d, const void *key);
+PORTABLEAPI(int) dictResize(dict *d);
+PORTABLEAPI(dictIterator *) dictGetIterator(dict *d);
+PORTABLEAPI(dictIterator *) dictGetSafeIterator(dict *d);
+PORTABLEAPI(dictEntry *) dictNext(dictIterator *iter);
+PORTABLEAPI(void) dictReleaseIterator(dictIterator *iter);
+PORTABLEAPI(dictEntry *) dictGetRandomKey(dict *d);
+PORTABLEAPI(dictEntry *) dictGetFairRandomKey(dict *d);
+PORTABLEAPI(unsigned int) dictGetSomeKeys(dict *d, dictEntry **des, unsigned int count);
+PORTABLEAPI(void) dictGetStats(char *buf, size_t bufsize, dict *d);
+PORTABLEAPI(uint64_t) dictGenHashFunction(const void *key, size_t len);
+PORTABLEAPI(uint64_t) dictGenCaseHashFunction(const unsigned char *buf, size_t len);
+PORTABLEAPI(void) dictEmpty(dict *d, void(callback)(dict*));
+PORTABLEAPI(void) dictEnableResize(void);
+PORTABLEAPI(void) dictDisableResize(void);
+PORTABLEAPI(int) dictRehash(dict *d, int n);
+PORTABLEAPI(int) dictRehashMilliseconds(dict *d, int ms);
+PORTABLEAPI(void) dictSetHashFunctionSeed(uint8_t *seed);
+PORTABLEAPI(uint8_t *) dictGetHashFunctionSeed(void);
+PORTABLEAPI(unsigned long) dictScan(dict *d, unsigned long v, dictScanFunction *fn, dictScanBucketFunction *bucketfn, void *privdata);
+PORTABLEAPI(uint64_t) dictGetHash(dict *d, const void *key);
+PORTABLEAPI(dictEntry **) dictFindEntryRefByPtrAndHash(dict *d, const void *oldptr, uint64_t hash);
 
 #ifdef REDIS_TEST
 int dictTest(int argc, char *argv[], int flags);
