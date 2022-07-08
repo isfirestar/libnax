@@ -5,11 +5,13 @@ TARGET := $(PROGRAM)$(VERSION)
 INC_DIRS :=
 INC_DIRS := ./
 INC_DIRS += ../../include/
+INC_DIRS += ../dict/
 
 SRC_DIRS :=
 SRC_DIRS += ./
-SRC_DIRS += ../
 SRC_DIRS += ./wosi/
+SRC_DIRS += ../
+SRC_DIRS += ../dict/
 
 ##################################################################################
 # 				strong recommend do NOT change anything below  		        	 #

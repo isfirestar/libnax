@@ -154,7 +154,6 @@ struct _lwp_event
     enum lwp_event_category sync_;
     HANDLE cond_;
 };
-#define LWP_SYNC_EVENT_INITIALIZER
 #else
 struct _lwp_event
 {
@@ -164,11 +163,6 @@ struct _lwp_event
     lwp_mutex_t mutex_;
     int effective;
 };
-#define LWP_SYNC_EVENT_INITIALIZER { .sync_ = LWPEC_SYNC, \
-            .cond_ = PTHREAD_COND_INITIALIZER, \
-            .pass_ = 0, \
-            .mutex_ = { PTHREAD_MUTEX_INITIALIZER, } \
-            .effective = 1, }
 #endif
 typedef struct _lwp_event lwp_event_t;
 
