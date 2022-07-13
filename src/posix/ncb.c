@@ -142,15 +142,25 @@ void ncb_deconstruct(objhld_t ignore, void *p)
     mxx_call_ecr("link:%lld finalization released",ncb->hld);
 }
 
-nsp_status_t ncb_set_rcvtimeo(const ncb_t *ncb, const struct timeval *timeo)
+nsp_status_t ncb_set_rcvtimeo(const ncb_t *ncb, long long ms)
 {
-    return ( 0 == setsockopt(ncb->sockfd, SOL_SOCKET, SO_RCVTIMEO, (const void *)timeo, sizeof(struct timeval)) ) ?
+    struct timeval tv;
+
+    tv.tv_sec = ms / 1000;
+    tv.tv_usec = (ms % 1000) * 1000;
+
+    return ( 0 == setsockopt(ncb->sockfd, SOL_SOCKET, SO_RCVTIMEO, (const void *)&tv, sizeof(tv)) ) ?
         NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
 }
 
-nsp_status_t ncb_set_sndtimeo(const ncb_t *ncb, const struct timeval *timeo)
+nsp_status_t ncb_set_sndtimeo(const ncb_t *ncb, long long ms)
 {
-    return ( 0 == setsockopt(ncb->sockfd, SOL_SOCKET, SO_SNDTIMEO, (const void *)timeo, sizeof(struct timeval)) ) ?
+    struct timeval tv;
+
+    tv.tv_sec = ms / 1000;
+    tv.tv_usec = (ms % 1000) * 1000;
+
+    return ( 0 == setsockopt(ncb->sockfd, SOL_SOCKET, SO_SNDTIMEO, (const void *)&tv, sizeof(tv)) ) ?
         NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
 }
 

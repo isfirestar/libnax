@@ -575,7 +575,7 @@ static nsp_status_t _tcp_connect(ncb_t *ncb, const char* ipstr, uint16_t port)
         }
 
         /* the low-level [TCP Keep-ALive] are usable. */
-        tcp_set_keepalive(ncb);
+        tcp_set_keepalive(ncb, 9);
 
         /* get peer address information */
         tcp_relate_address(ncb);
@@ -1224,39 +1224,48 @@ nsp_status_t tcp_get_cork(const ncb_t *ncb, int *set)
          NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
 }
 
-nsp_status_t tcp_set_keepalive(const ncb_t *ncb)
+nsp_status_t tcp_set_keepalive(const ncb_t *ncb, int interval)
 {
-    int optka;
-    int optkintvl;
-    int optkidle;
-    int optkcnt;
+    int optval;
 
-    optka = 1;
-    if ( setsockopt(ncb->sockfd, SOL_SOCKET, SO_KEEPALIVE, (const char *)&optka, sizeof(optka)) < 0 ) {
+    optval = 1;
+    if ( setsockopt(ncb->sockfd, SOL_SOCKET, SO_KEEPALIVE, (const char *)&optval, sizeof(optval)) < 0 ) {
         mxx_call_ecr("fatal syscall setsockopt(2) on level:%d, name:%d, errno:%d, link:%lld", SOL_SOCKET, SO_KEEPALIVE, errno, ncb->sockfd);
         return posix__makeerror(errno);
     }
 
-    /* The time (in seconds) between individual keepalive probes */
-    optkintvl = 2;
-    if ( setsockopt(ncb->sockfd, IPPROTO_TCP, TCP_KEEPINTVL, (const char *)&optkintvl, sizeof(optkintvl)) < 0 ) {
+#if __linux__
+    /* Default settings are more or less garbage, with the keepalive time
+     * set to 7200 by default on Linux. Modify settings to make the feature
+     * actually useful. */
+
+    /* Send first probe after interval(in seconds). */
+    optval = interval;
+    if (setsockopt(ncb->sockfd, IPPROTO_TCP, TCP_KEEPIDLE, &optval, sizeof(optval)) < 0) {
+        mxx_call_ecr("fatal syscall setsockopt(2) on level:%d, name:%d, errno:%d, link:%lld", IPPROTO_TCP, TCP_KEEPIDLE, errno, ncb->sockfd);
+        return posix__makeerror(errno);
+    }
+
+    /* Send next probes after the specified interval. Note that we set the
+     * delay as interval / 3, as we send three probes before detecting
+     * an error (see the next setsockopt call). */
+    optval = interval / 3;
+    if (optval == 0) {
+        optval = 1;
+    }
+    if (setsockopt(ncb->sockfd, IPPROTO_TCP, TCP_KEEPINTVL, &optval, sizeof(optval)) < 0) {
         mxx_call_ecr("fatal syscall setsockopt(2) on level:%d, name:%d, errno:%d, link:%lld", IPPROTO_TCP, TCP_KEEPINTVL, errno, ncb->sockfd);
         return posix__makeerror(errno);
     }
 
-    /* The  time (in seconds) the connection needs to remain idle before TCP starts sending keepalive probes */
-    optkidle = 4;
-    if ( setsockopt(ncb->sockfd, IPPROTO_TCP, TCP_KEEPIDLE, (const char *)&optkidle, sizeof(optkidle)) < 0 ) {
-        mxx_call_ecr("fatal syscall setsockopt(2) on level:%d, name:%d, errno:%d, link:%lld", IPPROTO_TCP, TCP_KEEPIDLE, errno, ncb->sockfd);
+    /* Consider the socket in error state after three we send three ACK
+     * probes without getting a reply. */
+    optval = 3;
+    if (setsockopt(ncb->sockfd, IPPROTO_TCP, TCP_KEEPCNT, &optval, sizeof(optval)) < 0) {
+        mxx_call_ecr("fatal syscall setsockopt(2) on level:%d, name:%d, errno:%d, link:%lld", IPPROTO_TCP, TCP_KEEPCNT, errno, ncb->sockfd);
         return posix__makeerror(errno);
     }
-
-    /* The  time (in seconds) the connection needs to remain idle before TCP starts sending keepalive probes */
-    optkcnt = 1;
-    if ( setsockopt(ncb->sockfd, IPPROTO_TCP, TCP_KEEPCNT, (const char *)&optkcnt, sizeof(optkcnt)) < 0 ) {
-        mxx_call_ecr("fatal syscall setsockopt(2) on level:%d, name:%d, errno:%d, link:%lld", IPPROTO_TCP, TCP_KEEPIDLE, errno, ncb->sockfd);
-        return posix__makeerror(errno);
-    }
+#endif /* __linux__ */
 
     return NSP_STATUS_SUCCESSFUL;
 }

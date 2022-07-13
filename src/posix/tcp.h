@@ -125,7 +125,7 @@ nsp_status_t tcp_set_cork(const ncb_t *ncb, int set);
 extern
 nsp_status_t tcp_get_cork(const ncb_t *ncb, int *set);
 extern
-nsp_status_t tcp_set_keepalive(const ncb_t *ncb);
+nsp_status_t tcp_set_keepalive(const ncb_t *ncb, int interval);
 extern
 nsp_status_t tcp_set_syncnt(const ncb_t *ncb, int cnt);
 extern

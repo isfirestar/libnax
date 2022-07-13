@@ -70,7 +70,7 @@ static nsp_status_t _tcp_syn_dpc(ncb_t *ncb_server, ncb_t *ncb)
         /* save local and remote address structure */
         tcp_relate_address(ncb);
         /* the low-level [TCP Keep-ALive] are usable. */
-        tcp_set_keepalive(ncb);
+        tcp_set_keepalive(ncb, 9);
         /* acquire save TCP Info and adjust linger in the accept phase.
             l_onoff on and l_linger not zero, these settings means:
             TCP drop any data cached in the kernel buffer of this socket file descriptor when close(2) called.
@@ -363,7 +363,7 @@ nsp_status_t tcp_tx_syn(ncb_t *ncb)
 
             if (ncb->local_addr.sin_family != AF_UNIX) {
                 /* the low-level [TCP Keep-ALive] are usable. */
-                tcp_set_keepalive(ncb);
+                tcp_set_keepalive(ncb, 9);
                 /* get peer address information */
                 tcp_relate_address(ncb);
             }

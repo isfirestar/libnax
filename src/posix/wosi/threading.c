@@ -24,11 +24,28 @@ static nsp_status_t lwp_priority_range(int *min, int *max)
     return NSP_STATUS_SUCCESSFUL;
 }
 
+static void _lwp_set_stacksize(lwp_t *lwp)
+{
+    size_t stacksize;
+    static const size_t NSP_THREAD_STACK_SIZE = 1024 * 1024 * 4;
+
+    /* set the stack size as by default it may be small in some system */
+    pthread_attr_getstacksize(&lwp->attr, &stacksize);
+    if (!stacksize) {
+        stacksize = 1;  /* the world is full of Solaris Fixes */
+    }
+    while (stacksize < NSP_THREAD_STACK_SIZE) {
+        stacksize <<= 1;
+    }
+    pthread_attr_setstacksize(&lwp->attr, stacksize);
+}
+
 nsp_status_t lwp_create(lwp_t *lwp, int priority, void*(*start_rtn)(void*), void *arg)
 {
     int retval;
     struct sched_param param;
     int minprior, maxprior;
+
 
     if ( unlikely((!lwp || !start_rtn)) ) {
         return posix__makeerror(EINVAL);
@@ -51,8 +68,9 @@ nsp_status_t lwp_create(lwp_t *lwp, int priority, void*(*start_rtn)(void*), void
 
     /* loop schedule are the modle whcih most time we want */
     pthread_attr_setinheritsched(&lwp->attr, PTHREAD_EXPLICIT_SCHED);
-
     pthread_attr_setdetachstate(&lwp->attr, PTHREAD_CREATE_JOINABLE);
+    /* change stack size */
+    _lwp_set_stacksize(lwp);
     retval = pthread_create(&lwp->pid, &lwp->attr, start_rtn, arg);
     return posix__makeerror(retval);
 }

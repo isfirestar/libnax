@@ -141,11 +141,11 @@ extern
 nsp_status_t ncb_query_link_error(const ncb_t *ncb, int *err);
 
 extern
-nsp_status_t ncb_set_rcvtimeo(const ncb_t *ncb, const struct timeval *timeo);
+nsp_status_t ncb_set_rcvtimeo(const ncb_t *ncb, long long ms);
 extern
 nsp_status_t ncb_get_rcvtimeo(const ncb_t *ncb);
 extern
-nsp_status_t ncb_set_sndtimeo(const ncb_t *ncb, const struct timeval *timeo);
+nsp_status_t ncb_set_sndtimeo(const ncb_t *ncb, long long ms);
 extern
 nsp_status_t ncb_get_sndtimeo(const ncb_t *ncb);
 
