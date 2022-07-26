@@ -205,7 +205,7 @@ static nsp_status_t _udp_create(ncb_t *ncb, const char* ipstr, uint16_t port, in
     return status;
 }
 
-HUDPLINK udp_create(udp_io_callback_t callback, const char* ipstr, uint16_t port, int flag)
+HUDPLINK udp_create(udp_io_fp callback, const char* ipstr, uint16_t port, int flag)
 {
     ncb_t *ncb;
     struct objcreator creator;
@@ -283,7 +283,7 @@ nsp_status_t udp_awaken(HUDPLINK link, const void *pipedata, unsigned int cb)
     return status;
 }
 
-nsp_status_t udp_write(HUDPLINK link, const void *origin, unsigned int cb, const char* ipstr, uint16_t port, const nis_serializer_t serializer)
+nsp_status_t udp_write(HUDPLINK link, const void *origin, unsigned int cb, const char* ipstr, uint16_t port, const nis_serializer_fp serializer)
 {
     ncb_t *ncb;
     unsigned char *buffer;

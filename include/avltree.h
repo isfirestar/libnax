@@ -24,8 +24,7 @@ typedef struct avltree_node_t TREENODE_T, *PTREENODE, *TREEROOT;
  *	左节点小于右节点， 返回指定 -1
  *	左右节点相等，     返回指定 0
  */
-typedef int( *compare_routine)(const void *left, const void *right);
-typedef compare_routine avlcompare_t;
+typedef int( *avltree_compare_fp)(const void *left, const void *right);
 
 #define avl_simple_compare(left, right, field)   \
     ( ((left)->field > (right)->field) ? (1) : ( ((left)->field < (right)->field) ? (-1) : (0) ) )

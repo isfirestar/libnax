@@ -218,7 +218,7 @@ namespace nsp {
             return -1;
         }
 
-        int obtcp::send(const void *origin, int cb, const nis_serializer_t serializer)
+        int obtcp::send(const void *origin, int cb, const nis_serializer_fp serializer)
         {
             if (INVALID_HTCPLINK != lnk_ && cb > 0 && origin && serializer) {
                 return ::tcp_write(lnk_, origin, cb, serializer);
@@ -383,7 +383,7 @@ namespace nsp {
             return -1;
         }
 
-        int obudp::sendto(const void *origin, int cb, const endpoint &ep, const nis_serializer_t serializer)
+        int obudp::sendto(const void *origin, int cb, const endpoint &ep, const nis_serializer_fp serializer)
         {
             if (INVALID_HUDPLINK != lnk_ && cb > 0 && origin && serializer) {
                 return ::udp_write(lnk_, origin, cb, ep.ipv4(), ep.port(), serializer);

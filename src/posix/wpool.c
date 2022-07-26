@@ -12,7 +12,7 @@
 #include "fifo.h"
 #include "zmalloc.h"
 #include "spinlock.h"
-#include "sharedptr.h"
+#include "refs.h"
 
 struct wpool;
 struct wptask {
@@ -22,7 +22,7 @@ struct wptask {
 };
 
 struct wpool {
-    struct shared_ptr ref;
+    refs_t ref;
     lwp_t thread;
     struct spin_lock sp;
     lwp_event_t signal;
@@ -245,7 +245,7 @@ void wp_uninit(int protocol)
     lwp_mutex_unlock(&_wpmgr.mutex);
 }
 
-static void _wp_close_protocol(struct shared_ptr *ref)
+static void _wp_close_protocol(refs_t *ref)
 {
     struct wpool *poolptr;
 

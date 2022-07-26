@@ -18,7 +18,7 @@ typedef struct _NCC_NETWORK_BASIC_CONTROL_BLCOK
 
 	struct sockaddr_in			local_addr;				// 本地地址信息记录
 	struct sockaddr_in			remote_addr;				// 对端地址信息记录
-	nis_callback_t				nis_callback;
+	nis_callback_fp				nis_callback;
 
 	int							flag_;						// 标记， 目前TCP未使用， UDP可以指定为 UDP_FLAG_BROADCAST
 	int							connected_;					// 是否已经建立连接
@@ -60,7 +60,7 @@ typedef struct _NCC_NETWORK_BASIC_CONTROL_BLCOK
 
 void ncb_init( ncb_t * ncb, enum proto_type_t proto_type );
 
-#define ncb_set_callback(ncb, fn)		( ncb->nis_callback = ( nis_callback_t )( void * )fn )
+#define ncb_set_callback(ncb, fn)		( ncb->nis_callback = ( nis_callback_fp )( void * )fn )
 #define ncb_lb_marked(ncb)	((ncb) ? ((NULL != ncb->lb_data_) && (ncb->lb_length_ > 0)) : (FALSE))
 
 extern

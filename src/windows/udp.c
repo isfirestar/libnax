@@ -8,7 +8,7 @@
 typedef struct _udp_cinit {
 	uint32_t ipv4_;
 	uint16_t port_;
-	udp_io_callback_t f_user_callback_;
+	udp_io_fp f_user_callback_;
 	int ncb_flag_;
 }udp_cinit_t;
 
@@ -22,7 +22,7 @@ int udp_get_boardcast( ncb_t *ncb, int *enabled );
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 static
-int udprefr(objhld_t hld, ncb_t **ncb) 
+int udprefr(objhld_t hld, ncb_t **ncb)
 {
 	if (hld < 0 || !ncb) {
 		return -ENOENT;
@@ -119,7 +119,7 @@ static void udp_dispatch_io_exception( packet_t * packet, NTSTATUS status )
 	objdefr(ncb->hld);
 }
 
-static int udp_update_opts(ncb_t *ncb) 
+static int udp_update_opts(ncb_t *ncb)
 {
 	static const int RECV_BUFFER_SIZE = 0xFFFF;
     static const int SEND_BUFFER_SIZE = 0xFFFF;
@@ -232,7 +232,7 @@ static void udp_unload( objhld_t h, void * user_buffer )
 	ncb_post_close(ncb);
 }
 
-static objhld_t udp_allocate_object(const udp_cinit_t *ctx) 
+static objhld_t udp_allocate_object(const udp_cinit_t *ctx)
 {
 	ncb_t *ncb;
 	objhld_t h;
@@ -331,7 +331,7 @@ PORTABLEIMPL(int) udp_init()
 	return so_init( kProto_UDP, 0 );
 }
 
-PORTABLEIMPL(HUDPLINK) udp_create( udp_io_callback_t user_callback, const char* l_ipstr, uint16_t l_port, int flag )
+PORTABLEIMPL(HUDPLINK) udp_create( udp_io_fp user_callback, const char* l_ipstr, uint16_t l_port, int flag )
 {
 	objhld_t h;
 	udp_cinit_t ctx;
@@ -384,7 +384,7 @@ PORTABLEIMPL(HUDPLINK) udp_create( udp_io_callback_t user_callback, const char* 
 }
 
 static
-int __udp_tx_single_packet(ncb_t *ncb, const unsigned char *data, int cb, const char* r_ipstr, uint16_t r_port)  
+int __udp_tx_single_packet(ncb_t *ncb, const unsigned char *data, int cb, const char* r_ipstr, uint16_t r_port)
 {
 	int wcb;
 	int offset;
@@ -450,7 +450,7 @@ PORTABLEIMPL(int) udp_awaken(HUDPLINK link, const void *pipedata, int cb)
 		}
 		packet->link = link;
 		packet->ori_buffer_ = buffer;
-		
+
 		if (!PostQueuedCompletionStatus(epfd, cb, 0, &packet->overlapped_)) {
 			break;
 		}
@@ -468,7 +468,7 @@ PORTABLEIMPL(int) udp_awaken(HUDPLINK link, const void *pipedata, int cb)
 	return -1;
 }
 
-PORTABLEIMPL(int) udp_write(HUDPLINK lnk, const void *origin, int cb, const char* r_ipstr, uint16_t r_port, const nis_serializer_t serializer)
+PORTABLEIMPL(int) udp_write(HUDPLINK lnk, const void *origin, int cb, const char* r_ipstr, uint16_t r_port, const nis_serializer_fp serializer)
 {
 	int retval;
 	ncb_t *ncb;
@@ -765,7 +765,7 @@ PORTABLEIMPL(int) udp_write_grp( HUDPLINK lnk, packet_grp_t *grp )
 	return retval;
 }
 
-PORTABLEIMPL(int) udp_joingrp(HUDPLINK lnk, const char *g_ipstr, uint16_t g_port) 
+PORTABLEIMPL(int) udp_joingrp(HUDPLINK lnk, const char *g_ipstr, uint16_t g_port)
 {
     ncb_t *ncb;
     objhld_t hld = (objhld_t) lnk;
@@ -857,7 +857,7 @@ PORTABLEIMPL(int) udp_dropgrp(HUDPLINK lnk)
     return retval;
 }
 
-int udp_set_boardcast(ncb_t *ncb, int enable) 
+int udp_set_boardcast(ncb_t *ncb, int enable)
 {
     if (ncb) {
         return setsockopt(ncb->sockfd, SOL_SOCKET, SO_BROADCAST, (const void *) &enable, sizeof (enable));
@@ -865,7 +865,7 @@ int udp_set_boardcast(ncb_t *ncb, int enable)
     return -EINVAL;
 }
 
-int udp_get_boardcast(ncb_t *ncb, int *enabled) 
+int udp_get_boardcast(ncb_t *ncb, int *enabled)
 {
     if (ncb && enabled) {
         socklen_t optlen = sizeof (int);

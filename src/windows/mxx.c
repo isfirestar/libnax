@@ -182,9 +182,9 @@ PORTABLEIMPL(char *) nis_lgethost(char *name, int cb)
 }
 
 /* manage ECR and it's calling */
-static nis_event_callback_t current_ecr = NULL;
+static nis_event_callback_fp current_ecr = NULL;
 
-PORTABLEIMPL(nis_event_callback_t) nis_checr(const nis_event_callback_t ecr)
+PORTABLEIMPL(nis_event_callback_fp) nis_checr(const nis_event_callback_fp ecr)
 {
 	if ( !ecr ) {
 		InterlockedExchangePointer( (volatile PVOID *)&current_ecr, NULL );
@@ -195,7 +195,7 @@ PORTABLEIMPL(nis_event_callback_t) nis_checr(const nis_event_callback_t ecr)
 
 void nis_call_ecr( const char *fmt, ... )
 {
-	nis_event_callback_t ecr = NULL, old;
+	nis_event_callback_fp ecr = NULL, old;
 	va_list ap;
 	char logstr[1280];
 	int retval;

@@ -1,10 +1,10 @@
-#include "sharedptr.h"
+#include "refs.h"
 
 #define REF_STATUS_NORMAL       (0)
 #define REF_STATUS_CLOSEWAIT    (1)
 #define REF_STATUS_CLOSED       (2)
 
-PORTABLEIMPL(void) ref_init(struct shared_ptr *ref, const ref_on_closed_t on_closed)
+PORTABLEIMPL(void) ref_init(refs_pt ref, const refs_close_fp on_closed)
 {
     if (!ref) {
         return;
@@ -15,7 +15,7 @@ PORTABLEIMPL(void) ref_init(struct shared_ptr *ref, const ref_on_closed_t on_clo
     ref->on_closed = on_closed;
 }
 
-PORTABLEIMPL(int) ref_retain(struct shared_ptr *ref)
+PORTABLEIMPL(int) ref_retain(refs_pt ref)
 {
     if (!ref) {
         return -1;
@@ -29,7 +29,7 @@ PORTABLEIMPL(int) ref_retain(struct shared_ptr *ref)
     return ref->count;
 }
 
-PORTABLEIMPL(int) ref_release(struct shared_ptr *ref)
+PORTABLEIMPL(int) ref_release(refs_pt ref)
 {
     if (!ref) {
         return -1;
@@ -55,7 +55,7 @@ PORTABLEIMPL(int) ref_release(struct shared_ptr *ref)
     return ref->count;
 }
 
-PORTABLEIMPL(void) ref_close(struct shared_ptr *ref)
+PORTABLEIMPL(void) ref_close(refs_pt ref)
 {
     if (!ref) {
         return;

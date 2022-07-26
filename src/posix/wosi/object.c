@@ -37,8 +37,8 @@ typedef struct _object_t
     int status;
     int refcnt;
     unsigned int size;
-    objinitfn_t initializer;
-    objuninitfn_t unloader;
+    objinit_fp initializer;
+    objuninit_fp unloader;
     unsigned char body[0];
 } object_t;
 
@@ -280,7 +280,7 @@ PORTABLEIMPL(nsp_status_t) objallo4(const struct objcreator *creator, objhld_t *
     return NSP_STATUS_SUCCESSFUL;
 }
 
-PORTABLEIMPL(objhld_t) objallo(unsigned int size, objinitfn_t initializer, objuninitfn_t unloader, const void *context, unsigned int ctxsize)
+PORTABLEIMPL(objhld_t) objallo(unsigned int size, objinit_fp initializer, objuninit_fp unloader, const void *context, unsigned int ctxsize)
 {
     struct objcreator creator;
 

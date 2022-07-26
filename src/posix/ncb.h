@@ -69,7 +69,7 @@ struct _ncb {
     struct sockaddr_un domain_addr;
 
     /* the user-specified nshost event handler */
-    nis_callback_t nis_callback;
+    nis_callback_fp nis_callback;
 
     /* IO response routine */
     ncb_rw_t ncb_read;

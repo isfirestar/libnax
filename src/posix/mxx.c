@@ -117,9 +117,9 @@ nsp_status_t nis_gethost(const char *name, uint32_t *ipv4)
 }
 
 /* manage ECR and it's calling */
-static nis_event_callback_t _ecr = NULL;
+static nis_event_callback_fp _ecr = NULL;
 
-nis_event_callback_t nis_checr(const nis_event_callback_t ecr)
+nis_event_callback_fp nis_checr(const nis_event_callback_fp ecr)
 {
     return atom_exchange(&_ecr, ecr);
 }
@@ -127,7 +127,7 @@ nis_event_callback_t nis_checr(const nis_event_callback_t ecr)
 /* the ecr usually use for diagnose low-level error */
 void nis_call_ecr(const char *fmt,...)
 {
-    nis_event_callback_t ecr;
+    nis_event_callback_fp ecr;
     va_list ap;
     char logstr[1280];
     int retval;

@@ -106,9 +106,9 @@ struct nis_event {
 typedef struct nis_event nis_event_t;
 
 /* user callback definition for network events */
-typedef void( STDCALL *nis_callback_t)(const struct nis_event *event, const void *data);
-typedef nis_callback_t tcp_io_callback_t;
-typedef nis_callback_t udp_io_callback_t;
+typedef void( STDCALL *nis_callback_fp)(const struct nis_event *event, const void *data);
+typedef nis_callback_fp tcp_io_fp;
+typedef nis_callback_fp udp_io_fp;
 
 /*---------------------------------------------------------------------------------------------------------------------------------------------------------
     TCP implement
@@ -137,7 +137,7 @@ struct __tcp_stream_template {
 
 typedef struct __tcp_stream_template tst_t;
 
-/*  @nis_serializer_t target object use for @tcp_write or @udp_write procedure call,
+/*  @nis_serializer_fp target object use for @tcp_write or @udp_write procedure call,
  *  when:
  *  @origin is a pointer to a C-style strcuture object without 1 byte aligned,
  *  or,
@@ -148,7 +148,7 @@ typedef struct __tcp_stream_template tst_t;
  *
  *  when @origin pointer to a standard C byte-stream, @serializer is ignore and can be set to null
  */
-typedef nsp_status_t( STDCALL *nis_serializer_t)(unsigned char *packet, const void *origin, int cb);
+typedef nsp_status_t( STDCALL *nis_serializer_fp)(unsigned char *packet, const void *origin, int cb);
 
 struct nis_tcp_data {
     union {
@@ -235,7 +235,7 @@ typedef struct __swnet_version swnet_version_t;
 /*  receiving notification text informations from nshost moudle
     version > 9.6.0
 */
-typedef void( STDCALL *nis_event_callback_t)(const char *host_event, const char *reserved, int rescb);
+typedef void( STDCALL *nis_event_callback_fp)(const char *host_event, const char *reserved, int rescb);
 
 struct __ifmisc {
     char eth[64];

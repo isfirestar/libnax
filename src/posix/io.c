@@ -9,7 +9,7 @@
 #include "atom.h"
 #include "ifos.h"
 #include "zmalloc.h"
-#include "sharedptr.h"
+#include "refs.h"
 
 #include "ncb.h"
 #include "wpool.h"
@@ -31,7 +31,7 @@ struct epoll_object_block
 
 struct io_object_block
 {
-    struct shared_ptr ref;
+    refs_t ref;
     struct epoll_object_block *epoptr;
     int nprocs;
     int protocol;
@@ -379,7 +379,7 @@ static void _io_safe_release(struct io_object_block *obptr)
     lwp_mutex_unlock(&_iomgr.mutex);
 }
 
-static void _io_close_protocol(struct shared_ptr *ref)
+static void _io_close_protocol(refs_t *ref)
 {
     struct io_object_block *obptr;
 

@@ -33,7 +33,7 @@ namespace nsp {
             int connect2(const char *epstr);
             int connect2(const endpoint &ep);
             int listen();
-            int send(const void *origin, int cb, const nis_serializer_t serializer);
+            int send(const void *origin, int cb, const nis_serializer_fp serializer);
             int send(const unsigned char *data, int cb);
             const endpoint &local() const;
             const endpoint &remote() const;
@@ -85,7 +85,7 @@ namespace nsp {
             int create(const char *epstr, const int flag = UDP_FLAG_NONE);
             void close();
             int sendto(const unsigned char *data, int cb, const endpoint &ep);
-            int sendto(const void *origin, int cb, const endpoint &ep, const nis_serializer_t serializer);
+            int sendto(const void *origin, int cb, const endpoint &ep, const nis_serializer_fp serializer);
 
             const endpoint &local() const;
             void setlnk(const HUDPLINK lnk);

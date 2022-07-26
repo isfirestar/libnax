@@ -53,8 +53,8 @@ PORTABLEAPI(void) tcp_uninit();
 		failed if calling thread invoke @listen next
 	in IPC pattern, @port have been ignored.
 */
-PORTABLEAPI(HTCPLINK) tcp_create(tcp_io_callback_t callback, const char* ipstr, uint16_t port);
-PORTABLEAPI(HTCPLINK) tcp_create2(tcp_io_callback_t callback, const char* ipstr, uint16_t port, const tst_t *tst);
+PORTABLEAPI(HTCPLINK) tcp_create(tcp_io_fp callback, const char* ipstr, uint16_t port);
+PORTABLEAPI(HTCPLINK) tcp_create2(tcp_io_fp callback, const char* ipstr, uint16_t port, const tst_t *tst);
 PORTABLEAPI(void) tcp_destroy(HTCPLINK link);
 
 /* @tcp_connect try to connect target host indicate by @ipstr and @port in synchronous model and @tcp_connect2 try it by asynchronous
@@ -125,7 +125,7 @@ PORTABLEAPI(nsp_status_t) tcp_listen(HTCPLINK link, int block);
 	-ENOMEM : framework can not allocate virtual memory from system-kernel
 	-EBUSY : send-Q of system kernel are already full, the cache queue of framework also arrived maximum pending limit, user request can NOT be perform now
 */
-PORTABLEAPI(nsp_status_t) tcp_write(HTCPLINK link, const void *origin, int size, const nis_serializer_t serializer);
+PORTABLEAPI(nsp_status_t) tcp_write(HTCPLINK link, const void *origin, int size, const nis_serializer_fp serializer);
 
 /* @tcp_awaken schedules the pointer to @pipedata of @cb bytes of user data to receive thread which assign to @link,
 	this implement is helpful for thread merge and/or lockless design in some complex program.
@@ -215,7 +215,7 @@ PORTABLEAPI(void) udp_uninit();
 		so, the IPC file will not be create but Tx operation will not affected.
 	in IPC pattern, @port and @flag parameters have been ignored.
 */
-PORTABLEAPI(HUDPLINK) udp_create(udp_io_callback_t user_callback, const char* ipstr, uint16_t port, int flag);
+PORTABLEAPI(HUDPLINK) udp_create(udp_io_fp user_callback, const char* ipstr, uint16_t port, int flag);
 PORTABLEAPI(void) udp_destroy(HUDPLINK link);
 
 /* @udp_write send @size bytes of user datagram @origin from local address tuple associated by @link to remote target host @ipstr and it's UDP port @port.
@@ -252,7 +252,7 @@ PORTABLEAPI(void) udp_destroy(HUDPLINK link);
 	during send function called, @ipstr should be the target IPC file which pass by parameter @ipstr when server calling @udp_craate
 	notes that when udp received data from IPC channel, callback type is EVT_UDP_RECEIVE_DOMAIN and associated with structure nis_udp_data::e::Domain
 */
-PORTABLEAPI(nsp_status_t) udp_write(HUDPLINK link, const void *origin, unsigned int size, const char* ipstr, uint16_t port, const nis_serializer_t serializer);
+PORTABLEAPI(nsp_status_t) udp_write(HUDPLINK link, const void *origin, unsigned int size, const char* ipstr, uint16_t port, const nis_serializer_fp serializer);
 
 /* @udp_awaken schedules the pointer to @pipedata of @cb bytes of user data to receive thread which assign to @link,
 	this implement is helpful for thread merge and/or lockless design in some complex program.
@@ -306,7 +306,7 @@ PORTABLEAPI(nsp_status_t) nis_getver(swnet_version_t *version);
 PORTABLEAPI(nsp_status_t) nis_gethost(const char *name, uint32_t *ipv4);
 PORTABLEAPI(nsp_status_t) nis_lgethost(abuff_64_t *name);
 /* set/change ECR(event callback routine) for nshost use, return the previous ecr address. */
-PORTABLEAPI(nis_event_callback_t) nis_checr(const nis_event_callback_t ecr);
+PORTABLEAPI(nis_event_callback_fp) nis_checr(const nis_event_callback_fp ecr);
 
 /* use @nis_getifmisc to view all local network adapter information
 	the @ifv pointer must large enough and specified by @*cbifv to storage all device interface info

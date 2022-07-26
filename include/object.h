@@ -4,8 +4,8 @@
 #include "compiler.h"
 
 typedef long objhld_t;
-typedef int( STDCALL * objinitfn_t)(void *udata, const void *ctx, int ctxcb);
-typedef void( STDCALL * objuninitfn_t)(objhld_t hld, void *udata);
+typedef int( STDCALL * objinit_fp)(void *udata, const void *ctx, int ctxcb);
+typedef void( STDCALL * objuninit_fp)(objhld_t hld, void *udata);
 
 #define INVALID_OBJHLD      (~((objhld_t)(0)))
 
@@ -16,9 +16,9 @@ struct objcreator
     /* MUST large than zero */
     unsigned int size;
     /* opt,can be null, if specified, this routine will be invoke before object insert into memory-pool */
-    objinitfn_t initializer;
+    objinit_fp initializer;
     /* opt,can be null, if specified, this routine wiil be invoke after object finilly remove from memory-pool */
-    objuninitfn_t unloader;
+    objuninit_fp unloader;
     /* opt,can be null, when this field is non-null pointer, @ctxsize field MUST set to the size of bytes of pointer @context pointer to. */
     const void *context;
     unsigned int ctxsize;
@@ -28,7 +28,7 @@ PORTABLEAPI(void) objinit(); /* not necessary for POSIX */
 PORTABLEAPI(void) objuninit();
 
 /* obsolete implementation, normal object allocate function, new application should use @objallo3 instead of it */
-PORTABLEAPI(objhld_t) objallo(unsigned int size, objinitfn_t initializer, objuninitfn_t unloader, const void *context, unsigned int ctxsize);
+PORTABLEAPI(objhld_t) objallo(unsigned int size, objinit_fp initializer, objuninit_fp unloader, const void *context, unsigned int ctxsize);
 /* obsolete implementation, simple way to allocate a object, new application should use @objallo3 instead of it  */
 PORTABLEAPI(objhld_t) objallo2(unsigned int size);
 /* try to allocate a object with a knwon handle-identify specified by @hld,

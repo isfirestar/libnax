@@ -21,7 +21,7 @@
 typedef struct _TCP_INIT_CONTEXT {
 	uint32_t ip_;
 	uint16_t port_;
-	tcp_io_callback_t callback_;
+	tcp_io_fp callback_;
 	int is_remote_;
 }tcp_cinit_t;
 
@@ -1069,7 +1069,7 @@ int tcp_gettst_r(HTCPLINK link, tst_t *tst, tst_t *previous)
 	return retval;
 }
 
-PORTABLEIMPL(HTCPLINK) tcp_create(tcp_io_callback_t user_callback, const char* l_ipstr, uint16_t l_port)
+PORTABLEIMPL(HTCPLINK) tcp_create(tcp_io_fp user_callback, const char* l_ipstr, uint16_t l_port)
 {
 	tcp_cinit_t ctx;
 
@@ -1306,7 +1306,7 @@ PORTABLEIMPL(int) tcp_awaken(HUDPLINK link, const void *pipedata, int cb)
 	return -1;
 }
 
-PORTABLEIMPL(int) tcp_write(HTCPLINK lnk, const void *origin, int cb, const nis_serializer_t serializer)
+PORTABLEIMPL(int) tcp_write(HTCPLINK lnk, const void *origin, int cb, const nis_serializer_fp serializer)
 {
 	char *buffer;
 	ncb_t *ncb;

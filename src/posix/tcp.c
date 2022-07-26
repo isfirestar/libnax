@@ -196,7 +196,7 @@ static nsp_status_t _tcp_create(ncb_t *ncb, const char* ipstr, uint16_t port)
     return NSP_STATUS_SUCCESSFUL;
 }
 
-HTCPLINK tcp_create(tcp_io_callback_t callback, const char* ipstr, uint16_t port)
+HTCPLINK tcp_create(tcp_io_fp callback, const char* ipstr, uint16_t port)
 {
     ncb_t *ncb;
     objhld_t hld;
@@ -241,7 +241,7 @@ HTCPLINK tcp_create(tcp_io_callback_t callback, const char* ipstr, uint16_t port
     return ncb->hld;
 }
 
-HTCPLINK tcp_create2(tcp_io_callback_t callback, const char* ipstr, uint16_t port, const tst_t *tst)
+HTCPLINK tcp_create2(tcp_io_fp callback, const char* ipstr, uint16_t port, const tst_t *tst)
 {
     HTCPLINK link;
     nsp_status_t status;
@@ -918,7 +918,7 @@ nsp_status_t tcp_awaken(HTCPLINK link, const void *pipedata, unsigned int cb)
     return status;
 }
 
-nsp_status_t tcp_write(HTCPLINK link, const void *origin, int cb, const nis_serializer_t serializer)
+nsp_status_t tcp_write(HTCPLINK link, const void *origin, int cb, const nis_serializer_fp serializer)
 {
     ncb_t *ncb;
     unsigned char *buffer;
