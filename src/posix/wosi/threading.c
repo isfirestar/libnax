@@ -172,6 +172,10 @@ nsp_status_t lwp_setname(const lwp_t *lwp, const abuff_pthread_name_t *name)
         return posix__makeerror(EINVAL);
     }
 
+    if (0 == lwp->pid) {
+        return posix__makeerror(EINVAL);
+    }
+
     /* prctl(PR_SET_NAME) */
     fr = pthread_setname_np(lwp->pid, name->cst);
     if (0 == fr) {
@@ -186,6 +190,10 @@ nsp_status_t lwp_getname(const lwp_t *lwp, abuff_pthread_name_t *name)
     int fr;
 
     if (!lwp || !name) {
+        return posix__makeerror(EINVAL);
+    }
+
+    if (0 == lwp->pid) {
         return posix__makeerror(EINVAL);
     }
 

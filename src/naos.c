@@ -157,8 +157,12 @@ PORTABLEIMPL(void) naos_hexdump(const unsigned char *buffer, uint16_t length, ui
     uint32_t i;
     int written;
 
-    if ( !buffer || 0 == length) {
+    if ( !buffer || 0 == length || length >= 8192)  {
         return;
+    }
+
+    if (columns < 2 || columns > 32) {
+        columns = 8;
     }
 
     display_length = length * 3 + length / columns + 8;

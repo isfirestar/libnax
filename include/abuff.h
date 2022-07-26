@@ -94,8 +94,13 @@ PORTABLEAPI(char *) crt_strrev(char *src);
 #define abuff_cuchar(abuff)  ((const unsigned char *)(&(abuff)->cust[0]))
 #define abuff_size(abuff)   (sizeof(*(abuff)))
 
+#if __cplusplus
+#define abuff_strcpy(abuff, src) strncpy((abuff)->u.st, src, abuff_size((abuff)) - 1)
+#define abuff_strncpy(abuff, src, n) strncpy((abuff)->u.st, src, min(n, abuff_size((abuff)) - 1))
+#else
 #define abuff_strcpy(abuff, src) strncpy((abuff)->st, src, abuff_size((abuff)) - 1)
 #define abuff_strncpy(abuff, src, n) strncpy((abuff)->st, src, min(n, abuff_size((abuff)) - 1))
+#endif
 
 #if _WIN32
 #define abuff_sprintf(abuff, format, ...) snprintf((abuff)->st, (abuff_size((abuff)) - 1), format, ##__VA_ARGS__)
