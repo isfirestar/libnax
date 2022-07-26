@@ -12,8 +12,17 @@
 #include "fifo.h"
 #include "zmalloc.h"
 #include "spinlock.h"
+#include "sharedptr.h"
+
+struct wpool;
+struct wptask {
+    objhld_t hld;
+    struct wpool *poolptr;
+    struct list_head link;
+};
 
 struct wpool {
+    struct shared_ptr ref;
     lwp_t thread;
     struct spin_lock sp;
     lwp_event_t signal;
@@ -22,44 +31,76 @@ struct wpool {
     int actived;
 };
 
-struct wptask {
-    objhld_t hld;
-    struct wpool *thread;
-    struct list_head link;
+struct wp_manager
+{
+    struct wpool *_wptcp;
+    struct wpool *_wpudp;
+    lwp_mutex_t mutex;
 };
+static struct wp_manager _wpmgr = {
+    ._wptcp = NULL,
+    ._wpudp = NULL,
+    .mutex = { PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP },
+     };
 
-static objhld_t _tcphld = -1;
-static objhld_t _udphld = -1;
+#define _wp_locate_protocol(p) (((IPPROTO_TCP == (p)) ? &_wpmgr._wptcp : ((IPPROTO_UDP == (p)) ? &_wpmgr._wpudp : NULL)))
+
+static struct wpool *_wp_safe_retain(int protocol)
+{
+    struct wpool *poolptr, **locate;
+
+    poolptr = NULL;
+
+    lwp_mutex_lock(&_wpmgr.mutex);
+    locate = _wp_locate_protocol(protocol);
+    if (locate) {
+        poolptr = *locate;
+        if ( unlikely(ref_retain(&poolptr->ref)) <= 0) {
+            poolptr = NULL;
+        }
+    }
+    lwp_mutex_unlock(&_wpmgr.mutex);
+
+    return poolptr;
+}
+
+static void _wp_safe_release(struct wpool *poolptr)
+{
+    lwp_mutex_lock(&_wpmgr.mutex);
+    ref_release(&poolptr->ref);
+    lwp_mutex_unlock(&_wpmgr.mutex);
+}
+
 
 static void _wp_add_task(struct wptask *task)
 {
-    struct wpool *wpptr;
+    struct wpool *poolptr;
 
     if (task) {
-        wpptr = task->thread;
+        poolptr = task->poolptr;
         INIT_LIST_HEAD(&task->link);
 
         /* very brief CPU time consumption, we can use spinlock instead of mutex */
-        acquire_spinlock(&wpptr->sp);
-        list_add_tail(&task->link, &wpptr->tasks);
-        ++wpptr->task_list_size;
-        release_spinlock(&wpptr->sp);
+        acquire_spinlock(&poolptr->sp);
+        list_add_tail(&task->link, &poolptr->tasks);
+        ++poolptr->task_list_size;
+        release_spinlock(&poolptr->sp);
     }
 }
 
-static struct wptask *_wp_get_task(struct wpool *wpptr)
+static struct wptask *_wp_get_task(struct wpool *poolptr)
 {
     struct wptask *task;
 
     task = NULL;
 
     /* very brief CPU time consumption, we can use spinlock instead of mutex */
-    acquire_spinlock(&wpptr->sp);
-    if (NULL != (task = list_first_entry_or_null(&wpptr->tasks, struct wptask, link))) {
-         --wpptr->task_list_size;
+    acquire_spinlock(&poolptr->sp);
+    if (NULL != (task = list_first_entry_or_null(&poolptr->tasks, struct wptask, link))) {
+         --poolptr->task_list_size;
         list_del(&task->link);
     }
-    release_spinlock(&wpptr->sp);
+    release_spinlock(&poolptr->sp);
 
     if (task) {
         INIT_LIST_HEAD(&task->link);
@@ -120,22 +161,22 @@ static nsp_status_t _wp_exec(struct wptask *task)
 static void *_wp_run(void *p)
 {
     struct wptask *task;
-    struct wpool *wpptr;
+    struct wpool *poolptr;
     nsp_status_t status;
 
-    wpptr = (struct wpool *)p;
-    //mxx_call_ecr("Wp worker:%lld standby.", wpptr->hld);
+    poolptr = (struct wpool *)p;
+    //mxx_call_ecr("Wp worker:%lld standby.", poolptr->hld);
 
-    while (wpptr->actived) {
-        status = lwp_event_wait(&wpptr->signal, 10);
+    while (poolptr->actived) {
+        status = lwp_event_wait(&poolptr->signal, 10);
         if (!NSP_SUCCESS_OR_ERROR_EQUAL(status, ETIMEDOUT)) {
             break;
         }
-        lwp_event_block(&wpptr->signal);
+        lwp_event_block(&poolptr->signal);
 
         /* complete all write task when once signal arrived,
             no matter which thread wake up this wait object */
-        while ((NULL != (task = _wp_get_task(wpptr)) ) && wpptr->actived) {
+        while ((NULL != (task = _wp_get_task(poolptr)) ) && poolptr->actived) {
             status = _wp_exec(task);
             if (!NSP_SUCCESS(status)) {
                 zfree(task);
@@ -143,19 +184,19 @@ static void *_wp_run(void *p)
         }
     }
 
-    //mxx_call_ecr("Wp worker:%lld terminated.", wpptr->hld);
+    //mxx_call_ecr("Wp worker:%lld terminated.", poolptr->hld);
     pthread_exit((void *) 0);
     return NULL;
 }
 
-static nsp_status_t _wp_init(struct wpool *wpptr)
+static nsp_status_t _wp_init(struct wpool *poolptr)
 {
-    INIT_LIST_HEAD(&wpptr->tasks);
-    lwp_event_init(&wpptr->signal, LWPEC_NOTIFY);
-    initial_spinlock(&wpptr->sp);
-    wpptr->task_list_size = 0;
-    wpptr->actived = 1;
-    if (lwp_create(&wpptr->thread, 0, &_wp_run, (void *)wpptr) < 0 ) {
+    INIT_LIST_HEAD(&poolptr->tasks);
+    lwp_event_init(&poolptr->signal, LWPEC_NOTIFY);
+    initial_spinlock(&poolptr->sp);
+    poolptr->task_list_size = 0;
+    poolptr->actived = 1;
+    if (lwp_create(&poolptr->thread, 0, &_wp_run, (void *)poolptr) < 0 ) {
         mxx_call_ecr("fatal error occurred syscall pthread_create(3), error:%d", errno);
         return NSP_STATUS_FATAL;
     }
@@ -163,113 +204,104 @@ static nsp_status_t _wp_init(struct wpool *wpptr)
     return NSP_STATUS_SUCCESSFUL;
 }
 
-static void _wp_uninit(objhld_t hld, void *udata)
+static void _wp_uninit(struct wpool *poolptr)
 {
-    struct wpool *wpptr;
     struct wptask *task;
-
-    wpptr = (struct wpool *)udata;
 
     /* This is an important judgment condition.
         when @__sync_bool_compare_and_swap failed in @wp_init, the mutex/condition_variable will notbe initialed,
         in this case, wait function block the calling thread and @wp_uninit progress cannot continue */
-    if (wpptr->actived) {
-        wpptr->actived = 0;
-        lwp_event_awaken(&wpptr->signal);
-        lwp_join(&wpptr->thread, NULL);
+    if (poolptr->actived) {
+        poolptr->actived = 0;
+        lwp_event_awaken(&poolptr->signal);
+        lwp_join(&poolptr->thread, NULL);
 
         /* clear the tasks which too late to deal with */
-        while (NULL != (task = _wp_get_task(wpptr))) {
+        while (NULL != (task = _wp_get_task(poolptr))) {
             zfree(task);
         }
 
-        INIT_LIST_HEAD(&wpptr->tasks);
-        lwp_event_uninit(&wpptr->signal);
-    }
-
-    if (!atom_compare_exchange_strong( &_tcphld, &hld, -1)) {
-        atom_compare_exchange_strong( &_udphld, &hld, -1);
+        INIT_LIST_HEAD(&poolptr->tasks);
+        lwp_event_uninit(&poolptr->signal);
     }
 }
 
 void wp_uninit(int protocol)
 {
-    objhld_t *hldptr;
+    struct wpool *poolptr, **locate;
 
-    hldptr = ((IPPROTO_TCP ==protocol ) ? &_tcphld : ((IPPROTO_UDP == protocol || ETH_P_ARP == protocol) ? &_udphld : NULL));
-    if (hldptr) {
-        if (*hldptr >= 0) {
-            objclos(*hldptr);
-        }
+    locate = _wp_locate_protocol(protocol);
+    if (!locate) {
+        return;
+    }
+
+    poolptr = *locate;
+    if (!atom_compare_exchange_strong(locate, poolptr, NULL)) {
+        return;
+    }
+
+    lwp_mutex_lock(&_wpmgr.mutex);
+    ref_close(&poolptr->ref);
+    lwp_mutex_unlock(&_wpmgr.mutex);
+}
+
+static void _wp_close_protocol(struct shared_ptr *ref)
+{
+    struct wpool *poolptr;
+
+    poolptr = container_of(ref, struct wpool, ref);
+    if (poolptr) {
+        _wp_uninit(poolptr);
+        zfree(poolptr);
     }
 }
 
 nsp_status_t wp_init(int protocol)
 {
-    int retval;
-    struct wpool *wpptr;
-    objhld_t hld, expect, *hldptr;
-    struct objcreator creator;
+    nsp_status_t status;
+    struct wpool *poolptr, *expect, **locate;
 
-    hldptr = ((IPPROTO_TCP ==protocol ) ? &_tcphld :
-                ((IPPROTO_UDP == protocol || ETH_P_ARP == protocol) ? &_udphld : NULL));
-    if (!hldptr) {
+    locate = _wp_locate_protocol(protocol);
+    if (unlikely(!locate)) {
         return posix__makeerror(EPROTOTYPE);
     }
 
-    /* judgment thread-unsafe first, handle the most case of interface rep-calls,
-        this case NOT mean a error */
-    if (*hldptr >= 0) {
+    poolptr = (struct wpool *)ztrymalloc(sizeof(*poolptr));
+    if (!poolptr) {
+        return posix__makeerror(ENOMEM);
+    }
+    ref_init(&poolptr->ref, &_wp_close_protocol);
+
+    expect = NULL;
+    if (!atom_compare_exchange_strong( locate, &expect, poolptr)) {
+        zfree(poolptr);
         return EALREADY;
     }
 
-    creator.known = INVALID_OBJHLD;
-    creator.size = sizeof(struct wpool);
-	creator.initializer = NULL;
-	creator.unloader = &_wp_uninit;
-	creator.context = NULL;
-	creator.ctxsize = 0;
-    hld = objallo3(&creator);
-    if (hld < 0) {
-        return NSP_STATUS_FATAL;
+    lwp_mutex_lock(&_wpmgr.mutex);
+    status = _wp_init(poolptr);
+    if (unlikely(!NSP_SUCCESS(status))) {
+        atom_set(locate, NULL);
+        ref_close(&poolptr->ref);
     }
-
-    expect = -1;
-    if (!atom_compare_exchange_strong( hldptr, &expect, hld)) {
-        objclos(hld);
-        return EALREADY;
-    }
-
-    wpptr = objrefr(*hldptr);
-    if (!wpptr) {
-        return posix__makeerror(ENOENT);
-    }
-
-    retval = _wp_init(wpptr);
-    objdefr(*hldptr);
-    return retval;
+    lwp_mutex_unlock(&_wpmgr.mutex);
+    return status;
 }
 
 nsp_status_t wp_queued(void *ncbptr)
 {
     struct wptask *task;
-    struct wpool *wpptr;
+    struct wpool *poolptr;
     ncb_t *ncb;
-    objhld_t hld;
     nsp_status_t status;
     int protocol;
 
     ncb = (ncb_t *)ncbptr;
     protocol = ncb->protocol;
-    hld = ((IPPROTO_TCP == protocol ) ? _tcphld :
-                ((IPPROTO_UDP == protocol || ETH_P_ARP == protocol) ? _udphld : -1));
-    if ( unlikely(hld < 0)) {
-        return posix__makeerror(ENOENT);
-    }
 
-    wpptr = objrefr(hld);
-    if (!wpptr) {
-        return posix__makeerror(ENOENT);
+    poolptr = _wp_safe_retain(protocol);
+    if (!poolptr) {
+        return posix__makeerror(EPROTOTYPE);
     }
 
     do {
@@ -279,14 +311,14 @@ nsp_status_t wp_queued(void *ncbptr)
         }
 
         task->hld = ncb->hld;
-        task->thread = wpptr;
+        task->poolptr = poolptr;
         _wp_add_task(task);
 
         /* use local variable to save the thread object, because @task maybe already freed by handler now */
-        lwp_event_awaken(&wpptr->signal);
+        lwp_event_awaken(&poolptr->signal);
         status = NSP_STATUS_SUCCESSFUL;
     } while (0);
 
-    objdefr(hld);
+    _wp_safe_release(poolptr);
     return status;
 }

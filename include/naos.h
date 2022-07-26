@@ -24,4 +24,10 @@ PORTABLEAPI(uint16_t) naos_chord16(uint16_t value);
 /* verfiy the IP address string */
 PORTABLEAPI(nsp_boolean_t) naos_is_legal_ipv4(const char *inetstr);
 
+/* generic a hexadecimal text dump for specify buffer with it's fix length
+ * @naos_hexdump didn't deal with buffer which have length large than 65535 bytes
+ * @columns parameter indicate the output align columns, 8 by default.
+ * if @on_dump callback function is a nullptr, dump text will write to stdout directly */
+PORTABLEAPI(void) naos_hexdump(const unsigned char *buffer, uint16_t length, uint8_t columns, void (*on_dump)(const char *text, uint32_t length));
+
 #endif

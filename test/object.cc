@@ -30,7 +30,7 @@ TEST(DoNormalTest, NormalTest)
     EXPECT_EQ(hld, (objhld_t)1);
 
     struct context *pctx = (struct context *)objrefr(hld);
-    EXPECT_NE(pctx, NULL);
+    EXPECT_TRUE(pctx != NULL);
     pctx->idx = 101;
     strcpy(pctx->buffer, "hello world");
 
@@ -77,7 +77,7 @@ TEST(DoNormalSpecifyHld, NormalSpecifyHld)
 TEST(DoRefNonExist, RefNonExist)
 {
     struct context *pctx = (struct context *)objrefr(10);
-    EXPECT_EQ(pctx, NULL);
+    EXPECT_TRUE(pctx == NULL);
 
     unsigned int size = objrefr2(10, (void **)&pctx);
     EXPECT_EQ(size, (unsigned int)-1);
@@ -99,10 +99,10 @@ TEST(DoTestReff, TestReff)
     EXPECT_GT(hld, 0);
 
     struct context *pctx = (struct context *)objreff(hld);
-    EXPECT_NE(pctx, NULL);
+    EXPECT_TRUE(pctx != NULL);
 
     struct context *pctx2 = (struct context *)objreff(hld);
-    EXPECT_EQ(pctx2, NULL);
+    EXPECT_TRUE(pctx2 == NULL);
 
     objdefr(hld);
 }
@@ -135,6 +135,7 @@ int STDCALL initializer(void *udata, const void *ctx, int ctxcb)
     EXPECT_EQ(ctxcb, sizeof(int));
 
     strcpy(objctx->buffer, "abcd#1234");
+    return 0;
 }
 
 TEST(DoTestInitializer, TestInitializer)
@@ -154,16 +155,10 @@ TEST(DoTestInitializer, TestInitializer)
     EXPECT_GT(hld, 0);
 
     struct context *pctx = (struct context *)objrefr(hld);
-    EXPECT_NE(pctx, NULL);
+    EXPECT_TRUE(pctx != NULL);
     EXPECT_EQ(pctx->idx, 10001);
     EXPECT_EQ(0, strcmp(pctx->buffer, "abcd#1234"));
 
     objdefr(hld);
     objclos(hld);
-}
-
-int main(int argc, char *argv[])
-{
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

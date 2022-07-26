@@ -1,24 +1,31 @@
 #if !defined SHARED_PTR_H
 #define SHARED_PTR_H
 
-/* It is very important to say that :
- * you can't obtain multi-threading completely safe guarantee by @sharedptr without any other mutex locker!!!
- * refer to nshost!io.c*/
+#include "compiler.h"
 
-typedef struct sharedptr *sharedptr_pt;
+/*  IMPORTANT:
+ *      shared object just only a reference-count maintainer, it doesn't have multi-thread safe guarantee.
+ *      everyone shall use mutex -- such as lwp_mutex_t init with PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP -- to work with shared object
+ **/
 
-enum SharedPtrState
+struct shared_ptr;
+typedef void (*ref_on_closed_t)(struct shared_ptr *ref);
+struct shared_ptr
 {
-    SPS_INIT = 0,
-    SPS_AVAILABLE,
-    SPS_CLOSING,
-    SPS_CLOSED,
+    int count;
+    int status;
+    ref_on_closed_t on_closed;
 };
 
-extern sharedptr_pt ref_makeshared(long size);
-extern sharedptr_pt ref_shared_from_this(void *data, long size);
-extern void *ref_retain(sharedptr_pt sptr);
-extern int ref_close(sharedptr_pt sptr);
-extern int ref_release(sharedptr_pt sptr);
+PORTABLEAPI(void) ref_init(struct shared_ptr *ref, const ref_on_closed_t on_closed);
+/* retain the shared object, increase reference-count meanwhile, return value is the reference-count of this object on success, otherwise, return zero or negative number */
+PORTABLEAPI(int) ref_retain(struct shared_ptr *ref);
+/* release the shared object, decrease reference-count meanwhile,
+ *  return value is the reference-count of this object on success, otherwise, return negative number
+ *  zero return indicate a succesful release operation */
+PORTABLEAPI(int) ref_release(struct shared_ptr *ref);
+/* close the share object, this object are certain unusable after @ref_close call, but it's owned memory may not be freed immediately
+ *  the real free operation could postpone to last reference released.(ref_release called) */
+PORTABLEAPI(void) ref_close(struct shared_ptr *ref);
 
 #endif

@@ -399,10 +399,10 @@ nsp_status_t udp_write(HUDPLINK link, const void *origin, unsigned int cb, const
 
     /* @fifo_queue may raise a EBUSY error indicate the user-level cache of sender is full.
      * in this case, current send request is going to be ignore but link shall not be close.
-     * otherwise, close link nomatter what error code it is */
+     * otherwise, close link nomatter what error code it is
     if ( !NSP_SUCCESS_OR_ERROR_EQUAL(status, EBUSY)) {
         objclos(link);
-    }
+    }*/
 
     return status;
 }

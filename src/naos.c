@@ -147,3 +147,51 @@ PORTABLEIMPL(nsp_boolean_t) naos_is_legal_ipv4(const char *inetstr)
 
     return nsp_true;
 }
+
+PORTABLEIMPL(void) naos_hexdump(const unsigned char *buffer, uint16_t length, uint8_t columns, void (*on_dump)(const char *text, uint32_t length))
+{
+    char *display, *p;
+    uint32_t display_length;
+    uint8_t col;
+    uint32_t offset;
+    uint32_t i;
+    int written;
+
+    if ( !buffer || 0 == length) {
+        return;
+    }
+
+    display_length = length * 3 + length / columns + 8;
+    display = (char *)ztrymalloc(display_length);
+    if (!display) {
+        return;
+    }
+    p = &display[0];
+    col = 0;
+    offset = 0;
+
+    offset += snprintf(p + offset, display_length - offset , "\n");
+    for (i = 0; i < length; i++, col++) {
+        if (col == columns) {
+            written = snprintf(p + offset, display_length - offset, "\n");
+            if (written >= display_length - offset) {
+                break;
+            }
+            offset += written;
+            col = 0;
+        }
+        written = snprintf(p + offset, display_length - offset, " %02X", buffer[i]);
+        if (written >= display_length - offset) {
+            break;
+        }
+        offset += written;
+    }
+
+    /* callback to user context */
+    if ( on_dump) {
+        on_dump(display, offset);
+    } else {
+        printf(display);
+    }
+    zfree(display);
+}

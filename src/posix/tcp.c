@@ -222,10 +222,9 @@ HTCPLINK tcp_create(tcp_io_callback_t callback, const char* ipstr, uint16_t port
     ncb->nis_callback = callback;
 
     do {
-        status = NSP_STATUS_SUCCESSFUL;
         if (ipstr) {
             if (0 == strncasecmp(ipstr, "IPC:", 4)) {
-                _tcp_create_domain(ncb, &ipstr[4]);
+                status = _tcp_create_domain(ncb, &ipstr[4]);
                 break;
             }
         }
@@ -867,6 +866,7 @@ nsp_status_t tcp_listen(HTCPLINK link, int block)
 
         /* this NCB object is readonly， and it must be used for accept */
         if (NULL != atom_compare_exchange(&ncb->ncb_read, NULL, &tcp_syn)) {
+            status = posix__makeerror(EEXIST);
             break;
         }
         atom_set(&ncb->ncb_write, NULL);
@@ -890,9 +890,10 @@ nsp_status_t tcp_listen(HTCPLINK link, int block)
 
     } while (0);
 
+    /*
     if (!NSP_SUCCESS(status)) {
         objclos(link);
-    }
+    }*/
 
     objdefr(link);
     return status;
@@ -1067,10 +1068,10 @@ nsp_status_t tcp_write(HTCPLINK link, const void *origin, int cb, const nis_seri
 
     /* @fifo_queue may raise a EBUSY error indicate the user-level cache of sender is full.
      * in this case, current send request is going to be ignore but link shall not be close.
-     * otherwise, close link nomatter what error code it is */
+     * otherwise, close link nomatter what error code it is
     if ( !NSP_SUCCESS_OR_ERROR_EQUAL(status, EBUSY)) {
         objclos(link);
-    }
+    }*/
 
     return status;
 }

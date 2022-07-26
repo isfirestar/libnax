@@ -1,121 +1,74 @@
 #include "sharedptr.h"
-#include "zmalloc.h"
 
-#include <errno.h>
+#define REF_STATUS_NORMAL       (0)
+#define REF_STATUS_CLOSEWAIT    (1)
+#define REF_STATUS_CLOSED       (2)
 
-#include "compiler.h"
-#include "atom.h"
-
-struct sharedptr
+PORTABLEIMPL(void) ref_init(struct shared_ptr *ref, const ref_on_closed_t on_closed)
 {
-    long refcnt;
-    long size;
-    int type;
-    int state;
-    union {
-        void *data;
-        char section[1];
-    };
-};
-
-enum SharedPtrType
-{
-    SPT_CONTIGUOUS = 0,
-    SPT_DISCRETE,
-};
-
-sharedptr_pt ref_makeshared(long size)
-{
-    sharedptr_pt ptr;
-
-    if ( unlikely(size < 0)) {
-        return NULL;
+    if (!ref) {
+        return;
     }
 
-    ptr = (sharedptr_pt)ztrymalloc(size + sizeof(*ptr));
-    if (unlikely(!ptr)) {
-        return NULL;
-    }
-    ptr->refcnt = 0;
-    ptr->size = size;
-    ptr->type = SPT_CONTIGUOUS;
-    ptr->state = SPS_AVAILABLE;
-    return ptr;
+    ref->count = 0;
+    ref->status = REF_STATUS_NORMAL;
+    ref->on_closed = on_closed;
 }
 
-sharedptr_pt ref_shared_from_this(void *data, long size)
+PORTABLEIMPL(int) ref_retain(struct shared_ptr *ref)
 {
-    sharedptr_pt ptr;
-
-    if ( unlikely(!data || size <= 0 )) {
-        return NULL;
+    if (!ref) {
+        return -1;
     }
 
-    ptr = (sharedptr_pt)ztrymalloc(size + sizeof(*ptr));
-    if (unlikely(!ptr)) {
-        return NULL;
+    if (ref->status != REF_STATUS_NORMAL) {
+        return -1;
     }
-    ptr->refcnt = 0;
-    ptr->size = size;
-    ptr->type = SPT_DISCRETE;
-    ptr->state = SPS_AVAILABLE;
-    return ptr;
+
+    ref->count++;
+    return ref->count;
 }
 
-void *ref_retain(sharedptr_pt sptr)
+PORTABLEIMPL(int) ref_release(struct shared_ptr *ref)
 {
-    if (unlikely(!sptr)) {
-        return NULL;
+    if (!ref) {
+        return -1;
     }
 
-    if (SPS_AVAILABLE != atom_get(&sptr->state) ) {
-        return NULL;
+    if (ref->status == REF_STATUS_CLOSED) {
+        return -1;
     }
 
-    atom_addone(&sptr->refcnt);
-
-    if (sptr->type == SPT_CONTIGUOUS) {
-        return &sptr->section[0];
+#if DEBUG
+    assert(ref->count);
+#endif
+    if (ref->count <= 0) {
+        return -1;
     }
+    --ref->count;
 
-    return sptr->data;
-}
-
-static int _ref_decrease_check(sharedptr_pt sptr, int decrease)
-{
-    int expect;
-
-    if (0 == atom_decrease(&sptr->refcnt, decrease)) {
-        expect = SPS_CLOSING;
-        if (atom_compare_exchange_strong(&sptr->state, &expect, SPS_CLOSED)) {
-            zfree(sptr);
-            return 1;
+    if (ref->count == 0 && ref->status == REF_STATUS_CLOSEWAIT) {
+        if (ref->on_closed) {
+            ref->on_closed(ref);
         }
     }
-    return 0;
+    return ref->count;
 }
 
-int ref_close(sharedptr_pt sptr)
+PORTABLEIMPL(void) ref_close(struct shared_ptr *ref)
 {
-    int expect;
-
-    if (unlikely(!sptr)) {
-        return -EINVAL;
+    if (!ref) {
+        return;
     }
 
-    expect = SPS_AVAILABLE;
-    if (atom_compare_exchange_strong(&sptr->state, &expect, SPS_CLOSING)) {
-        return _ref_decrease_check(sptr, 0);
+    if (ref->status == REF_STATUS_NORMAL) {
+        if (ref->count == 0) {
+            if (ref->on_closed) {
+                ref->on_closed(ref);
+            }
+            ref->status = REF_STATUS_CLOSED;
+        } else {
+            ref->status = REF_STATUS_CLOSEWAIT;
+        }
     }
-
-    return 0;
-}
-
-int ref_release(sharedptr_pt sptr)
-{
-    if (unlikely(!sptr)) {
-        return -EINVAL;
-    }
-
-    return _ref_decrease_check(sptr, 1);
 }

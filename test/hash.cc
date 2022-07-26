@@ -77,7 +77,6 @@ TEST(DoTestSiphash, TestSipHash)
 {
     uint8_t in[64], k[16];
     int i;
-    int j;
 
     for (i = 0; i < 16; ++i) {
         k[i] = i;
@@ -110,7 +109,7 @@ TEST(DoTestDESEncrypt, TestDESEncrypt)
 {
     char origin[64], encrypt[64], decrypt[64];
 
-    for (int i = 0; i < sizeof(origin); i++) {
+    for (unsigned int i = 0; i < sizeof(origin); i++) {
         origin[i] = ifos_random(1, 254);
     }
 
@@ -128,11 +127,11 @@ TEST(DoTestDESEncryptWithKey, TestDESEncryptWithKey)
     char origin[64], encrypt[64], decrypt[64];
     abuff_des_key_t key;
 
-    for (int i = 0; i < sizeof(origin); i++) {
+    for (unsigned int i = 0; i < sizeof(origin); i++) {
         origin[i] = ifos_random(1, 254);
     }
 
-    for (int i = 0; i < sizeof(key); i++) {
+    for (unsigned int i = 0; i < sizeof(key); i++) {
         key.u.st[i] = ifos_random(1, 127);
     }
 

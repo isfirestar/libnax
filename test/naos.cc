@@ -78,8 +78,6 @@ TEST(DoIpv4ToU, Ipv4ToU)
     EXPECT_EQ(value, 0);
     value = naos_ipv4tou("262.173.215.69", kByteOrder_BigEndian);
     EXPECT_EQ(value, 0);
-    value = naos_ipv4tou("222.173.215.69", 4);
-    EXPECT_EQ(value, 0);
 }
 
 TEST(DpIpv4ToS, Ipv4ToS)
@@ -92,10 +90,4 @@ TEST(DpIpv4ToS, Ipv4ToS)
     status = naos_ipv4tos(0xdeadd745, &inetstr);
     EXPECT_EQ(status, NSP_STATUS_SUCCESSFUL);
     EXPECT_EQ(0, strcmp(inetstr.u.cst, "222.173.215.69"));
-}
-
-int main(int argc, char *argv[])
-{
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
 }

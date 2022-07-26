@@ -19,7 +19,8 @@
 /* 1024 is just a hint for the kernel */
 #define EPOLL_SIZE    (1024)
 
-struct epoll_object_block {
+struct epoll_object_block
+{
     int epfd;
     nsp_boolean_t actived;
     lwp_t lwp;
@@ -28,25 +29,25 @@ struct epoll_object_block {
     pid_t tid;
 } ;
 
-struct io_object_block {
+struct io_object_block
+{
+    struct shared_ptr ref;
     struct epoll_object_block *epoptr;
     int nprocs;
     int protocol;
 };
 
-struct io_manager {
-    sharedptr_pt tcpio;
-    sharedptr_pt udpio;
+struct io_manager
+{
+    struct io_object_block *tcpio;
+    struct io_object_block *udpio;
     lwp_mutex_t mutex;
-    enum SharedPtrState tcp_available;
-    enum SharedPtrState udp_available;
 };
 static struct io_manager _iomgr = {
     .tcpio = NULL,
     .udpio = NULL,
-    .mutex = { PTHREAD_MUTEX_INITIALIZER },
-    .tcp_available = SPS_CLOSED,
-    .udp_available = SPS_CLOSED };
+    .mutex = { PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP },
+     };
 
 static void _io_rdhup(ncb_t *ncb)
 {
@@ -252,56 +253,6 @@ static void *_epoll_proc(void *argv)
     return NULL;
 }
 
-static enum SharedPtrState *_io_protocol_stat(int protocol)
-{
-    enum SharedPtrState *statpp;
-
-    statpp = NULL;
-    if (IPPROTO_TCP == protocol) {
-        statpp = &_iomgr.tcp_available;
-    } else if (IPPROTO_UDP == protocol) {
-        statpp = &_iomgr.udp_available;
-    } else {
-        ;
-    }
-
-    return statpp;
-}
-
-static struct io_object_block *_io_retain_obp(int protocol, int available, sharedptr_pt *sptr)
-{
-    sharedptr_pt *targetpp;
-    struct io_object_block *obptr;
-
-    targetpp = NULL;
-    if (IPPROTO_TCP == protocol) {
-        targetpp = &_iomgr.tcpio;
-    } else if (IPPROTO_UDP == protocol) {
-        targetpp = &_iomgr.udpio;
-    } else {
-        return NULL;
-    }
-
-    obptr = NULL;
-    lwp_mutex_lock(&_iomgr.mutex);
-    do {
-        if (available != atom_get( _io_protocol_stat(protocol)) ) {
-            mxx_call_ecr("Unknown protocol:%d,available:%d", protocol, available);
-            break;
-        }
-
-        *sptr = atom_get(targetpp);
-        if (NULL == *sptr) {
-            break;
-        }
-
-        obptr = (struct io_object_block *)ref_retain(*sptr);
-    } while(0);
-    lwp_mutex_unlock(&_iomgr.mutex);
-
-    return obptr;
-}
-
 static nsp_status_t _io_init(struct io_object_block *obptr)
 {
     int i;
@@ -364,6 +315,14 @@ static void _io_uninit(struct io_object_block *obptr)
     int i;
     struct epoll_object_block *epoptr;
 
+    if (!obptr) {
+        return;
+    }
+
+    if (!obptr->epoptr) {
+        return;
+    }
+
     for (i = 0; i < obptr->nprocs; i++) {
         _io_exit_epo(&obptr->epoptr[i]);
     }
@@ -383,39 +342,72 @@ static void _io_uninit(struct io_object_block *obptr)
     obptr->epoptr = NULL;
 }
 
+static struct io_object_block **_io_locate_protocol(int protocol)
+{
+    if (IPPROTO_TCP == protocol) {
+        return &_iomgr.tcpio;
+    } else if (IPPROTO_UDP == protocol) {
+        return &_iomgr.udpio;
+    } else {
+        return NULL;
+    }
+}
+
+static struct io_object_block *_io_safe_retain(int protocol)
+{
+    struct io_object_block *obptr, **locate;
+
+    obptr = NULL;
+
+    lwp_mutex_lock(&_iomgr.mutex);
+    locate = _io_locate_protocol(protocol);
+    if (locate) {
+        obptr = *locate;
+        if ( unlikely(ref_retain(&obptr->ref)) <= 0) {
+            obptr = NULL;
+        }
+    }
+    lwp_mutex_unlock(&_iomgr.mutex);
+
+    return obptr;
+}
+
+static void _io_safe_release(struct io_object_block *obptr)
+{
+    lwp_mutex_lock(&_iomgr.mutex);
+    ref_release(&obptr->ref);
+    lwp_mutex_unlock(&_iomgr.mutex);
+}
+
+static void _io_close_protocol(struct shared_ptr *ref)
+{
+    struct io_object_block *obptr;
+
+    obptr = container_of(ref, struct io_object_block, ref);
+    if (obptr) {
+        _io_uninit(obptr);
+        zfree(obptr);
+    }
+}
+
 nsp_status_t io_init(int protocol, int nprocs)
 {
     nsp_status_t status;
-    struct io_object_block *obptr;
-    sharedptr_pt sptr, *targetpp;
-    enum SharedPtrState expect;
-    enum SharedPtrState *statpp;
+    struct io_object_block *obptr, *expect, **locate;
 
-    targetpp = NULL;
-    if (IPPROTO_TCP == protocol) {
-        targetpp = &_iomgr.tcpio;
-    } else if (IPPROTO_UDP == protocol) {
-        targetpp = &_iomgr.udpio;
-    } else {
-        return posix__makeerror(EINVAL);
-    }
-    statpp = _io_protocol_stat(protocol);
-
-    expect = SPS_CLOSED;
-    if (!atom_compare_exchange_strong(statpp, &expect, SPS_AVAILABLE)) {
-        return EEXIST;
-    }
-
-    sptr = ref_makeshared(sizeof(struct io_object_block));
-    if ( unlikely(!sptr)) {
-        atom_set(statpp, SPS_CLOSED);
-        return posix__makeerror(ENOMEM);
+    locate = _io_locate_protocol(protocol);
+    if (!locate) {
+        return posix__makeerror(EPROTOTYPE);
     }
 
     /* retain io-object entity body */
-    obptr = (struct io_object_block *)ref_retain(sptr);
-    *targetpp = sptr;
+    obptr = (struct io_object_block *)ztrycalloc(sizeof(*obptr));
+    if (!obptr) {
+        return posix__makeerror(ENOMEM);
+    }
 
+    /* initialize shared object reference */
+    ref_init(&obptr->ref, &_io_close_protocol);
     /* determine how many threads are there IO module acquire */
     obptr->protocol = protocol;
     if (0 == nprocs) {
@@ -426,38 +418,42 @@ nsp_status_t io_init(int protocol, int nprocs)
     } else {
         obptr->nprocs = (nprocs < 0) ? 1 : nprocs;
     }
-    status = _io_init(obptr);
 
-    ref_release(sptr);
-
-    if ( unlikely(!NSP_SUCCESS(status)) ) {
-        atom_set(statpp, SPS_CLOSED);
-        ref_close(sptr);
+    expect = NULL;
+    if (!atom_compare_exchange_strong(locate, &expect, obptr)) {
+        zfree(obptr);
+        return EEXIST; /* not a error */
     }
+
+    /* create IO thread */
+    lwp_mutex_lock(&_iomgr.mutex);
+    status = _io_init(obptr);
+    if ( unlikely(!NSP_SUCCESS(status)) ) {
+        atom_set(locate, NULL);
+        ref_close(&obptr->ref);
+    }
+    lwp_mutex_unlock(&_iomgr.mutex);
 
     return posix__makeerror(status);
 }
 
 void io_uninit(int protocol)
 {
-    sharedptr_pt sptr;
-    struct io_object_block *obptr;
-    enum SharedPtrState expect;
-    enum SharedPtrState *statpp;
+    struct io_object_block *obptr, **locate;
 
-    statpp = _io_protocol_stat(protocol);
-    expect = SPS_AVAILABLE;
-    if (!atom_compare_exchange_strong(statpp, &expect, SPS_CLOSING)) {
+    locate = _io_locate_protocol(protocol);
+    if (!locate) {
         return;
     }
 
-    obptr = _io_retain_obp(protocol, SPS_CLOSING, &sptr);
-    if (likely(obptr)) {
-        _io_uninit(obptr);
-        ref_release(sptr);
+    obptr = *locate;
+    if (!atom_compare_exchange_strong(locate, obptr, NULL)) {
+        return;
     }
-    ref_close(sptr);
-    atom_set(statpp, SPS_CLOSED);
+
+    lwp_mutex_lock(&_iomgr.mutex);
+    ref_close(&obptr->ref);
+    lwp_mutex_unlock(&_iomgr.mutex);
 }
 
 nsp_status_t io_setfl(int fd, int test)
@@ -514,15 +510,13 @@ nsp_status_t io_attach(void *ncbptr, int mask)
     struct epoll_event epevt;
     ncb_t *ncb;
     nsp_status_t status;
-    sharedptr_pt sptr;
     struct io_object_block *obptr;
     struct epoll_object_block *epoptr;
 
     ncb = (ncb_t *)ncbptr;
-
-    obptr = _io_retain_obp(ncb->protocol, SPS_AVAILABLE, &sptr);
+    obptr = _io_safe_retain(ncb->protocol);
     if (unlikely(!obptr)) {
-        return posix__makeerror(ENOENT);
+        return posix__makeerror(EPROTOTYPE);
     }
 
     do {
@@ -548,7 +542,8 @@ nsp_status_t io_attach(void *ncbptr, int mask)
             mxx_call_ecr("Success associate link:%lld,sockfd:%d,epfd:%d", ncb->hld, ncb->sockfd, ncb->epfd);
         }
     } while(0);
-    ref_release(sptr);
+
+    _io_safe_release(obptr);
 	return ((ncb->epfd < 0) ? NSP_STATUS_FATAL : NSP_STATUS_SUCCESSFUL);
 }
 
@@ -628,20 +623,19 @@ void io_close(void *ncbptr)
 nsp_status_t io_pipefd(void *ncbptr, int *pipefd)
 {
     ncb_t *ncb;
-    sharedptr_pt sptr;
     struct io_object_block *obptr;
     nsp_status_t status;
 
     ncb = (ncb_t *)ncbptr;
-    obptr = _io_retain_obp(ncb->protocol, SPS_AVAILABLE, &sptr);
+    obptr = _io_safe_retain(ncb->protocol);
     if (unlikely(!obptr)) {
-        return posix__makeerror(ENOENT);
+        return posix__makeerror(EPROTOTYPE);
     }
 
     *pipefd = obptr->epoptr[ncb->hld % obptr->nprocs].pipefdw;
     status = *pipefd > 0 ? NSP_STATUS_SUCCESSFUL : posix__makeerror(EBADFD);
 
-    ref_release(sptr);
+    _io_safe_release(obptr);
     return status;
 }
 

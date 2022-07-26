@@ -1,4 +1,4 @@
-#include "../include/atom.h"
+#include "atom.h"
 
 #include <gtest/gtest.h>
 
@@ -14,14 +14,14 @@ TEST(DoBaseFunc, BaseFunc)
     atom_set64(&value, 2);
     EXPECT_EQ(atom_get(&value), 2);
 
-    atom_increase(&value);
+    atom_increase(&value, 1);
     EXPECT_EQ(atom_get(&value), 3);
-    atom_increase64(&value);
+    atom_increase64(&value, 1);
     EXPECT_EQ(atom_get(&value), 4);
 
-    atom_decrease(&value);
+    atom_decrease(&value, 1);
     EXPECT_EQ(atom_get(&value), 3);
-    atom_decrease64(&value);
+    atom_decrease64(&value, 1);
     EXPECT_EQ(atom_get(&value), 2);
 
     EXPECT_EQ(atom_exchange(&value, 10), 2);
