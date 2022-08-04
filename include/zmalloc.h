@@ -54,7 +54,7 @@ PORTABLEAPI(void *) zrealloc(void *ptr, size_t size);
 PORTABLEAPI(void *) ztrymalloc(size_t size);
 PORTABLEAPI(void *) ztrycalloc(size_t size);
 PORTABLEAPI(void *) ztryrealloc(void *ptr, size_t size);
-PORTABLEIMPL(void) zfree(void *ptr);
+PORTABLEAPI(void) zfree(void *ptr);
 void *zmalloc_usable(size_t size, size_t *usable);
 void *zcalloc_usable(size_t size, size_t *usable);
 void *zrealloc_usable(void *ptr, size_t size, size_t *usable);
