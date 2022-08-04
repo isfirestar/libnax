@@ -3,6 +3,7 @@
 #include <getopt.h>
 
 #include "abuff.h"
+#include "nis.h"
 
 static struct argument  __startup_parameters;
 
@@ -64,11 +65,16 @@ static void arg_display_usage()
 static void arg_display_author_information()
 {
     static char author_context[512];
-    sprintf(author_context, "nstest\n%s\n"
+    swnet_version_t version;
+
+    nis_getver(&version);
+
+    (void)snprintf(author_context, sizeof(author_context) - 1, "libnax-demo\n%s\n"
             "Copyright (C) 2017 Neo.Anderson\n"
+            "libnax:%s\n"
             "For bug reporting instructions, please see:\n"
             "<http://www.nsplibrary.com.cn/>.\n"
-            "For help, type \"help\".\n", VERSION_STRING);
+            "For help, type \"help\".\n", VERSION_STRING, version.text);
     printf("%s", author_context);
 }
 

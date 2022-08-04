@@ -13,7 +13,9 @@ target_include_directories(nax
 			PRIVATE 
 			${CMAKE_CURRENT_LIST_DIR}/../include/
 			PUBLIC
+			"${PROJECT_BINARY_DIR}"
 			${CMAKE_CURRENT_LIST_DIR}/posix/
 			)
 
 target_compile_definitions(nax PUBLIC _GNU_SOURCE)
+target_compile_definitions(nax PRIVATE _GENERATE_BY_CMAKE)

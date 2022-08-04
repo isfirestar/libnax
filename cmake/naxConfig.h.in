@@ -1,0 +1,4 @@
+#define nax_VERSION_MAJOR @nax_VERSION_MAJOR@
+#define nax_VERSION_MINOR @nax_VERSION_MINOR@
+#define nax_VERSION_PATCH @nax_VERSION_PATCH@
+#define nax_VERSION_WTEAK @nax_VERSION_TWEAK@

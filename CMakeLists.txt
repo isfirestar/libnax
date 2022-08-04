@@ -2,7 +2,8 @@
 # use command "cmake .. -DCMAKE_USER_ARCH=arm" to generat arm binary file
 cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
 
-project(nax VERSION 9.0)
+project(nax VERSION 9.9.1)
+configure_file(cmake/naxConfig.h.in naxConfig.h)
 
 set(CMAKE_C_FLAGS_DEBUG "$ENV{CFLAGS} -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -DDEBUG=1")
 set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CPPFLAGS} -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -DDEBUG=1")

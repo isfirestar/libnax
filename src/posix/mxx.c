@@ -20,21 +20,36 @@
 
 /* use command: strings nshost.so.9.9.1 | grep 'COMPILE DATE'
     to query the compile date of specify ELF file */
+#if _GENERATE_BY_CMAKE
+#include "naxConfig.h"
 nsp_status_t nis_getver(swnet_version_t *version)
 {
-    static const char COMPILE_DATE[]="COMPILE DATE: Fri 14 May 2021 09:19:01 PM CST\n";
-    size_t n;
-
-    if (!version) {
-        return NSP_STATUS_FATAL;
+    if (unlikely(!version)) {
+        return posix__makeerror(EINVAL);
     }
 
-    n = sizeof(version->compile_date);
-    snprintf(version->compile_date, n, "%s", COMPILE_DATE);
-    version->compile_date[n - 1] = 0;
+    version->major = nax_VERSION_MAJOR;
+    version->minor = nax_VERSION_MINOR;
+    version->patch = nax_VERSION_PATCH;
+    version->tweak = 0;
+    snprintf(version->text, sizeof(version->text) - 1, "%d.%d.%d", nax_VERSION_MAJOR, nax_VERSION_MINOR, nax_VERSION_PATCH);
     return NSP_STATUS_SUCCESSFUL;
 }
+#else
+nsp_status_t nis_getver(swnet_version_t *version)
+{
+    if (unlikely(!version)) {
+        return posix__makeerror(EINVAL);
+    }
 
+    version->major = 9;
+    version->minor = 9;
+    version->patch = 1;
+    version->tweak = 0;
+    snprintf(version->text, sizeof(version->text) - 1, "%d.%d.%d", 9, 9, 1);
+    return NSP_STATUS_SUCCESSFUL;
+}
+#endif
 nsp_status_t nis_lgethost(abuff_64_t *name)
 {
     if (!name) {
