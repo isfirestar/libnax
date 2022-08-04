@@ -21,6 +21,8 @@ if (CMAKE_USER_ARCH STREQUAL "arm")
 	set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 endif()
 
+include(cmake/FindGTest.cmake)
+
 option(ENABLE_LIBNAX  "enable libnax" ON)
 if (ENABLE_LIBNAX)
 	add_subdirectory(src)
