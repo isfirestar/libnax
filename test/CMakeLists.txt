@@ -4,6 +4,8 @@ set(SOURCES ${DIR_SRCS})
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+#find_package(gtest REQUIRED)
+
 add_executable(naxtest ${SOURCES})
 
 # message(${CMAKE_CURRENT_LIST_DIR} )
