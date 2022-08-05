@@ -5,6 +5,8 @@ cmake_minimum_required(VERSION 3.15 FATAL_ERROR)
 project(nax VERSION 9.9.1)
 configure_file(cmake/naxConfig.h.in naxConfig.h)
 
+include(cmake/FindGTest.cmake)
+
 set(CMAKE_C_FLAGS_DEBUG "$ENV{CFLAGS} -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -DDEBUG=1")
 set(CMAKE_CXX_FLAGS_DEBUG "$ENV{CPPFLAGS} -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -DDEBUG=1")
 set(CMAKE_C_FLAGS_RELEASE "$ENV{CFLAGS} -O2 -g -funroll-loops -D NO_DEBUG")
@@ -21,8 +23,6 @@ if (CMAKE_USER_ARCH STREQUAL "arm")
 	set(CMAKE_FIND_ROOT_PATH_MODE_LIBRARY ONLY)
 	set(CMAKE_FIND_ROOT_PATH_MODE_INCLUDE ONLY)
 endif()
-
-include(cmake/FindGTest.cmake)
 
 option(ENABLE_LIBNAX  "enable libnax" ON)
 if (ENABLE_LIBNAX)
