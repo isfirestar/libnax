@@ -8,8 +8,8 @@ find_package(GTest REQUIRED)
 
 add_executable(naxtest ${SOURCES})
 
-target_include_directories(naxtest 
-	PUBLIC 
+target_include_directories(naxtest
+	PUBLIC
 	${CMAKE_CURRENT_LIST_DIR}/
 	${CMAKE_CURRENT_LIST_DIR}/../include/
 	${GTEST_INCLUDE_DIRS})

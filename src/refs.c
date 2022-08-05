@@ -6,7 +6,7 @@
 
 PORTABLEIMPL(void) ref_init(refs_pt ref, const refs_close_fp on_closed)
 {
-    if (!ref) {
+    if (unlikely(!ref)) {
         return;
     }
 
@@ -17,11 +17,11 @@ PORTABLEIMPL(void) ref_init(refs_pt ref, const refs_close_fp on_closed)
 
 PORTABLEIMPL(int) ref_retain(refs_pt ref)
 {
-    if (!ref) {
+    if (unlikely(!ref)) {
         return -1;
     }
 
-    if (ref->status != REF_STATUS_NORMAL) {
+    if (REF_STATUS_NORMAL != ref->status) {
         return -1;
     }
 
@@ -31,23 +31,23 @@ PORTABLEIMPL(int) ref_retain(refs_pt ref)
 
 PORTABLEIMPL(int) ref_release(refs_pt ref)
 {
-    if (!ref) {
+    if (unlikely(!ref)) {
         return -1;
     }
 
-    if (ref->status == REF_STATUS_CLOSED) {
+    if (unlikely(REF_STATUS_CLOSED == ref->status)) {
         return -1;
     }
 
 #if DEBUG
     assert(ref->count);
 #endif
-    if (ref->count <= 0) {
+    if (unlikely(ref->count <= 0)) {
         return -1;
     }
     --ref->count;
 
-    if (ref->count == 0 && ref->status == REF_STATUS_CLOSEWAIT) {
+    if (0 == ref->count && REF_STATUS_CLOSEWAIT == ref->status) {
         if (ref->on_closed) {
             ref->on_closed(ref);
         }
@@ -57,12 +57,12 @@ PORTABLEIMPL(int) ref_release(refs_pt ref)
 
 PORTABLEIMPL(void) ref_close(refs_pt ref)
 {
-    if (!ref) {
+    if (unlikely(!ref)) {
         return;
     }
 
-    if (ref->status == REF_STATUS_NORMAL) {
-        if (ref->count == 0) {
+    if (REF_STATUS_NORMAL == ref->status) {
+        if (0 == ref->count) {
             if (ref->on_closed) {
                 ref->on_closed(ref);
             }
