@@ -25,8 +25,8 @@ SRC_ADDON :=
 # specify the extension of source file name
 SRC_EXT := c
 
-# ELF_TYPE can be one of { dll/so, exe, lib/static } corresponding to { dynamic-library, executive-elf, static-archive }
-ELF_TYPE := dll
+# TARGET_TYPE can be one of { dll/so, exe, lib/static } corresponding to { dynamic-library, executive-elf, static-archive }
+TARGET_TYPE := dll
 
 # BUILD can be one of { debug, release(default) } to change optimization pattern of this build
 BUILD := debug
@@ -54,8 +54,8 @@ ifeq ($(filter $(ARCH), X86 x86 i386 X64 x64 x8664 X8664 x86_64 X86_64 IA64 ARM 
 $(error unexpected ARCH: $(ARCH))
 endif
 
-ifeq ($(filter $(ELF_TYPE), exe dll so lib),)
-$(error unexpected ELF_TYPE: $(ELF_TYPE))
+ifeq ($(filter $(TARGET_TYPE), exe dll so lib),)
+$(error unexpected TARGET_TYPE: $(TARGET_TYPE))
 endif
 
 ifeq ($(filter $(SRC_EXT), c cc cpp cxx),)
@@ -95,11 +95,11 @@ else
 endif
 
 # select option to use
-ifeq ($(ELF_TYPE), exe)
+ifeq ($(TARGET_TYPE), exe)
 	CFLAGS += -fPIE
 endif
 
-ifeq ($(ELF_TYPE), $(filter $(ELF_TYPE), dll so))
+ifeq ($(TARGET_TYPE), $(filter $(TARGET_TYPE), dll so))
 CFLAGS += -fPIC -fvisibility=hidden
 LDFLAGS += -shared
 endif
@@ -153,7 +153,7 @@ OBJS := $(addprefix $(OBJS_DIR)/,$(patsubst %.$(SRC_EXT),%.o,$(notdir $(SRCS))))
 DEPS := $(addprefix $(DEPS_DIR)/,$(patsubst %.$(SRC_EXT),%.d,$(notdir $(SRCS))))
 DISA := $(addprefix $(DISA_DIR)/,$(patsubst %.$(SRC_EXT),%.s,$(notdir $(SRCS))))
 
-ifeq ($(ELF_TYPE), $(filter $(ELF_TYPE), lib static))
+ifeq ($(TARGET_TYPE), $(filter $(TARGET_TYPE), lib static))
 $(TAGS_DIR)$(TARGET):$(OBJS)
 	@if [ ! -d $(TAGS_DIR) ]; then mkdir -p $(TAGS_DIR); fi;
 	@echo == AR $@
