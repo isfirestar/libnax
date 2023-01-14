@@ -110,8 +110,9 @@ endif
 # all includes
 INCS := $(addprefix -I, $(INC_DIRS))
 
+#src-$1 = $(foreach d,$2,$(wildcard $d*.$1))
 define set_src_x
-src-$1 = $(foreach d,$2,$(wildcard $d*.$1))
+src-$1 = $(filter-out $4,$(foreach d,$2,$(wildcard $d*.$1)) $(filter %.$1,$3))
 
 endef
 
@@ -128,7 +129,7 @@ endif
 OBJS_DIR := $(BUILD_DIR)objs/
 TAGS_DIR := $(BUILD_DIR)bin/
 
-$(eval $(foreach i,$(SRC_SUFFIX),$(call set_src_x,$i,$(SRC_DIRS))))
+$(eval $(foreach i,$(SRC_SUFFIX),$(call set_src_x,$i,$(SRC_DIRS),$(SRC_ADDON),$(SRC_EXCLUDE))))
 $(eval $(foreach i,$(SRC_SUFFIX),$(call set_obj_x,$i,$(src-$i),$(OBJS_DIR))))
 
 VPATH := $(SRC_DIRS)
