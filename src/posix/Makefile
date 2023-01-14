@@ -136,7 +136,7 @@ VPATH := $(SRC_DIRS)
 OBJS = $(foreach i,$(SRC_SUFFIX),$(obj-$i))
 SRCS = $(foreach i,$(SRC_SUFFIX),$(src-$i))
 
-PHONY := clean .mkdir all
+PHONY := clean .mkdir all detach
 
 all: .mkdir $(TAGS_DIR)$(TARGET)
 
@@ -155,6 +155,10 @@ LDFLAGS += $(if $(strip $(src-cpp) $(src-cc) $(src-cxx)), -lstdc++)
 $(TAGS_DIR)$(TARGET): $(OBJS)
 	$(CC) -o $@ $^ $(LDFLAGS)
 endif
+
+detach:
+	$(OBJCOPY) --only-keep-debug $(TAGS_DIR)$(TARGET) $(TAGS_DIR)$(TARGET)$(DEBUGINFO)
+	$(OBJCOPY) --strip-unneeded $(TAGS_DIR)$(TARGET) $(TAGS_DIR)$(TARGET)$(DETACHED)
 
 .mkdir:
 	if [ ! -d $(OBJS_DIR) ]; then mkdir -p $(OBJS_DIR); fi
