@@ -195,7 +195,7 @@ PORTABLEIMPL(void) naos_hexdump(const unsigned char *buffer, uint16_t length, ui
     if ( on_dump) {
         on_dump(display, offset);
     } else {
-        printf(display);
+        printf("%s\n",display);
     }
     zfree(display);
 }
