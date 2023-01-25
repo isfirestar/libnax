@@ -4,9 +4,9 @@ set(SOURCES ${DIR_SRCS})
 
 add_executable(demo ${SOURCES})
 
-message(${CMAKE_CURRENT_LIST_DIR} )
-target_include_directories(demo 
-	PUBLIC 
+#message(${CMAKE_CURRENT_LIST_DIR} )
+target_include_directories(demo
+	PUBLIC
 	${CMAKE_CURRENT_LIST_DIR}/
 	${CMAKE_CURRENT_LIST_DIR}/../include/)
 

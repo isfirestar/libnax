@@ -20,7 +20,7 @@ static void _build_wallclock_byepoch(datetime_t *systime)
     systime->low = systime->epoch % ET_METHOD_NTKRNL;
 }
 
-static nsp_status_t _build_wallclock_bydate(datetime_t *systime)
+__attribute__((unused)) static nsp_status_t _build_wallclock_bydate(datetime_t *systime)
 {
     struct tm timem;
     uint64_t epoch;
