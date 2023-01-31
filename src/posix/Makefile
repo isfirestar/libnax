@@ -142,7 +142,7 @@ all: .mkdir $(TAGS_DIR)$(TARGET)
 
 define build_obj_x
 $$(obj-$1): $2%.o: %.$1  $(MAKEFILE_LIST)
-	$(CC) -Wp,-MT,$$@ -Wp,-MMD,$$@.d -c $$< $(INCS) $(CFLAGS) $3 -o $$@
+	$(CC) -Wp,-MT,$$@ -Wp,-MMD,$$@.d -c $$< $(INCS) $(CFLAGS) $(CFLAGS_ADDON) $3 -o $$@
 
 endef
 $(eval $(foreach i,$(SRC_SUFFIX),$(call build_obj_x,$i,$(OBJS_DIR),$(if $(filter $i,cpp cc cxx),-std=c++11,-std=gnu99))))
