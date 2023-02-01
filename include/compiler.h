@@ -141,6 +141,7 @@ typedef int nsp_boolean_t;
 #define SYSTEM_WIDE     (sizeof(void *))
 
 #define nsp_query_align_size(size, align) (((size) + (align) - 1) & (~((align) - 1)))
+#define nsp_align_long(size)	nsp_query_align_size(size, sizeof(long))
 
 #if !defined __POSIX_TYPE_ALIGNED__
     #if _WIN32
