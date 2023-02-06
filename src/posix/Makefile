@@ -19,6 +19,9 @@ SRC_DIRS += ./wosi/
 SRC_DIRS += ../
 SRC_DIRS += ../dict/
 
+# add source directory, this variable allow framework force traverse and include all source files in entire directoy and it's sub directory
+SRC_ENTIRE_DIRS := 
+
 # add some source file which didn't in any of $(SRC_DIRS)
 SRC_ADDON :=
 
@@ -128,6 +131,9 @@ endif
 # define the middle directory for build
 OBJS_DIR := $(BUILD_DIR)objs/
 TAGS_DIR := $(BUILD_DIR)bin/
+
+# expand SRC_DIRS
+SRC_DIRS += $(foreach i,$(SRC_ENTIRE_DIRS),$(shell find $(i) -type d -exec echo {}/ \;))
 
 $(eval $(foreach i,$(SRC_SUFFIX),$(call set_src_x,$i,$(SRC_DIRS),$(SRC_ADDON),$(SRC_EXCLUDE))))
 $(eval $(foreach i,$(SRC_SUFFIX),$(call set_obj_x,$i,$(src-$i),$(OBJS_DIR))))
