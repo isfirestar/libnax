@@ -20,6 +20,7 @@ SRC_DIRS += ../
 SRC_DIRS += ../dict/
 
 # add source directory, this variable allow framework force traverse and include all source files in entire directoy and it's sub directory
+# path MUST end with slash
 SRC_ENTIRE_DIRS := 
 
 # add some source file which didn't in any of $(SRC_DIRS)
@@ -167,8 +168,8 @@ detach:
 	$(OBJCOPY) --strip-unneeded $(TAGS_DIR)$(TARGET) $(TAGS_DIR)$(TARGET)$(DETACHED)
 
 .mkdir:
-	if [ ! -d $(OBJS_DIR) ]; then mkdir -p $(OBJS_DIR); fi
-	if [ ! -d $(TAGS_DIR) ]; then mkdir -p $(TAGS_DIR); fi
+	@if [ ! -d $(OBJS_DIR) ]; then mkdir -p $(OBJS_DIR); fi
+	@if [ ! -d $(TAGS_DIR) ]; then mkdir -p $(TAGS_DIR); fi
 
 clean:
 	rm -fr $(BUILD_DIR)
