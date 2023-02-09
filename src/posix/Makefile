@@ -12,6 +12,10 @@ INC_DIRS := ./
 INC_DIRS += ../../include/
 INC_DIRS += ../dict/
 
+# add include directory, this variable allow framework force traverse and include all head files in entire directoy and it's sub directory
+# path MUST end with slash
+INC_ENTIRE_DIRS :=
+
 # add source directory, compiler shall compile all files which with $(SRC_SUFFIX) in these folders, path MUST end with slash
 SRC_DIRS :=
 SRC_DIRS += ./
@@ -113,6 +117,7 @@ endif
 
 # all includes
 INCS := $(addprefix -I, $(INC_DIRS))
+INCS += $(foreach i,$(INC_ENTIRE_DIRS),$(addprefix -I,$(shell find $(i) -type d -exec echo {}/ \;)))
 
 #src-$1 = $(foreach d,$2,$(wildcard $d*.$1))
 define set_src_x
