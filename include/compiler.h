@@ -90,18 +90,8 @@ typedef long nsp_status_t;
 #endif
 
 #if !defined STD_CALL /* compatible with nshost 9.8 */
-    #if _WIN32 && _M_X64
-        #define STD_CALL __stdcall
-    #else
-        #define STD_CALL
-    #endif
+    #define STD_CALL STDCALL
 #endif
-
-#if defined NISV
-#undef NISV
-#endif
-
-#define NISV 991u
 
 typedef int nsp_boolean_t;
 #if !defined __true__
@@ -211,17 +201,6 @@ typedef int nsp_boolean_t;
 #define DDN_IPV4(name)  char name[INET_ADDRSTRLEN]
 #define DDN_IPV6(name)  char name[INET6_ADDRSTRLEN]
 
-#if !_WIN32
-    #if defined __USE_MISC
-        #if !__USE_MISC
-            #undef __USE_MISC
-            #define __USE_MISC 1 /* syscall nice in <unistd.h> */
-        #endif /* !__USE_MISC */
-    #else
-        #define __USE_MISC 1
-    #endif /* defined __USE_MISC */
-#endif /* !_WIN32 */
-
 #if _WIN32
     #if !defined NT_SUCCESS
         #define NT_SUCCESS(Status) ((NTSTATUS)(Status) >= 0)
@@ -294,71 +273,60 @@ static int inline logarithm2(x)
 	return n;
 }
 
-/* zero float accuracy */
-#if defined EPSINON
-    #undef EPSINON
-#endif
-
 #if _WIN32
 #define DEPRECATED(s) __declspec(deprecated)
 #else
 #define DEPRECATED(s) __attribute__((deprecated(s)))
 #endif
 
+/* zero float accuracy */
+#if defined EPSINON
+    #undef EPSINON
+#endif
 #define EPSINON  0.000001
 #define is_float_zero(x) (((x) < EPSINON) && ((x) > -EPSINON))
 #define is_float_equal(n, m) ((fabs((n)-(m))) <= EPSINON )
 #define is_float_larger_than(n, m)  (((n) - (m)) > EPSINON)
 #define is_float_less_than(n, m)  is_float_larger_than(m, n)
 
+/* looking for the offset/size/posision of any field of structure */
 #if !defined containing_record
     #define containing_record(__address, __type, __field) ((__type *)( (char *)(__address) -  (char *)(&((__type *)0)->__field)))
 #endif
-
 #if !defined container_of
     #define container_of(__address, __type, __field) containing_record(__address, __type, __field)
 #endif
-
 #if !defined sizeof_array
     #define sizeof_array(__array)   (int)(sizeof(__array) / sizeof(__array[0]))
 #endif
-
 #if !defined offsetof
     #define offsetof(__type, __field)      (( unsigned long )(&((__type*)0)->__field))
 #endif
-
 #if !defined sizeof_field
     #define sizeof_field(__type, __field)      (sizeof(((__type*)0)->__field))
 #endif
 
+/* smb macro */
 #if _WIN32
-
 #if !defined smp_mb
     #define smp_mb() do {__asm { mfence } } while( 0 )
 #endif
-
 #if !defined smp_rmb
     #define smp_rmb() do {__asm { lfence } } while( 0 )
 #endif
-
 #if !defined smp_wmb
     #define smp_wmb() do {__asm { sfence } } while( 0 )
 #endif
-
 #else /* _GNU_ */
-
 #if !defined smp_mb
     #define smp_mb()  do { asm volatile("mfence" ::: "memory"); } while(0)
 #endif
-
 #if !defined smp_rmb
     #define smp_rmb()  do { asm volatile("lfence" ::: "memory"); } while(0)
 #endif
-
 #if !defined smp_wmb
     #define smp_wmb()  do { asm volatile("sfence" ::: "memory"); } while(0)
 #endif
-
 #endif /* !_WIN32 */
 
 /* Optimization barrier */
