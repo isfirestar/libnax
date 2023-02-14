@@ -140,9 +140,6 @@ typedef int nsp_boolean_t;
 
 #define SYSTEM_WIDE     (sizeof(void *))
 
-#define nsp_query_align_size(size, align) (((size) + (align) - 1) & (~((align) - 1)))
-#define nsp_align_long(size)	nsp_query_align_size(size, sizeof(long))
-
 #if !defined __POSIX_TYPE_ALIGNED__
     #if _WIN32
         #define __POSIX_TYPE_ALIGNED__
@@ -270,6 +267,32 @@ typedef int nsp_boolean_t;
 #if !defined is_powerof_2
     #define is_powerof_2(x) ((x) != 0 && (((x) & ((x) - 1)) == 0))
 #endif
+
+#define nsp_normal_align_up(size, align) ((0 == align) ? 0 : (((size) + ((align) - 1)) / (align)) * (align))
+#define nsp_align_up(size, align) (is_powerof_2(align) ? (((size) + (align) - 1) & (~((align) - 1))) : nsp_normal_align_up(size, align))
+#define nsp_align_down(size, align) ((0 == align) ? 0 : ((size) / (align)) * (align))
+#define nsp_align_long(size)	nsp_align_up(size, sizeof(void *))
+#define nsp_align_binary(size)	nsp_align_up(size, 2)
+
+static int inline logarithm2(x)
+{
+	int n;
+	
+	if (1 == x) {
+		return 0;
+	}
+	
+	if (!is_powerof_2(x)) {
+		return -1;
+	}
+	
+	n = 0;
+	while (x) {
+		x >>= 1;
+		++n;
+	}
+	return n;
+}
 
 /* zero float accuracy */
 #if defined EPSINON
