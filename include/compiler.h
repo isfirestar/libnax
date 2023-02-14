@@ -35,6 +35,7 @@ typedef unsigned int u32;
     typedef unsigned long long u64;
 #endif
 
+/* string format style in both os and system-width */
 #if __WORDSIZE == 64
     #define LARGE_INTEGER_STRFMT    ("%ld")
     #define LARGE_UINTEGER_STRFMT   ("%lu")
@@ -43,6 +44,26 @@ typedef unsigned int u32;
     #define LARGE_UINTEGER_STRFMT   ("%llu")
 #endif
 
+#if _WIN32
+    #define UINT64_STRFMT "%I64u"
+    #define INT64_STRFMT "%I64d"
+    #define POSIX__EOL              "\r\n"
+    #define POSIX__DIR_SYMBOL       '\\'
+    #define POSIX__DIR_SYMBOL_STR   "\\"
+#else
+    #if __WORDSIZE == 64
+        #define UINT64_STRFMT "%lu"
+        #define INT64_STRFMT "%ld"
+    #else
+        #define UINT64_STRFMT "%llu"
+        #define INT64_STRFMT "%lld"
+    #endif
+    #define POSIX__EOL              "\n"
+    #define POSIX__DIR_SYMBOL       '/'
+    #define POSIX__DIR_SYMBOL_STR   "/"
+#endif
+
+/* builtin expection */
 #if !defined likely
     #if _WIN32
         #define likely(x)   x
@@ -59,6 +80,7 @@ typedef unsigned int u32;
     #endif
 #endif
 
+/* global status and error definition */
 typedef long nsp_status_t;
 
 #if !defined NSP_STATUS_SUCCESSFUL
@@ -81,18 +103,19 @@ typedef long nsp_status_t;
 #define posix__makeerror(e)                 (((nsp_status_t)(e)) <= 0 ? ((nsp_status_t)e) : (nsp_status_t)(~((nsp_status_t)(e)) + 1))
 #define posix__status_to_errno(status)      (((status) < 0) ? (int)((~status) + 1) : (int)status)
 
+/* compatible definition for stdcall */
 #if !defined STDCALL
-	#if _WIN32 && _M_X64
+    #if _WIN32 && _M_X64
         #define STDCALL __stdcall
     #else
         #define STDCALL
     #endif
 #endif
-
 #if !defined STD_CALL /* compatible with nshost 9.8 */
     #define STD_CALL STDCALL
 #endif
 
+/* nsp boolean definition */
 typedef int nsp_boolean_t;
 #if !defined __true__
     #define __true__ (1)
@@ -105,6 +128,7 @@ typedef int nsp_boolean_t;
     #define nsp_false ((nsp_boolean_t)__false__)
 #endif
 
+/* nsp export and global function declar header */
 #if !defined __extern__
     #if defined __cplusplus
         #define __extern__  extern "C"
@@ -121,76 +145,11 @@ typedef int nsp_boolean_t;
     #endif
 #endif
 
-#define PORTABLEAPI(__type__)  __extern__ __export__ __type__ STDCALL
-#define PORTABLEIMPL(__type__)   __type__ STDCALL
-
-#if !defined __ALIGNED_SIZE__
-    #define __ALIGNED_SIZE__        (sizeof(int))
-#endif /* !__ALIGNED_SIZE__ */
-
-#define SYSTEM_WIDE     (sizeof(void *))
-
-#if !defined __POSIX_TYPE_ALIGNED__
-    #if _WIN32
-        #define __POSIX_TYPE_ALIGNED__
-    #else
-        #define __POSIX_TYPE_ALIGNED__ /*__attribute__((aligned(__ALIGNED_SIZE__))) */
-    #endif
-#endif
-
-#if !defined __POSIX_POINTER_ALIGNED__
-    #define __POSIX_POINTER_ALIGNED__(ptr)   ((0 == ((long)ptr) % __ALIGNED_SIZE__))
-#endif /* !__POSIX_POINTER_ALIGNED__ */
-
-#if !defined __POSIX_EFFICIENT_ALIGNED_PTR__
-    #define __POSIX_EFFICIENT_ALIGNED_PTR__(ptr)    ((NULL != ptr) && __POSIX_POINTER_ALIGNED__(ptr))
-#endif /* !__POSIX_EFFICIENT_ALIGNED_PTR__ */
-
-#define __POSIX_EFFICIENT_PTR__(ptr) ((NULL != ptr))
-#define __POSIX_EFFICIENT_PTR_IR__(ptr) do { if (!__POSIX_EFFICIENT_PTR__(ptr)) return -EINVAL; } while (0)
-#define __POSIX_EFFICIENT_PTR_NR__(ptr) do { if (!__POSIX_EFFICIENT_PTR__(ptr)) return; } while (0)
-
-#define __POSIX_EFFICIENT_ALIGNED_PTR_IR__(ptr) do { if (!__POSIX_EFFICIENT_ALIGNED_PTR__(ptr)) return -EINVAL; } while (0)
-#define __POSIX_EFFICIENT_ALIGNED_PTR_NR__(ptr) do { if (!__POSIX_EFFICIENT_ALIGNED_PTR__(ptr)) return; } while (0)
-
-#if !defined UINT64_STRFMT
-    #if _WIN32
-        #define UINT64_STRFMT "%I64u"
-    #else
-        #if __WORDSIZE == 64
-            #define UINT64_STRFMT "%lu"
-        #else
-            #define UINT64_STRFMT "%llu"
-        #endif
-    #endif
-#endif
-
-#if !defined INT64_STRFMT
-    #if _WIN32
-        #define INT64_STRFMT "%I64d"
-    #else
-        #if __WORDSIZE == 64
-            #define INT64_STRFMT "%ld"
-        #else
-            #define INT64_STRFMT "%lld"
-        #endif
-    #endif
-#endif
-
-#if !defined POSIX__EOL
-    #if _WIN32
-        #define POSIX__EOL              "\r\n"
-        #define POSIX__DIR_SYMBOL       '\\'
-        #define POSIX__DIR_SYMBOL_STR   "\\"
-    #else
-        #define POSIX__EOL              "\n"
-        #define POSIX__DIR_SYMBOL       '/'
-        #define POSIX__DIR_SYMBOL_STR   "/"
-    #endif
-#endif
+#define PORTABLEAPI(__type)  __extern__ __export__ __type STDCALL
+#define PORTABLEIMPL(__type)   __type STDCALL
 
 #if !defined INET_ADDRSTRLEN
-    #define INET_ADDRSTRLEN     (16)
+    #define INET_ADDRSTRLEN     (16)   /* netinet/in.h */
 #endif
 
 #if !defined INET6_ADDRSTRLEN
@@ -211,18 +170,8 @@ typedef int nsp_boolean_t;
     #if _WIN32
         #define __always_inline __forceinline
     #else
-        #define __always_inline static inline
+        #define __always_inline __inline__ __attribute__((__always_inline__))
     #endif
-#endif
-
-#if defined __static_inline_function
-    #undef __static_inline_function
-#endif
-
-#if _WIN32
-    #define __static_inline_function(type) __always_inline static type
-#else
-    #define __static_inline_function(type) static type inline
 #endif
 
 #if !defined NULL
@@ -247,13 +196,21 @@ typedef int nsp_boolean_t;
     #define is_powerof_2(x) ((x) != 0 && (((x) & ((x) - 1)) == 0))
 #endif
 
+/* aligned definition */
+#if !defined __POSIX_TYPE_ALIGNED__
+    #if _WIN32
+        #define __POSIX_TYPE_ALIGNED__
+    #else
+        #define __POSIX_TYPE_ALIGNED__ __attribute__((aligned(sizeof(long))))
+    #endif
+#endif
 #define nsp_normal_align_up(size, align) ((0 == align) ? 0 : (((size) + ((align) - 1)) / (align)) * (align))
 #define nsp_align_up(size, align) (is_powerof_2(align) ? (((size) + (align) - 1) & (~((align) - 1))) : nsp_normal_align_up(size, align))
 #define nsp_align_down(size, align) ((0 == align) ? 0 : ((size) / (align)) * (align))
 #define nsp_align_long(size)	nsp_align_up(size, sizeof(void *))
 #define nsp_align_binary(size)	nsp_align_up(size, 2)
 
-static int inline logarithm2(x)
+static __always_inline int logarithm2(x)
 {
 	int n;
 	
@@ -351,7 +308,7 @@ static int inline logarithm2(x)
  */
 #if _WIN32
 
-__static_inline_function(int) fls(int x) {
+static __always_inline int fls(int x) {
     int position;
     int i;
     if (0 != x) {
@@ -365,7 +322,7 @@ __static_inline_function(int) fls(int x) {
 }
 #else
 
-__static_inline_function(int) fls(int x) {
+static __always_inline int fls(int x) {
     int r;
     __asm__( "bsrl %1,%0\n\t"
             "jnz 1f\n\t"
@@ -383,24 +340,24 @@ __static_inline_function(int) fls(int x) {
  * - return 64..1 to indicate bit 63..0 most significant bit set
  * - return 0 to indicate no bits set
  */
-__static_inline_function(int) fls64(uint64_t x) {
+static __always_inline int fls64(uint64_t x) {
     uint32_t h = x >> 32;
     if (h)
         return fls(h) + 32;
     return fls((int) x);
 }
 
-__static_inline_function(unsigned long) fls_long(unsigned long l) {
+static __always_inline unsigned long fls_long(unsigned long l) {
     if (sizeof ( void *) == 4)
         return fls(l);
     return fls64(l);
 }
 
-__static_inline_function(uint32_t) roundup_pow_of_two(uint32_t x) {
+static __always_inline uint32_t roundup_pow_of_two(uint32_t x) {
     return 1UL << fls(x - 1);
 }
 
-__static_inline_function(uint64_t) roundup_pow_of_two64(uint64_t x) {
+static __always_inline uint64_t roundup_pow_of_two64(uint64_t x) {
     return (uint64_t) 1 << fls64(x - 1);
 }
 #endif
@@ -419,7 +376,7 @@ static __always_inline void __read_once_size(const volatile void *p, void *res, 
     }
 }
 
-__static_inline_function(void) __write_once_size(volatile void *p, void *res, int size) {
+static __always_inline void __write_once_size(volatile void *p, void *res, int size) {
     switch (size) {
         case 1: *(volatile uint8_t *) p = *(uint8_t *) res;
             break;
@@ -457,9 +414,9 @@ __static_inline_function(void) __write_once_size(volatile void *p, void *res, in
 
 #if !defined access_once
     #if _WIN32
-        #define access_once(__type, __x) (*(volatile __type *)&(x))
+        #define access_once(__type, x) (*(volatile __type *)&(x))
     #else
-        #define access_once(__type, __x) (*(volatile typeof(x) *)&(x))
+        #define access_once(__type, x) (*(volatile typeof(x) *)&(x))
     #endif
 #endif
 
