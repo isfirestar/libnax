@@ -46,7 +46,7 @@ BUILD := debug
 CROSS_COMPILER_PREFIX := #arm-seev100-linux-gnueabihf-
 
 # user define complie-time options
-CFLAGS_ADDON := 
+CFLAGS_ADDON := -D__USE_MISC
 
 # user define link-time options
 LDFALGS_ADDON := -pthread -lrt -ldl -lcrypt -lm
