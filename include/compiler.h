@@ -315,20 +315,20 @@ static int inline logarithm2(x)
     #define containing_record(__address, __type, __field) ((__type *)( (char *)(__address) -  (char *)(&((__type *)0)->__field)))
 #endif
 
-#if !defined cchof
-    #define cchof(__array)   (int)(sizeof(__array) / sizeof(__array[0]))
+#if !defined container_of
+    #define container_of(__address, __type, __field) containing_record(__address, __type, __field)
+#endif
+
+#if !defined sizeof_array
+    #define sizeof_array(__array)   (int)(sizeof(__array) / sizeof(__array[0]))
 #endif
 
 #if !defined offsetof
     #define offsetof(__type, __field)      (( unsigned long )(&((__type*)0)->__field))
 #endif
 
-#if !defined msizeof
-    #define msizeof(__type, __field)      (sizeof(((__type*)0)->__field))
-#endif
-
-#if !defined container_of
-    #define container_of(__address, __type, __field) containing_record(__address, __type, __field)
+#if !defined sizeof_field
+    #define sizeof_field(__type, __field)      (sizeof(((__type*)0)->__field))
 #endif
 
 #if _WIN32
