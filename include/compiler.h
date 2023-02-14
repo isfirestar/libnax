@@ -243,7 +243,7 @@ typedef int nsp_boolean_t;
 #if _WIN32
     #define __static_inline_function(type) __always_inline static type
 #else
-    #define __static_inline_function(type) static __always_inline type
+    #define __static_inline_function(type) static type inline
 #endif
 
 #if !defined NULL
