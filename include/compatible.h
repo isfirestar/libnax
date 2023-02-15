@@ -3,10 +3,6 @@
 
 #include "compiler.h"
 
-#if NISV < 991
-#define PORTABLEAPI(__type__)  __extern__ __export__ __type__ STDCALL
-#define PORTABLEIMPL(__type__)   __type__ STDCALL
-
 #if _WIN32
 #include <windows.h>
 #define posix__atomic_get(ptr)					InterlockedExchangeAdd((volatile LONG *)(ptr), 0)
@@ -37,7 +33,5 @@ struct nis_endpoint_v4 {
 #define __export__ __attribute__((visibility("default")))
 #endif
 #endif /* !__export__ */
-
-#endif /* NISV < 991 */
 
 #endif /* !NIS_COMPATIBLE_H */
