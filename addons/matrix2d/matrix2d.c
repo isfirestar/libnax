@@ -4,31 +4,27 @@
 #include <stdio.h>
 #include <string.h>
 
-#define matrix2d_index2line(m, i)         ((i) / (m)->geometry.column)
-#define matrix2d_index2column(m, i)       ((i) % (m)->geometry.column)
-
 struct matrix2d
 {
-    matrix2d_ele_t *field;
-    struct matrix2d_geometry geometry;
-    unsigned int raw_size;
+    unsigned int column;
+    unsigned int line;
+    matrix2d_ele_t field[0];
 };
 
 void matrix2d_display(const matrix2d_pt m)
 {
-    int i;
-    int ele_count;
+    unsigned int i, ele_count;
 
     if (!m) {
         return;
     }
     
-    ele_count = m->geometry.line * m->geometry.column;
+    ele_count = m->line * m->column;
 
     for (i = 0; i < ele_count; i++) {
         printf("%ld    ", m->field[i]);
 
-        if ((i > 0) && ((i + 1) % m->geometry.column == 0)) {
+        if ((i > 0) && ((i + 1) % m->column == 0)) {
             printf("\n");
         }
     }
@@ -36,65 +32,22 @@ void matrix2d_display(const matrix2d_pt m)
     printf("--------------------------------------\n");
 }
 
-matrix2d_pt matrix2d_allocate(const void *raw, unsigned int raw_size, const struct matrix2d_geometry *geometry, const matrixed_ele_assign_t assignfn)
-{
-    matrix2d_pt m;
-    int i;
-    unsigned int ele_count;
-    unsigned int offset;
-
-    if (0 == raw_size || !geometry || 0 == geometry->column || 0 == geometry->line) {
-        return NULL;
-    }
-
-
-    m = (matrix2d_pt )malloc(sizeof(*m));
-    if (!m) {
-        return NULL;
-    }
-    m->geometry.column = geometry->column;
-    m->geometry.line = geometry->line;
-    m->raw_size = raw_size;
-    ele_count = geometry->line * geometry->column;
-    m->field = (matrix2d_ele_t *)malloc(sizeof(matrix2d_ele_t) * ele_count);
-    if (!m->field) {
-        free(m);
-        return NULL;
-    }
-
-    if (raw && assignfn) {
-        offset = 0;
-        for (i = 0; i < ele_count; i++) {
-            m->field[i] = assignfn( (unsigned char *)raw + offset);
-            offset += raw_size;
-        }
-    } else {
-        memset(m->field, 0, sizeof(matrix2d_ele_t) * ele_count);
-    }
-
-    return m;
-}
-
-matrix2d_pt matrix2d_allocate_identity(const unsigned int scale)
+matrix2d_pt matrix2d_alloc(unsigned int line, unsigned int column)
 {
     matrix2d_pt m;
     unsigned int ele_count;
-    int i;
-    struct matrix2d_geometry geo;
 
-    if (0 == scale ) {
+    if (0 == column || 0 == line) {
         return NULL;
     }
 
-    geo.line = geo.column = scale;
-    if ( NULL == (m = matrix2d_allocate(NULL, sizeof(matrix2d_ele_t), &geo, NULL))) {
+    ele_count = line * column;
+    if (NULL == (m = (matrix2d_pt )malloc(sizeof(*m) + sizeof(matrix2d_ele_t) * ele_count))) {
         return NULL;
     }
-    ele_count = scale * scale;
-
-    for (i = 0; i < scale; i++) {
-        m->field[i * scale + i] = 1;
-    }
+    m->column = column;
+    m->line = line;
+    memset(m->field, 0, sizeof(matrix2d_ele_t) * ele_count);
     return m;
 }
 
@@ -103,34 +56,92 @@ void matrix2d_free(matrix2d_pt m)
     if (!m) {
         return;
     }
-
-    if (m->field) {
-        free(m->field);
-    }
-
     free(m);
 }
 
-matrix2d_pt matrix2d_alloc_add(const matrix2d_pt left, const matrix2d_pt right, const metriax2d_calc_t addfn)
+void *matrix2d_raw(matrix2d_pt m)
+{
+    if (!m) {
+        return NULL;
+    }
+
+    if (m->column == 0 || m->line == 0) {
+        return NULL;
+    }
+
+    return &m->field[0];
+}
+
+void matrix2d_iterate_element(const matrix2d_pt m, const matrixed_iterator_fp iterator, void *args)
+{
+    unsigned int i, ele_count;
+
+    if (m && iterator) {
+        ele_count = m->column * m->line;
+        for (i = 0; i < ele_count; i++) {
+            iterator(&m->field[i], i, args);
+        }
+    }
+}
+
+void matrix2d_iterate_line(const matrix2d_pt m, unsigned int line, const matrixed_iterator_fp iterator, void *args)
+{
+    unsigned int i, loc;
+
+    if (m && iterator && line < m->line) {
+        for (i = 0; i < m->column; i++) {
+            loc = m->column * line + i;
+            iterator(&m->field[loc], loc, args);
+        }
+    }
+}
+
+void matrix2d_iterate_column(const matrix2d_pt m, unsigned int column, const matrixed_iterator_fp iterator, void *args)
+{
+    unsigned int i, loc;
+
+    if (m && iterator && column < m->column) {
+        for (i = 0; i < m->line; i++) {
+            loc = i * m->column + column;
+            iterator(&m->field[loc], loc, args);
+        }
+    }
+}
+
+int matrix2d_query_element(const matrix2d_pt m, unsigned int line, unsigned int column, matrix2d_ele_t *output)
+{
+    if (!m) {
+        return -1;
+    }
+
+    if (column >= m->column || line >= m->line) {
+        return -1;
+    }
+
+    if (output) {
+        *output = m->field[line * m->column + column];
+    }
+    return 0;
+}
+
+matrix2d_pt matrix2d_add(const matrix2d_pt left, const matrix2d_pt right, const metriax2d_calc_fp addfn)
 {
     matrix2d_pt m;
-    int i;
-    unsigned int ele_count;
+    unsigned int ele_count, i;
 
     if (!left || !right) {
         return NULL;
     }
 
-    if (left->geometry.column != right->geometry.column || left->geometry.line != right->geometry.line) {
+    if (left->column != right->column || left->line != right->line) {
         return NULL;
     }
 
-    m = matrix2d_allocate(NULL, left->raw_size, &left->geometry, NULL);
-    if (!m) {
+    if (NULL == (m = matrix2d_alloc(left->line, left->column))) {
         return NULL;
     }
 
-    ele_count = m->geometry.line * m->geometry.column;
+    ele_count = m->line * m->column;
     for (i = 0; i < ele_count; i++) {
         m->field[i] = ((NULL == addfn) ? matrix2d_calc_add(left->field[i], right->field[i]) : addfn(left->field[i], right->field[i]));
     }
@@ -138,56 +149,34 @@ matrix2d_pt matrix2d_alloc_add(const matrix2d_pt left, const matrix2d_pt right, 
     return m;
 }
 
-int matrix2d_get_element(const matrix2d_pt m, const struct matrix2d_geometry *geometry, matrix2d_ele_t *output)
-{
-    if (!m || !geometry) {
-        return -1;
-    }
-
-    if (geometry->column >= m->geometry.column || geometry->line >= m->geometry.line) {
-        return -1;
-    }
-
-    if (output) {
-        *output = m->field[geometry->line * m->geometry.column + geometry->column];
-    }
-    return 0;
-}
-
-matrix2d_pt matrix2d_alloc_mul(const matrix2d_pt left, const matrix2d_pt right, const metriax2d_calc_t mulfn, const metriax2d_calc_t addfn)
+matrix2d_pt matrix2d_mul(const matrix2d_pt left, const matrix2d_pt right, const metriax2d_calc_fp mulfn, const metriax2d_calc_fp addfn)
 {
     matrix2d_pt m;
-    int i, j;
-    unsigned int ele_count;
+    unsigned int i, j, idx_line, idx_column, ele_count;
     matrix2d_ele_t ele_left, ele_right, middle;
-    struct matrix2d_geometry geo;
-    int cur_line;
 
     if (!left || !right) {
         return NULL;
     }
 
-    if (left->geometry.column != right->geometry.line ) {
+    if (left->column != right->line ) {
         return NULL;
     }
 
-    geo.line = left->geometry.line;
-    geo.column = right->geometry.column;
-    m = matrix2d_allocate(NULL, left->raw_size, &geo, NULL);
-    if (!m) {
+    if (NULL == (m = matrix2d_alloc(left->line,left->column))) {
         return NULL;
     }
-    ele_count = m->geometry.line * m->geometry.column;
+    ele_count = m->line * m->column;
 
     for (i = 0; i < ele_count; i++) {
-        for (j = 0; j < left->geometry.column; j++) {
-            geo.line = matrix2d_index2line(m, i);
-            geo.column = j;
-            matrix2d_get_element(left, &geo, &ele_left);
+        for (j = 0; j < left->column; j++) {
+            idx_line = matrix2d_index2line(m, i);
+            idx_column = j;
+            matrix2d_query_element(left, idx_line, idx_column, &ele_left);
             
-            geo.line = j;
-            geo.column = matrix2d_index2column(m, i);
-            matrix2d_get_element(right, &geo, &ele_right);
+            idx_line = j;
+            idx_column = matrix2d_index2column(m, i);
+            matrix2d_query_element(right, idx_line, idx_column, &ele_right);
             
             middle = ((NULL == mulfn) ? matrix2d_calc_mul(ele_left, ele_right) : mulfn(ele_left, ele_right));
             m->field[i] =  ((NULL == addfn) ? matrix2d_calc_add(m->field[i] , middle) : addfn(m->field[i] , middle));
@@ -197,32 +186,70 @@ matrix2d_pt matrix2d_alloc_mul(const matrix2d_pt left, const matrix2d_pt right, 
     return m;
 }
  
-matrix2d_pt matrixed_alloc_transport(const matrix2d_pt src)
+matrix2d_pt matrix2d_scalar_mul(const matrix2d_pt left, const matrix2d_ele_t scalar, const metriax2d_calc_fp mulfn)
 {
     matrix2d_pt m;
-    struct matrix2d_geometry geo;
-    int i, j;
-    unsigned int ele_count;
-    int off;
+    unsigned int i, ele_count;
+
+    if (!left) {
+        return NULL;
+    }
+
+    if (0 == left->line || 0 == left->column) {
+        return NULL;
+    }
+
+    if (NULL == (m = matrix2d_alloc(left->line, left->column))) {
+        return NULL;
+    }
+    ele_count = m->line * m->column;
+
+    for (i = 0; i < ele_count; i++) {
+        m->field[i] = left->field[i] * scalar;
+    }
+    return m;
+}
+
+matrix2d_pt matrixed_transport(const matrix2d_pt src)
+{
+    matrix2d_pt m;
+    unsigned int i, j, ele_count, off;
 
     if (!src) {
         return NULL;
     }
 
-    geo.line = src->geometry.column;
-    geo.column = src->geometry.line;
-    m = matrix2d_allocate(NULL, src->raw_size, &geo, NULL);
-    if (!m) {
+    if (NULL == (m = matrix2d_alloc(src->line, src->column))) {
         return NULL;
     }
-    ele_count = m->geometry.line * m->geometry.column;
+    ele_count = m->line * m->column;
 
     off = 0;
-    for (i = 0; i < src->geometry.column; i++) {
-        for (j = 0; j < src->geometry.line; j++) {
-            m->field[off++] = src->field[j * src->geometry.column + i];
+    for (i = 0; i < src->column; i++) {
+        for (j = 0; j < src->line; j++) {
+            m->field[off++] = src->field[j * src->column + i];
         }
     }
 
+    return m;
+}
+
+matrix2d_pt matrix2d_make_identity(const unsigned int scale)
+{
+    matrix2d_pt m;
+    unsigned int ele_count, i;
+
+    if (0 == scale ) {
+        return NULL;
+    }
+
+    if ( NULL == (m = matrix2d_alloc(scale, scale))) {
+        return NULL;
+    }
+    ele_count = scale * scale;
+
+    for (i = 0; i < scale; i++) {
+        m->field[i * scale + i] = 1;
+    }
     return m;
 }
