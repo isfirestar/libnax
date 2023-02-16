@@ -40,7 +40,7 @@ matrix2d_pt matrix2d_allocate(const void *raw, unsigned int raw_size, const stru
 {
     matrix2d_pt m;
     int i;
-    int ele_count;
+    unsigned int ele_count;
     unsigned int offset;
 
     if (0 == raw_size || !geometry || 0 == geometry->column || 0 == geometry->line) {
@@ -72,6 +72,29 @@ matrix2d_pt matrix2d_allocate(const void *raw, unsigned int raw_size, const stru
         memset(m->field, 0, sizeof(matrix2d_ele_t) * ele_count);
     }
 
+    return m;
+}
+
+matrix2d_pt matrix2d_allocate_identity(const unsigned int scale)
+{
+    matrix2d_pt m;
+    unsigned int ele_count;
+    int i;
+    struct matrix2d_geometry geo;
+
+    if (0 == scale ) {
+        return NULL;
+    }
+
+    geo.line = geo.column = scale;
+    if ( NULL == (m = matrix2d_allocate(NULL, sizeof(matrix2d_ele_t), &geo, NULL))) {
+        return NULL;
+    }
+    ele_count = scale * scale;
+
+    for (i = 0; i < scale; i++) {
+        m->field[i * scale + i] = 1;
+    }
     return m;
 }
 
