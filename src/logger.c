@@ -127,17 +127,17 @@ static struct log_file_descriptor *_attach_log_file(const datetime_t *currst, co
     ifos_getpename(&pename);
 
     /* New or any form of file switching occurs in log posts  */
-    crt_sprintf(name, cchof(name), "%s_%04u%02u%02u_%02u%02u%02u.log",
+    crt_sprintf(name, sizeof_array(name), "%s_%04u%02u%02u_%02u%02u%02u.log",
 		module, currst->year, currst->month, currst->day, currst->hour, currst->minute, currst->second);
-    crt_sprintf(path, cchof(path), "%s"POSIX__DIR_SYMBOL_STR"log"POSIX__DIR_SYMBOL_STR"%s"POSIX__DIR_SYMBOL_STR,
+    crt_sprintf(path, sizeof_array(path), "%s"POSIX__DIR_SYMBOL_STR"log"POSIX__DIR_SYMBOL_STR"%s"POSIX__DIR_SYMBOL_STR,
         abuff_raw(&_log_root_directory), abuff_raw(&pename) );
     ifos_pmkdir(path);
-    crt_sprintf(path, cchof(path), "%s"POSIX__DIR_SYMBOL_STR"log"POSIX__DIR_SYMBOL_STR"%s"POSIX__DIR_SYMBOL_STR"%s",
+    crt_sprintf(path, sizeof_array(path), "%s"POSIX__DIR_SYMBOL_STR"log"POSIX__DIR_SYMBOL_STR"%s"POSIX__DIR_SYMBOL_STR"%s",
         abuff_raw(&_log_root_directory), abuff_raw(&pename), name);
     retval = ifos_file_open(path, FF_RDACCESS | FF_WRACCESS | FF_CREATE_ALWAYS, 0644, &file->fd);
     if (retval >= 0) {
         memcpy(&file->timestamp, currst, sizeof ( datetime_t));
-        crt_strcpy(file->module, cchof(file->module), module);
+        crt_strcpy(file->module, sizeof_array(file->module), module);
         file->line_count_ = 0;
     } else {
         /* If file creation fails, the linked list node needs to be removed  */
@@ -361,7 +361,7 @@ PORTABLEIMPL(void) log_write(const char *module, enum log_levels level, int targ
     clock_systime(&currst);
 
     va_start(ap, format);
-    _format_log_string(level, ifos_gettid(), format, ap, &currst, logstr, cchof(logstr));
+    _format_log_string(level, ifos_gettid(), format, ap, &currst, logstr, sizeof_array(logstr));
     va_end(ap);
 
     if (!module) {
@@ -413,7 +413,7 @@ PORTABLEIMPL(void) log_save(const char *module, enum log_levels level, int targe
     memcpy(&node->timestamp, &currst, sizeof(currst));
 
     if (module) {
-        crt_strcpy(node->module, cchof(node->module), module);
+        crt_strcpy(node->module, sizeof_array(node->module), module);
     } else {
         status = ifos_getpename(&pename);
         if ( NSP_SUCCESS(status) ) {
