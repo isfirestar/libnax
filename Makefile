@@ -127,7 +127,7 @@ obj-$1 = $(patsubst %.$1,$3%.o,$(notdir $2))
 endef
 
 ifeq ($(BUILD_DIR),)
-BUILD_DIR := gbuild
+BUILD_DIR := gbuild/
 endif
 
 # define the middle directory for build
