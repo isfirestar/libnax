@@ -1,8 +1,6 @@
 #pragma once
 
 typedef long matrix2d_ele_t; /* you can use it by the way (void *)  */
-#define  MATRIX2D_INVALID_ELEMENT   (-1)
-
 typedef matrix2d_ele_t (*matrixed_ele_assign_t)(void *raw);
 typedef matrix2d_ele_t (*metriax2d_calc_t)(matrix2d_ele_t left, matrix2d_ele_t right);
 
@@ -42,6 +40,7 @@ extern void matrix2d_display(const matrix2d_pt m);
 extern matrix2d_pt matrix2d_allocate(const void *raw, unsigned int raw_size, const struct matrix2d_geometry *geometry, const matrixed_ele_assign_t assignfn);
 
 /* you will got a identity matrix like below when you specify scale==8 to invoke  @matrix2d_allocate_indentity
+ * any matrix multiplied by the identity matrix is equal to itself
  * | 1,0,0,0,0,0,0,0 |
  * | 0,1,0,0,0,0,0,0 |
  * | 0,0,1,0,0,0,0,0 |
@@ -50,13 +49,12 @@ extern matrix2d_pt matrix2d_allocate(const void *raw, unsigned int raw_size, con
  * | 0,0,0,0,0,1,0,0 |
  * | 0,0,0,0,0,0,1,0 |
  * | 0,0,0,0,0,0,0,1 |
-
 */
 extern matrix2d_pt matrix2d_allocate_identity(const unsigned int scale);
 extern void matrix2d_free(matrix2d_pt m);
 
 /* query element a specify location @geometry */
-extern matrix2d_ele_t matrix2d_get_element(const matrix2d_pt m, const struct matrix2d_geometry *geometry);
+extern int matrix2d_get_element(const matrix2d_pt m, const struct matrix2d_geometry *geometry, matrix2d_ele_t *output);
 
 /* of course, you can invoke @matrix2d_alloc_add to implement subtract method
  *
