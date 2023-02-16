@@ -50,7 +50,7 @@ static nsp_status_t _ifos_rmdir(const char *dir)
             continue;
         }
 
-        crt_sprintf(filename, cchof(filename), "%s/%s", dir, ent->d_name);
+        crt_sprintf(filename, sizeof_array(filename), "%s/%s", dir, ent->d_name);
 
         if (ifos_isdir(filename)) {
             status = _ifos_rmdir(filename);
