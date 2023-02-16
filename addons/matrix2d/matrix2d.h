@@ -40,6 +40,19 @@ extern void matrix2d_display(const matrix2d_pt m);
 
 /* allocate or load buff as a matrix */
 extern matrix2d_pt matrix2d_allocate(const void *raw, unsigned int raw_size, const struct matrix2d_geometry *geometry, const matrixed_ele_assign_t assignfn);
+
+/* you will got a identity matrix like below when you specify scale==8 to invoke  @matrix2d_allocate_indentity
+ * | 1,0,0,0,0,0,0,0 |
+ * | 0,1,0,0,0,0,0,0 |
+ * | 0,0,1,0,0,0,0,0 |
+ * | 0,0,0,1,0,0,0,0 |
+ * | 0,0,0,0,1,0,0,0 |
+ * | 0,0,0,0,0,1,0,0 |
+ * | 0,0,0,0,0,0,1,0 |
+ * | 0,0,0,0,0,0,0,1 |
+
+*/
+extern matrix2d_pt matrix2d_allocate_identity(const unsigned int scale);
 extern void matrix2d_free(matrix2d_pt m);
 
 /* query element a specify location @geometry */
