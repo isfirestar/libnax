@@ -210,7 +210,7 @@ typedef int nsp_boolean_t;
 #define nsp_align_long(size)	nsp_align_up(size, sizeof(void *))
 #define nsp_align_binary(size)	nsp_align_up(size, 2)
 
-static __always_inline int logarithm2(x)
+static __always_inline int logarithm2(int x)
 {
 	int n;
 	
