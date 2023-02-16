@@ -27,7 +27,7 @@ SRC_ADDON :=
 SRC_EXCLUDE :=
 
 # specify the extension of source file name, can be one or more of (c/cc/cpp/cxx)
-SRC_SUFFIX := c cpp
+SRC_SUFFIX := c
 
 # $(TARGET_TYPE) can be one of (dll/so, exe/app, lib/archive) corresponding to (dynamic-library, executive-elf, static-archive)
 TARGET_TYPE := app
