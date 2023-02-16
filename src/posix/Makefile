@@ -154,18 +154,21 @@ all: .mkdir $(TAGS_DIR)$(TARGET)
 
 define build_obj_x
 $$(obj-$1): $2%.o: %.$1  $(MAKEFILE_LIST)
-	$(CC) -Wp,-MT,$$@ -Wp,-MMD,$$@.d -c $$< $(INCS) $(CFLAGS) $(CFLAGS_ADDON) $3 -o $$@
+	@echo compiling $$<
+	@$(CC) -Wp,-MT,$$@ -Wp,-MMD,$$@.d -c $$< $(INCS) $(CFLAGS) $(CFLAGS_ADDON) $3 -o $$@
 
 endef
 $(eval $(foreach i,$(SRC_SUFFIX),$(call build_obj_x,$i,$(OBJS_DIR),$(if $(filter $i,cpp cc cxx),-std=c++11,-std=gnu99))))
 
 ifeq ($(TARGET_TYPE), $(filter $(TARGET_TYPE), lib static))
 $(TAGS_DIR)$(TARGET): $(OBJS)
-	$(AR) crv $@ $^
+	@echo archiving $@
+	@$(AR) crv $@ $^
 else
 LDFLAGS += $(if $(strip $(src-cpp) $(src-cc) $(src-cxx)), -lstdc++)
 $(TAGS_DIR)$(TARGET): $(OBJS)
-	$(CC) -o $@ $^ $(LDFLAGS)
+	@echo linking $@
+	@$(CC) -o $@ $^ $(LDFLAGS)
 endif
 
 detach:
@@ -177,7 +180,8 @@ detach:
 	@if [ ! -d $(TAGS_DIR) ]; then mkdir -p $(TAGS_DIR); fi
 
 clean:
-	rm -fr $(BUILD_DIR)
+	@echo cleaning project.
+	@rm -fr $(BUILD_DIR)
 	
 .PHONY : $(PHONY)
 
