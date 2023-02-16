@@ -152,7 +152,7 @@ void nis_call_ecr(const char *fmt,...)
     }
 
     va_start(ap, fmt);
-    retval = vsnprintf(logstr, cchof(logstr) - 1, fmt, ap);
+    retval = vsnprintf(logstr, sizeof_array(logstr) - 1, fmt, ap);
     va_end(ap);
     if (retval <= 0) {
         return;
