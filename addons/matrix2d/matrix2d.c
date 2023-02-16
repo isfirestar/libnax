@@ -138,17 +138,20 @@ matrix2d_pt matrix2d_alloc_add(const matrix2d_pt left, const matrix2d_pt right, 
     return m;
 }
 
-matrix2d_ele_t matrix2d_get_element(const matrix2d_pt m, const struct matrix2d_geometry *geometry)
+int matrix2d_get_element(const matrix2d_pt m, const struct matrix2d_geometry *geometry, matrix2d_ele_t *output)
 {
     if (!m || !geometry) {
-        return MATRIX2D_INVALID_ELEMENT;
+        return -1;
     }
 
     if (geometry->column >= m->geometry.column || geometry->line >= m->geometry.line) {
-        return MATRIX2D_INVALID_ELEMENT;
+        return -1;
     }
 
-    return m->field[geometry->line * m->geometry.column + geometry->column];
+    if (output) {
+        *output = m->field[geometry->line * m->geometry.column + geometry->column];
+    }
+    return 0;
 }
 
 matrix2d_pt matrix2d_alloc_mul(const matrix2d_pt left, const matrix2d_pt right, const metriax2d_calc_t mulfn, const metriax2d_calc_t addfn)
@@ -180,10 +183,12 @@ matrix2d_pt matrix2d_alloc_mul(const matrix2d_pt left, const matrix2d_pt right, 
         for (j = 0; j < left->geometry.column; j++) {
             geo.line = matrix2d_index2line(m, i);
             geo.column = j;
-            ele_left = matrix2d_get_element(left, &geo);
+            matrix2d_get_element(left, &geo, &ele_left);
+            
             geo.line = j;
             geo.column = matrix2d_index2column(m, i);
-            ele_right = matrix2d_get_element(right, &geo);
+            matrix2d_get_element(right, &geo, &ele_right);
+            
             middle = ((NULL == mulfn) ? matrix2d_calc_mul(ele_left, ele_right) : mulfn(ele_left, ele_right));
             m->field[i] =  ((NULL == addfn) ? matrix2d_calc_add(m->field[i] , middle) : addfn(m->field[i] , middle));
         }
