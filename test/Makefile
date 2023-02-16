@@ -1,91 +1,184 @@
-PROGRAM=testnax
-VERSION=
+PROGRAM := naxtest
 
-TARGET := $(PROGRAM)$(VERSION)
-INC_DIRS :=
-INC_DIRS += ../include/
+# specify the program version
+VERSION := 1.0.1
 
-SRC_DIRS :=
-SRC_DIRS += ./
+# TARGET shall be the output file when success compile
+TARGET := $(PROGRAM)
 
-##################################################################################
-# 				strong recommend do NOT change anything below  		        	 #
-##################################################################################
+# add include directory, path MUST end with slash
+INC_DIRS := ../include/
+
+# add include directory, this variable allow framework force traverse and include all head files in entire directoy and it's sub directory
+# path MUST end with slash
+INC_ENTIRE_DIRS :=
+
+# add source directory, compiler shall compile all files which with $(SRC_SUFFIX) in these folders, path MUST end with slash
+SRC_DIRS := ./
+
+# add source directory, this variable allow framework force traverse and include all source files in entire directoy and it's sub directory
+# path MUST end with slash
+SRC_ENTIRE_DIRS := 
+
+# add some source file which didn't in any of $(SRC_DIRS)
+SRC_ADDON :=
+
+# exclude some source file which maybe in one of $(SRC_DIRS)
+SRC_EXCLUDE :=
+
+# specify the extension of source file name, can be one or more of (c/cc/cpp/cxx)
+SRC_SUFFIX := cc
+
+# $(TARGET_TYPE) can be one of (dll/so, exe/app, lib/archive) corresponding to (dynamic-library, executive-elf, static-archive)
+TARGET_TYPE := app
+
+# $(BUILD) can be one of (debug, release) to change optimization pattern of this build, default to (release)
+BUILD := debug
+
+# specify the cross compiler prefix string (arm-seev100-linux-gnueabihf-)
+CROSS_COMPILER_PREFIX := #arm-seev100-linux-gnueabihf-
+
+# user define complie-time options
+CFLAGS_ADDON := -D__USE_MISC
+
+# user define link-time options
+LDFALGS_ADDON := -pthread -lrt -ldl -lcrypt -lm
+
+# target architecture, can be one of  (X64/X8664/IA64/X86_64, X86/I386, ARM/ARM32, ARM64)
+ARCH := X64
+
+# directory to save intermediate file and output target ( ./gbuild/ by default), path MUST end with slash
+BUILD_DIR := build/
+
+#################################################################################################
+#      build framework, you didn't need to understand what below script have done 		#
+#################################################################################################
 DETACHED := .detached
 DEBUGINFO := .debuginfo
-build := release
-arch := IA64
-SYSBITS := $(shell getconf LONG_BIT)
+CC := $(CROSS_COMPILER_PREFIX)gcc
+OBJCOPY := $(CROSS_COMPILER_PREFIX)objcopy
+AR := $(CROSS_COMPILER_PREFIX)ar
 
-SRCS := $(foreach dir, $(SRC_DIRS), $(wildcard $(dir)*.cc))
-INCS := $(addprefix -I, $(INC_DIRS))
-CPPFLAGS := $(INCS) -Wall -std=c++11 -D_FILE_OFFSET_BITS=64 -D_X64
-CC := g++
+# ld options
+LDFLAGS := -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack
+ifeq ($(TARGET_TYPE), $(filter $(TARGET_TYPE), dll so))
+LDFLAGS += -shared
+endif
+ifneq ($(BUILD), debug)
+LDFLAGS += -Wl,-O2
+endif
+ifeq ($(ARCH), $(filter $(ARCH), X86 x86 i386))
+LDFLAGS += -m32
+endif
+LDFLAGS += $(LDFALGS_ADDON)
 
+# compile options
+CFLAGS :=
+COMPILE_TIME := $(shell date +" %Y-%m-%d %H:%M:%S")
+CFLAGS += $(INCS) -Wall -D_GNU_SOURCE -Wno-unused-function -D_BUILTIN_VERSION="\"$(VERSION) $(COMPILE_TIME)"\"
+ifeq ($(TARGET_TYPE), $(filter $(TARGET_TYPE), exe app))
+CFLAGS += -fPIE
+endif
+ifeq ($(TARGET_TYPE), $(filter $(TARGET_TYPE), dll so))
+CFLAGS += -fPIC -fvisibility=hidden
+endif
 MIN_GCC_VERSION = "4.9"
 GCC_VERSION := "`$(CC) -dumpversion`"
 IS_GCC_ABOVE_MIN_VERSION := $(shell expr "$(GCC_VERSION)" ">=" "$(MIN_GCC_VERSION)")
 ifeq "$(IS_GCC_ABOVE_MIN_VERSION)" "1"
-    CPPFLAGS += -fstack-protector-all -fstack-check=specific
+STACK_PROT = -fstack-protector-all -fstack-check=specific
 else
-    CPPFLAGS += -fstack-protector
+STACK_PROT = -fstack-protector
 endif
-
-# COMPILE_TIME=$(shell date +" %Y-%m-%d %H:%M:%S")
-COMPILE_TIME=$(shell date)
-LDFLAGS := -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -pthread -lrt -ldl -lcrypt -lgtest -lgtest_main -lnax
-OBJCOPY := objcopy
-
-ifeq ($(arch), i686)
-	CPPFLAGS  += -m32 -D_X86
-	LDFLAGS += -m32
-endif
-
-ifeq ($(arch), $(filter $(arch),arm arm32))
-	CC := arm-seev100-linux-gnueabihf-g++
-	OBJCOPY := arm-seev100-linux-gnueabihf-objcopy
-	CPPFLAGS  += -mfloat-abi=hard -mfpu=neon -D_ARM32
-endif
-
-ifeq ($(arch), $(filter $(arch),arm64 aarch64))
-	CC := aarch64-linux-gnu-g++
-	OBJCOPY := aarch64-linux-gnu-objcopy
-	CPPFLAGS += -D_ARM64
-endif
-
-ifeq ($(build),debug)
-	CPPFLAGS += -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -DDEBUG=1
+ifeq ($(BUILD), debug)
+CFLAGS += -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -DDEBUG=1 $(STACK_PROT)
 else
-	CPPFLAGS += -O2 -g -funroll-loops -D NO_DEBUG #-fkeep-inline-functions -Winline
-	LDFLAGS += -Wl,-O2
+CFLAGS += -O2 -g -funroll-loops -D NO_DEBUG -fkeep-inline-functions -Winline
+endif
+ifeq ($(ARCH), $(filter $(ARCH), X86 x86 i386))
+CFLAGS  += -m32 -D_X86 -D_FILE_OFFSET_BITS=32
+endif
+ifeq ($(ARCH), $(filter $(ARCH), X64 x64 x8664 X8664 IA64 X86_64 x86_64))
+CFLAGS  += -D_X64 -D_X8664 -D_FILE_OFFSET_BITS=64
+endif
+ifeq ($(ARCH), $(filter $(ARCH), ARM ARM32 arm arm32))
+CFLAGS  += -mfloat-abi=hard -mfpu=neon -D_ARM32 -D_FILE_OFFSET_BITS=32
+endif
+ifeq ($(ARCH), $(filter $(ARCH), ARM64))
+CFLAGS  += -mfloat-abi=hard -mfpu=neon -D_ARM64 -D_FILE_OFFSET_BITS=64
+endif
+
+# all includes
+INCS := $(addprefix -I, $(INC_DIRS))
+INCS += $(foreach i,$(INC_ENTIRE_DIRS),$(addprefix -I,$(shell find $(i) -type d -exec echo {}/ \;)))
+
+#src-$1 = $(foreach d,$2,$(wildcard $d*.$1))
+define set_src_x
+src-$1 = $(filter-out $4,$(foreach d,$2,$(wildcard $d*.$1)) $(filter %.$1,$3))
+
+endef
+
+define set_obj_x
+obj-$1 = $(patsubst %.$1,$3%.o,$(notdir $2))
+
+endef
+
+ifeq ($(BUILD_DIR),)
+BUILD_DIR := gbuild
 endif
 
 # define the middle directory for build
-BUILD_DIR := tmp
-OBJS_DIR := $(BUILD_DIR)/objs
-DEPS_DIR := $(BUILD_DIR)/deps
+OBJS_DIR := $(BUILD_DIR)objs/
+TAGS_DIR := $(BUILD_DIR)bin/
 
-OBJS := $(patsubst %.cc,%.o,$(SRCS))
+# expand SRC_DIRS
+SRC_DIRS += $(foreach i,$(SRC_ENTIRE_DIRS),$(shell find $(i) -type d -exec echo {}/ \;))
 
-$(TARGET):$(OBJS)
-	$(CC) -o $@ $^ $(LDFLAGS)
+$(eval $(foreach i,$(SRC_SUFFIX),$(call set_src_x,$i,$(SRC_DIRS),$(SRC_ADDON),$(SRC_EXCLUDE))))
+$(eval $(foreach i,$(SRC_SUFFIX),$(call set_obj_x,$i,$(src-$i),$(OBJS_DIR))))
 
-%.o:%.cc
-	$(CC) -c $< $(CPPFLAGS) -o $@
+VPATH := $(SRC_DIRS)
+OBJS = $(foreach i,$(SRC_SUFFIX),$(obj-$i))
+SRCS = $(foreach i,$(SRC_SUFFIX),$(src-$i))
 
--include $(DEPS)
+PHONY := clean .mkdir all detach
 
-PHONY := clean all install detach
+all: .mkdir $(TAGS_DIR)$(TARGET)
 
-.PHONY : $(PHONY)
+define build_obj_x
+$$(obj-$1): $2%.o: %.$1  $(MAKEFILE_LIST)
+	@echo compiling $$<
+	@$(CC) -Wp,-MT,$$@ -Wp,-MMD,$$@.d -c $$< $(INCS) $(CFLAGS) $(CFLAGS_ADDON) $3 -o $$@
 
-all:
-	$(TARGET)
+endef
+$(eval $(foreach i,$(SRC_SUFFIX),$(call build_obj_x,$i,$(OBJS_DIR),$(if $(filter $i,cpp cc cxx),-std=c++11,-std=gnu99))))
 
-clean:
-	rm -rf $(OBJS_DIR) $(DEPS_DIR) $(OBJS)
-	rm -f $(TARGET)
+ifeq ($(TARGET_TYPE), $(filter $(TARGET_TYPE), lib static))
+$(TAGS_DIR)$(TARGET): $(OBJS)
+	@echo archiving $@
+	@$(AR) crv $@ $^
+else
+LDFLAGS += $(if $(strip $(src-cpp) $(src-cc) $(src-cxx)), -lstdc++)
+$(TAGS_DIR)$(TARGET): $(OBJS)
+	@echo linking $@
+	@$(CC) -o $@ $^ $(LDFLAGS)
+endif
 
 detach:
-	$(OBJCOPY) --only-keep-debug $(PROGRAM) $(PROGRAM)$(DEBUGINFO)
-	$(OBJCOPY) --strip-unneeded $(PROGRAM) $(PROGRAM)$(DETACHED)
+	$(OBJCOPY) --only-keep-debug $(TAGS_DIR)$(TARGET) $(TAGS_DIR)$(TARGET)$(DEBUGINFO)
+	$(OBJCOPY) --strip-unneeded $(TAGS_DIR)$(TARGET) $(TAGS_DIR)$(TARGET)$(DETACHED)
+
+.mkdir:
+	@if [ ! -d $(OBJS_DIR) ]; then mkdir -p $(OBJS_DIR); fi
+	@if [ ! -d $(TAGS_DIR) ]; then mkdir -p $(TAGS_DIR); fi
+
+clean:
+	@echo cleaning project.
+	@rm -fr $(BUILD_DIR)
+	
+.PHONY : $(PHONY)
+
+# ifneq ($(MAKECMDGOALS), clean)
+# -include $(DISS)
+# endif
+
