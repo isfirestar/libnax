@@ -38,7 +38,7 @@ TARGET_TYPE := app
 BUILD := debug
 
 # specify the cross compiler prefix string (arm-seev100-linux-gnueabihf-)
-CROSS_COMPILER_PREFIX := #arm-seev100-linux-gnueabihf-
+CROSS_COMPILER_PREFIX :=
 
 # user define complie-time options
 CFLAGS_ADDON := -D__USE_MISC
@@ -57,6 +57,10 @@ SUB_DIRS :=
 
 # other makefile which you want to invoke
 INVOKE_MK :=
+
+# both of below variable use to help you run shell script before/after gcc linker executive
+PRE_LINK_ORDER =
+POST_LINK_ORDER =
 
 include pattern.mk
 

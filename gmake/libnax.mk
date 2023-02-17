@@ -47,7 +47,7 @@ CROSS_COMPILER_PREFIX :=
 CFLAGS_ADDON := -D__USE_MISC
 
 # user define link-time options
-LDFALGS_ADDON := -pthread -lrt -ldl -lcrypt -lm
+LDFALGS_ADDON := -ldl
 
 # target architecture, can be one of  (X64/X8664/IA64/X86_64, X86/I386, ARM/ARM32, ARM64)
 ARCH := X64
@@ -61,4 +61,11 @@ SUB_DIRS :=
 # other makefile which you want to invoke
 INVOKE_MK :=
 
+# both of below variable use to help you run shell script before/after gcc linker executive
+PRE_LINK_ORDER =
+POST_LINK_ORDER = @ln -sf $(TAGS_DIR)$(TARGET) $(PROGRAM)
+
 include  pattern.mk
+
+
+	

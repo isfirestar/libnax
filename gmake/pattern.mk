@@ -4,6 +4,7 @@
 DETACHED := .detached
 DEBUGINFO := .debuginfo
 CC := $(CROSS_COMPILER_PREFIX)gcc
+G++ := $(CROSS_COMPILER_PREFIX)g++
 OBJCOPY := $(CROSS_COMPILER_PREFIX)objcopy
 AR := $(CROSS_COMPILER_PREFIX)ar
 
@@ -76,8 +77,8 @@ BUILD_DIR := ./build/
 endif
 
 # define the middle directory for build
-OBJS_DIR := $(BUILD_DIR)objs/
-TAGS_DIR := $(BUILD_DIR)bin/
+OBJS_DIR = $(BUILD_DIR)objs/
+TAGS_DIR = $(BUILD_DIR)bin/
 
 # expand SRC_DIRS
 SRC_DIRS += $(foreach i,$(SRC_ENTIRE_DIRS),$(shell find $(i) -type d -exec echo {}/ \;))
@@ -106,10 +107,15 @@ $(TAGS_DIR)$(TARGET): $(OBJS)
 	@echo archiving $@
 	@$(AR) crv $@ $^
 else
-LDFLAGS += $(if $(strip $(src-cpp) $(src-cc) $(src-cxx)), -lstdc++)
+#LDFLAGS += $(if $(strip $(src-cpp) $(src-cc) $(src-cxx)), -lstdc++)
+$(TAGS_DIR)$(TARGET): LD = $(if $(strip $(src-cpp) $(src-cc) $(src-cxx)),$(G++),$(CC))
 $(TAGS_DIR)$(TARGET): $(OBJS)
+	@echo executing pre link order
+	$(shell $(PRE_LINK_ORDER))
 	@echo linking $@
-	@$(CC) -o $@ $^ $(LDFLAGS)
+	@$(LD) -o $@ $^ $(LDFLAGS)
+	@echo executing post link order
+	$(shell $(POST_LINK_ORDER))
 endif
 
 detach:
