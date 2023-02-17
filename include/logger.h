@@ -39,11 +39,13 @@ PORTABLEAPI(void) log_flush();
 #define log_alert(module, fmt, ...) log_save(module, kLogLevel_Warning, kLogTarget_Stdout | kLogTarget_Filesystem, fmt, ##__VA_ARGS__)
 #define log_error(module, fmt, ...) log_save(module, kLogLevel_Error, kLogTarget_Stdout | kLogTarget_Filesystem, fmt, ##__VA_ARGS__)
 #define log_trace(module, fmt, ...) log_save(module, kLogLevel_Error, kLogTarget_Filesystem, fmt, ##__VA_ARGS__)
+#define nprint(fmt, ...) log_write(NULL,  kLogLevel_Info, kLogTarget_Stdout, fmt, ##__VA_ARGS__)
 #else
 #define log_info(module, fmt, arg...) log_save(module, kLogLevel_Info, kLogTarget_Stdout | kLogTarget_Filesystem, fmt, ##arg)
 #define log_alert(module, fmt, arg...) log_save(module, kLogLevel_Warning, kLogTarget_Stdout | kLogTarget_Filesystem, fmt, ##arg)
 #define log_error(module, fmt, arg...) log_save(module, kLogLevel_Error, kLogTarget_Stdout | kLogTarget_Filesystem, fmt, ##arg)
 #define log_trace(module, fmt, arg...) log_save(module, kLogLevel_Trace, kLogTarget_Filesystem, fmt, ##arg)
+#define nprint(fmt, arg...) log_write(NULL, kLogLevel_Info, kLogTarget_Stdout, fmt, ##arg)
 #endif
 
 #endif
