@@ -63,3 +63,4 @@ POST_LINK_ORDER = ln -sf $(TAGS_DIR)$(TARGET) $(PROGRAM)
 
 # finally, we MUST include make framework to complete the job
 include  pattern.mk
+
