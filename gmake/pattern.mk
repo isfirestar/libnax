@@ -1,58 +1,3 @@
-PROGRAM :=
-
-# specify the program version
-VERSION :=
-
-# TARGET shall be the output file when success compile
-TARGET :=
-
-# add include directory, path MUST end with slash
-INC_DIRS :=
-
-# add include directory, this variable allow framework force traverse and include all head files in entire directoy and it's sub directory
-# path MUST end with slash
-INC_ENTIRE_DIRS :=
-
-# add source directory, compiler shall compile all files which with $(SRC_SUFFIX) in these folders, path MUST end with slash
-SRC_DIRS :=
-
-# add source directory, this variable allow framework force traverse and include all source files in entire directoy and it's sub directory
-# path MUST end with slash
-SRC_ENTIRE_DIRS := 
-
-# add some source file which didn't in any of $(SRC_DIRS)
-SRC_ADDON :=
-
-# exclude some source file which maybe in one of $(SRC_DIRS)
-SRC_EXCLUDE :=
-
-# specify the extension of source file name, can be one or more of (c/cc/cpp/cxx)
-SRC_SUFFIX :=
-
-# $(TARGET_TYPE) can be one of (dll/so, exe/app, lib/archive) corresponding to (dynamic-library, executive-elf, static-archive)
-TARGET_TYPE :=
-
-# $(BUILD) can be one of (debug, release) to change optimization pattern of this build, default to (release)
-BUILD :=
-
-# specify the cross compiler prefix string (arm-seev100-linux-gnueabihf-)
-CROSS_COMPILER_PREFIX := #arm-seev100-linux-gnueabihf-
-
-# user define complie-time options
-CFLAGS_ADDON :=
-
-# user define link-time options
-LDFALGS_ADDON :=
-
-# target architecture, can be one of  (X64/X8664/IA64/X86_64, X86/I386, ARM/ARM32, ARM64)
-ARCH :=
-
-# directory to save intermediate file and output target ( ./gbuild/ by default), path MUST end with slash
-BUILD_DIR :=
-
-# sub directory which you want to build relating by this make. using this as the top make entry
-SUB_DIRS := ./src/posix/ ./demo/
-
 #################################################################################################
 #      build framework, you didn't need to understand what below script have done 		#
 #################################################################################################
@@ -127,7 +72,7 @@ obj-$1 = $(patsubst %.$1,$3%.o,$(notdir $2))
 endef
 
 ifeq ($(BUILD_DIR),)
-BUILD_DIR := gbuild/
+BUILD_DIR := ./build/
 endif
 
 # define the middle directory for build
@@ -144,9 +89,9 @@ VPATH := $(SRC_DIRS)
 OBJS = $(foreach i,$(SRC_SUFFIX),$(obj-$i))
 SRCS = $(foreach i,$(SRC_SUFFIX),$(src-$i))
 
-PHONY := clean .mkdir .subdir all detach
+PHONY := clean .mkdir .subdir .invoke all detach
 
-all: .mkdir .subdir $(TAGS_DIR)$(TARGET)
+all: .mkdir .subdir .invoke $(TAGS_DIR)$(TARGET)
 
 define build_obj_x
 $$(obj-$1): $2%.o: %.$1  $(MAKEFILE_LIST)
@@ -178,14 +123,17 @@ detach:
 .subdir:
 	@for i in $(SUB_DIRS); do make -C $$i; done
 
+.invoke:
+	@for i in $(INVOKE_MK); do make -f $$i; done
+
 clean:
 	@echo cleaning project.
 	@rm -fr $(BUILD_DIR)
 	@for i in $(SUB_DIRS); do make -C $$i clean; done
+	@for i in $(INVOKE_MK); do make -f $$i clean; done
   
 .PHONY : $(PHONY)
 
 # ifneq ($(MAKECMDGOALS), clean)
 # -include $(DISS)
 # endif
-
