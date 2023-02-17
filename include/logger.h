@@ -30,9 +30,11 @@ PORTABLEAPI(void) log_flush();
 PORTABLEIMPL(void) log_generical_print(const char *file, int line, const char *func, const char *fmt, ...);
 
 #if _WIN32
-#define xprint(fmt, arg...) log_generical_print(__FILE__, __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
+#define xprint(fmt, arg...) log_generical_print(NULL, NULL, NULL, fmt, ##__VA_ARGS__)
+#define dprint(fmt, arg...) log_generical_print(__FILE__, __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
 #else
-#define xprint(fmt, arg...) log_generical_print(__FILE__, __FUNCTION__, __LINE__, fmt, ##arg)
+#define xprint(fmt, arg...) log_generical_print(NULL, NULL, NULL, fmt, ##arg)
+#define dprint(fmt, arg...) log_generical_print(__FILE__, __FUNCTION__, __LINE__, fmt, ##arg)
 #endif
 
 /* Maximum allowable specified log module name length */
