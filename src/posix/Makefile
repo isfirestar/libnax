@@ -55,7 +55,7 @@ LDFALGS_ADDON := -pthread -lrt -ldl -lcrypt -lm
 ARCH := X64
 
 # directory to save intermediate file and output target ( ./gbuild/ by default), path MUST end with slash
-BUILD_DIR := build/
+BUILD_DIR :=
 
 # sub directory which you want to build relating by this make. using this as the top make entry
 SUB_DIRS :=
@@ -134,7 +134,7 @@ obj-$1 = $(patsubst %.$1,$3%.o,$(notdir $2))
 endef
 
 ifeq ($(BUILD_DIR),)
-BUILD_DIR := gbuild
+BUILD_DIR := ./build/
 endif
 
 # define the middle directory for build
