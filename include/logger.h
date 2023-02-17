@@ -27,6 +27,13 @@ PORTABLEAPI(void) log_init2(const char *rootdir);
 PORTABLEAPI(void) log_write(const char *module, enum log_levels level, int target, const char *format, ...);
 PORTABLEAPI(void) log_save(const char *module, enum log_levels level, int target, const char *format, ...);
 PORTABLEAPI(void) log_flush();
+PORTABLEIMPL(void) log_generical_print(const char *file, int line, const char *func, const char *fmt, ...);
+
+#if _WIN32
+#define nprint(fmt, arg...) log_generical_print(__FILE__, __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
+#else
+#define nprint(fmt, arg...) log_generical_print(__FILE__, __FUNCTION__, __LINE__, fmt, ##arg)
+#endif
 
 /* Maximum allowable specified log module name length */
 #define  LOG_MODULE_NAME_LEN   (128)
@@ -45,7 +52,6 @@ PORTABLEAPI(void) log_flush();
 #define log_alert(module, fmt, arg...) log_save(module, kLogLevel_Warning, kLogTarget_Stdout | kLogTarget_Filesystem, fmt, ##arg)
 #define log_error(module, fmt, arg...) log_save(module, kLogLevel_Error, kLogTarget_Stdout | kLogTarget_Filesystem, fmt, ##arg)
 #define log_trace(module, fmt, arg...) log_save(module, kLogLevel_Trace, kLogTarget_Filesystem, fmt, ##arg)
-#define nprint(fmt, arg...) log_write(NULL, kLogLevel_Info, kLogTarget_Stdout, fmt, ##arg)
 #endif
 
 #endif
