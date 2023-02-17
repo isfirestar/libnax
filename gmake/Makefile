@@ -54,7 +54,7 @@ BUILD_DIR :=
 SUB_DIRS := 
 
 # other makefile which you want to invoke
-INVOKE_MK := libnax.mk demo.mk tester.mk
+INVOKE_MK := libnax.mk demo.mk tester.mk demo-c++.mk
 
 # both of below variable use to help you run shell script before/after gcc linker executive
 PRE_LINK_ORDER =
