@@ -57,6 +57,9 @@ ARCH := X64
 # directory to save intermediate file and output target ( ./gbuild/ by default), path MUST end with slash
 BUILD_DIR := build/
 
+# sub directory which you want to build relating by this make. using this as the top make entry
+COMPONENT :=
+
 #################################################################################################
 #      build framework, you didn't need to understand what below script have done 		#
 #################################################################################################
@@ -148,9 +151,9 @@ VPATH := $(SRC_DIRS)
 OBJS = $(foreach i,$(SRC_SUFFIX),$(obj-$i))
 SRCS = $(foreach i,$(SRC_SUFFIX),$(src-$i))
 
-PHONY := clean .mkdir all detach
+PHONY := clean .mkdir .component all detach
 
-all: .mkdir $(TAGS_DIR)$(TARGET)
+all: .mkdir .component $(TAGS_DIR)$(TARGET)
 
 define build_obj_x
 $$(obj-$1): $2%.o: %.$1  $(MAKEFILE_LIST)
@@ -179,9 +182,13 @@ detach:
 	@if [ ! -d $(OBJS_DIR) ]; then mkdir -p $(OBJS_DIR); fi
 	@if [ ! -d $(TAGS_DIR) ]; then mkdir -p $(TAGS_DIR); fi
 
+.component:
+	@for i in $(COMPONENT); do make -C $$i; done
+	
 clean:
 	@echo cleaning project.
 	@rm -fr $(BUILD_DIR)
+	@for i in $(COMPONENT); do make -C $$i clean; done
 	
 .PHONY : $(PHONY)
 
