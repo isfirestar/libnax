@@ -457,3 +457,40 @@ PORTABLEIMPL(void) log_flush()
         }
     } while (node);
 }
+
+PORTABLEIMPL(void) log_generical_print(const char *file, int line, const char *func, const char *fmt, ...)
+{
+    char buffer[1024];
+    int pos;
+    va_list ap;
+    int written;
+
+    pos = 0;
+    if (file && (pos < sizeof(buffer))) {
+        written = snprintf(buffer + pos, sizeof(buffer) - pos, "[%s:%d]", file, line);
+        if (written >= (sizeof(buffer) - pos)) {
+            return;
+        }
+        pos += written;
+    }
+
+    if (func && (pos < sizeof(buffer))) {
+        written = snprintf(buffer + pos, sizeof(buffer) - pos, "[%s] ", func);
+        if (written >= (sizeof(buffer) - pos)) {
+            return;
+        }
+        pos += written;
+    }
+
+    if (fmt && (pos < sizeof(buffer) - 4)) {
+        va_start(ap, fmt);
+        written = vsnprintf(buffer + pos, sizeof(buffer) - pos - 4, fmt, ap);
+        if (written >= (sizeof(buffer) - pos - 4)) {
+            return;
+        }
+        pos += written;
+        va_end(ap);
+    }
+
+    printf("%s\n", buffer);
+}
