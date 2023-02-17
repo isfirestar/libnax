@@ -1,22 +1,9 @@
-﻿#include "icom/compiler.h"
-#include "icom/nisdef.h"
+﻿#include "args.h"
+
 #include <getopt.h>
+#include <iostream>
 
-#include "toolkit.h"
 #include "endpoint.h"
-
-#include "args.h"
-
-static struct {
-    int type; // @0: server @1:client
-    char host[128]; // IP地址或域名
-    uint16_t port; // 端口
-    uint32_t size_; // 包大小
-    uint32_t interval; // 打印间隔
-    char file[255]; // 使用文件
-    int mode;
-	int winsize;		// 交换窗口大小
-} __startup_parameters;
 
 enum ope_index {
     kOptIndex_GetHelp = 'h',
@@ -49,7 +36,7 @@ static const struct option long_options[] = {
     {NULL, 0, NULL, 0}
 };
 
-void display_usage()
+void args::display_usage()
 {
     static const char *usage_context =
             "usage escape - nshost escape timing counter\n"
@@ -67,12 +54,10 @@ void display_usage()
             "\t[-d|--download]\tfile mode of download from @args on server to current directory.only @C.\n"
 			"\t[-n|-w|--winsize|--window-size]\tpacket transfer window size of this connection. 1 by default. only @C and conflict with file mode.\n"
             ;
-
-    printf("%s", usage_context);
+    std::cout << usage_context;
 }
 
-static
-void display_author_information()
+void args::display_author_information()
 {
     static const char *author_context =
             "nshost escape 1,1,0,0\n"
@@ -81,65 +66,51 @@ void display_author_information()
             "<http://www.nshost.com.cn/>.\n"
             "For help, type \"help\".\n"
             ;
-    printf("%s", author_context);
+    std::cout << author_context;
 }
 
-int check_args(int argc, char **argv)
+nsp_status_t args::load_startup_parameters(int argc, char **argv)
 {
-    int opt_index;
-    int opt;
-    int retval = 0;
-    char shortopts[128];
-    static const int DEFAULT_ESCAPE_SIZE = MAX_TCP_UNIT - 8/*nsp head*/ - 24/*proto_head*/ - 4/*proto_string_t*/;
-
-    __startup_parameters.type = SESS_TYPE_CLIENT;
-    __startup_parameters.size_ = DEFAULT_ESCAPE_SIZE;
-    nsp::toolkit::posix_strcpy(__startup_parameters.host, cchof(__startup_parameters.host), "0.0.0.0");
-    __startup_parameters.port = 10256;
-    __startup_parameters.interval = 1000;
-    __startup_parameters.mode = CS_MODE_ESCAPE_TASK;
-    memset(__startup_parameters.file, 0, sizeof(__startup_parameters.file));
-	__startup_parameters.winsize = 1;
-
-    nsp::toolkit::posix_strcpy(shortopts, cchof(shortopts), "SCvhH:P:s:i:u:d:n:w:");
-    opt = getopt_long(argc, argv, shortopts, long_options, &opt_index);
+    static const std::string shortopts = "SCvhH:P:s:i:u:d:n:w:";
+    int idx;
+    int opt = ::getopt_long(argc, argv, shortopts.c_str(), long_options, &idx);
     while (opt != -1) {
         switch (opt) {
             case 'S':
-                __startup_parameters.type = SESS_TYPE_SERVER;
+                this->argument_.type = demo_sess_type::SESS_TYPE_SERVER;
                 break;
             case 'C':
-                __startup_parameters.type = SESS_TYPE_CLIENT;
+                this->argument_.type = demo_sess_type::SESS_TYPE_CLIENT;
                 break;
             case 'v':
                 display_author_information();
-                return -1;
+                return NSP_STATUS_FATAL;
             case 'h':
                 display_usage();
-                return -1;
+                return NSP_STATUS_FATAL;
             case 'H':
-                nsp::toolkit::posix_strcpy(__startup_parameters.host, cchof(__startup_parameters.host), optarg);
+                this->argument_.host.assign(optarg);
                 break;
             case 'P':
-                __startup_parameters.port = (uint16_t) strtoul(optarg, NULL, 10);
+                this->argument_.port = (uint16_t) strtoul(optarg, NULL, 10);
                 break;
             case 's':
-                __startup_parameters.size_ = strtoul(optarg, NULL, 10);
+                this->argument_.size = strtoul(optarg, NULL, 10);
                 break;
             case 'i':
-                __startup_parameters.interval = strtoul(optarg, NULL, 10) * 1000;
+                this->argument_.interval = strtoul(optarg, NULL, 10) * 1000;
                 break;
             case 'u':
-                __startup_parameters.mode = CS_MODE_FILE_UPLOAD;
-                nsp::toolkit::posix_strcpy(__startup_parameters.file, sizeof(__startup_parameters.file), optarg);
+                this->argument_.mode = demo_cs_mode::CS_MODE_FILE_UPLOAD;
+                this->argument_.file.assign(optarg);
                 break;
             case 'd':
-                __startup_parameters.mode = CS_MODE_FILE_DOWNLOAD;
-                nsp::toolkit::posix_strcpy(__startup_parameters.file, sizeof(__startup_parameters.file), optarg);
+                this->argument_.mode = demo_cs_mode::CS_MODE_FILE_DOWNLOAD;
+                this->argument_.file.assign(optarg);
                 break;
 			case 'w':
 			case 'n':
-				__startup_parameters.winsize = strtoul(optarg, NULL, 10);
+				this->argument_.winsize = strtoul(optarg, NULL, 10);
 				break;
             case '?':
                 printf("?\n");
@@ -147,60 +118,57 @@ int check_args(int argc, char **argv)
                 printf("0\n");
             default:
                 display_usage();
-                return -1;
+                return NSP_STATUS_FATAL;
         }
-        opt = getopt_long(argc, argv, shortopts, long_options, &opt_index);
+        opt = getopt_long(argc, argv, shortopts.c_str(), long_options, &idx);
     }
 
-    if ((__startup_parameters.mode > CS_MODE_MUST_BE_CLIENT) && __startup_parameters.type != SESS_TYPE_CLIENT){
-        display_usage();
-        return -1;
+    if ((this->argument_.mode > demo_cs_mode::CS_MODE_MUST_BE_CLIENT) && this->argument_.type != demo_sess_type::SESS_TYPE_CLIENT) {
+        this->display_usage();
+        return NSP_STATUS_FATAL;
     }
-	if ( __startup_parameters.type == SESS_TYPE_CLIENT && 0 == nsp::toolkit::posix_strcasecmp( __startup_parameters.host, "0.0.0.0" ) ) {
-		display_usage();
-		return -1;
+	if ( this->argument_.type == demo_sess_type::SESS_TYPE_CLIENT && this->argument_.host == "0.0.0.0") {
+		this->display_usage();
+		return NSP_STATUS_FATAL;
 	}
-	if ( __startup_parameters.winsize > 1 && __startup_parameters.type == SESS_TYPE_SERVER ) {
-		display_usage();
-		return -1;
+	if ( this->argument_.winsize > 1 && this->argument_.type == demo_sess_type::SESS_TYPE_SERVER ) {
+		this->display_usage();
+		return NSP_STATUS_FATAL;
 	}
-    return retval;
+    return NSP_STATUS_SUCCESSFUL;
 }
 
-int buildep(nsp::tcpip::endpoint &ep)
+nsp_status_t args::buildep(nsp::tcpip::endpoint &ep) const
 {
-    return nsp::tcpip::endpoint::build(__startup_parameters.host, __startup_parameters.port, ep);
+    return nsp::tcpip::endpoint::build(this->argument_.host.c_str(), this->argument_.port, ep);
 }
 
-int gettype()
+demo_sess_type args::gettype() const
 {
-    return __startup_parameters.type;
+    return this->argument_.type;
 }
 
-int getpkgsize()
+int args::getpkgsize() const
 {
-    return __startup_parameters.size_;
+    return this->argument_.size;
 }
 
-int getinterval()
+int args::getinterval() const
 {
-    return __startup_parameters.interval;
+    return this->argument_.interval;
 }
 
-extern int getmode()
+demo_cs_mode args::getmode() const
 {
-    return __startup_parameters.mode;
+    return this->argument_.mode;
 }
 
-const char *getfile( int *len )
+void args::getfile(std::string &file) const
 {
-	if ( len ) {
-		*len = strlen( __startup_parameters.file );
-	}
-	return &__startup_parameters.file[0];
+    file = this->argument_.file;
 }
 
-int getwinsize()
+int args::getwinsize() const
 {
-	return __startup_parameters.winsize;
+	return this->argument_.winsize;
 }
