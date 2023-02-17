@@ -125,7 +125,7 @@ TEST(DoTestMatrixTransport, TestMatrixTransport)
     ASSERT_TRUE(NULL != m_verify);
     matrix2d_iterate_element(m_verify, &iter_fill_integer, d_verify);
 
-    m = matrixed_transport(m_src);
+    m = matrix2d_transport(m_src);
     EXPECT_TRUE(m != NULL);
     EXPECT_TRUE(matrix2d_equal(m_verify, m));
 
