@@ -27,6 +27,13 @@ PORTABLEAPI(void) log_init2(const char *rootdir);
 PORTABLEAPI(void) log_write(const char *module, enum log_levels level, int target, const char *format, ...);
 PORTABLEAPI(void) log_save(const char *module, enum log_levels level, int target, const char *format, ...);
 PORTABLEAPI(void) log_flush();
+PORTABLEIMPL(void) log_generical_print(const char *file, int line, const char *func, const char *fmt, ...);
+
+#if _WIN32
+#define xprint(fmt, arg...) log_generical_print(__FILE__, __FUNCTION__, __LINE__, fmt, ##__VA_ARGS__)
+#else
+#define xprint(fmt, arg...) log_generical_print(__FILE__, __FUNCTION__, __LINE__, fmt, ##arg)
+#endif
 
 /* Maximum allowable specified log module name length */
 #define  LOG_MODULE_NAME_LEN   (128)
