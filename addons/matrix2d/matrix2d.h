@@ -88,7 +88,7 @@ matrix2d_function matrix2d_pt matrix2d_scalar_mul(const matrix2d_pt m, const mat
  * | 1,4,7 |
  * | 2,5,9 |
 */
-matrix2d_function matrix2d_pt matrixe2d_transport(const matrix2d_pt m);
+matrix2d_function matrix2d_pt matrix2d_transport(const matrix2d_pt m);
 
 /* you will got a identity matrix like below when you specify scale==6 to invoke  @matrix2d_allocate_indentity
  * any matrix multiplied by the identity matrix is equal to itself
