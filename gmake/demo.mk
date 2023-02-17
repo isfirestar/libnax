@@ -1,12 +1,11 @@
 PROGRAM := demo
+SOLUTION_DIR := ../
 
 # specify the program version
 VERSION := 1.0.1
 
 # TARGET shall be the output file when success compile
 TARGET := $(PROGRAM)
-
-SOLUTION_DIR := ../
 
 # add include directory, path MUST end with slash
 INC_DIRS := $(SOLUTION_DIR)demo/ $(SOLUTION_DIR)include/ $(SOLUTION_DIR)src/posix/
@@ -63,4 +62,3 @@ PRE_LINK_ORDER =
 POST_LINK_ORDER =
 
 include pattern.mk
-
