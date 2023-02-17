@@ -61,4 +61,5 @@ INVOKE_MK :=
 PRE_LINK_ORDER =
 POST_LINK_ORDER =
 
+# finally, we MUST include make framework to complete the job
 include pattern.mk
