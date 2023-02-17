@@ -1,12 +1,11 @@
 PROGRAM := libnax.so
+SOLUTION_DIR := ../
 
 # specify the program version
 VERSION := 1.0.1
 
 # TARGET shall be the output file when success compile
 TARGET := $(PROGRAM).$(VERSION)
-
-SOLUTION_DIR := ../
 
 # add include directory, path MUST end with slash
 INC_DIRS := 
@@ -66,6 +65,3 @@ PRE_LINK_ORDER =
 POST_LINK_ORDER = @ln -sf $(TAGS_DIR)$(TARGET) $(PROGRAM)
 
 include  pattern.mk
-
-
-	
