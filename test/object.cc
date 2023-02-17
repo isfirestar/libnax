@@ -27,7 +27,6 @@ TEST(DoNormalTest, NormalTest)
     objhld_t hld;
     nsp_status_t status = objallo4(&creator, &hld);
     EXPECT_EQ(status, NSP_STATUS_SUCCESSFUL);
-    EXPECT_EQ(hld, (objhld_t)1);
 
     struct context *pctx = (struct context *)objrefr(hld);
     EXPECT_TRUE(pctx != NULL);

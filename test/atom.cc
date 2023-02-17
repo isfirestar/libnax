@@ -41,8 +41,8 @@ TEST(DoPointerFunc, PointerFunc)
 }
 
 // g++ atom.cpp -g3 -oatom -lgtest -pthread -std=c++11
-int main(int argc,char *argv[])
-{
-    testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}
+// int main(int argc,char *argv[])
+// {
+//     testing::InitGoogleTest(&argc, argv);
+//     return RUN_ALL_TESTS();
+// }

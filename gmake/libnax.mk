@@ -17,12 +17,10 @@ INC_ENTIRE_DIRS :=
 
 # add source directory, compiler shall compile all files which with $(SRC_SUFFIX) in these folders, path MUST end with slash
 SRC_DIRS := $(SOLUTION_DIR)src/
-SRC_DIRS += $(SOLUTION_DIR)src/posix/
-SRC_DIRS += $(SOLUTION_DIR)src/posix/wosi/
 
 # add source directory, this variable allow framework force traverse and include all source files in entire directoy and it's sub directory
 # path MUST end with slash
-SRC_ENTIRE_DIRS := 
+SRC_ENTIRE_DIRS :=  $(SOLUTION_DIR)src/posix
 
 # add some source file which didn't in any of $(SRC_DIRS)
 SRC_ADDON :=
@@ -62,7 +60,7 @@ INVOKE_MK :=
 
 # both of below variable use to help you run shell script before/after gcc linker executive
 PRE_LINK_ORDER =
-POST_LINK_ORDER = @ln -sf $(TAGS_DIR)$(TARGET) $(PROGRAM)
+POST_LINK_ORDER = ln -sf $(TAGS_DIR)$(TARGET) $(PROGRAM)
 
 # finally, we MUST include make framework to complete the job
 include  pattern.mk

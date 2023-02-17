@@ -68,7 +68,7 @@ src-$1 = $(filter-out $4,$(foreach d,$2,$(wildcard $d*.$1)) $(filter %.$1,$3))
 endef
 
 define set_obj_x
-obj-$1 = $(patsubst %.$1,$3%.o,$(notdir $2))
+obj-$1 = $(patsubst %.$1,$3%.$1.o,$(notdir $2))
 
 endef
 
@@ -95,7 +95,7 @@ PHONY := clean .mkdir .subdir .invoke all detach
 all: .mkdir .subdir .invoke $(TAGS_DIR)$(TARGET)
 
 define build_obj_x
-$$(obj-$1): $2%.o: %.$1  $(MAKEFILE_LIST)
+$$(obj-$1): $2%.$1.o: %.$1  $(MAKEFILE_LIST)
 	@echo compiling $$<
 	@$(CC) -Wp,-MT,$$@ -Wp,-MMD,$$@.d -c $$< $(INCS) $(CFLAGS) $(CFLAGS_ADDON) $3 -o $$@
 
@@ -110,11 +110,9 @@ else
 #LDFLAGS += $(if $(strip $(src-cpp) $(src-cc) $(src-cxx)), -lstdc++)
 $(TAGS_DIR)$(TARGET): LD = $(if $(strip $(src-cpp) $(src-cc) $(src-cxx)),$(G++),$(CC))
 $(TAGS_DIR)$(TARGET): $(OBJS)
-	@echo executing pre link order
 	$(shell $(PRE_LINK_ORDER))
 	@echo linking $@
-	@$(LD) -o $@ $^ $(LDFLAGS)
-	@echo executing post link order
+	$(LD) -o $@ $^ $(LDFLAGS)
 	$(shell $(POST_LINK_ORDER))
 endif
 

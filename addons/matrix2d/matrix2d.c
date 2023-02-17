@@ -72,6 +72,31 @@ void *matrix2d_raw(matrix2d_pt m)
     return &m->field[0];
 }
 
+unsigned int matrix2d_size(const matrix2d_pt m)
+{
+    if (m) {
+        return m->line * m->column * sizeof(matrix2d_ele_t);
+    }
+    return 0;
+}
+
+matrix2d_boolean_t matrix2d_equal(const matrix2d_pt left, const matrix2d_pt right)
+{
+    if (!left || !right) {
+        return 0;
+    }
+
+    if (left->column != right->column || left->line != right->line) {
+        return 0;
+    }
+
+    if ( 0 == memcmp(left->field, right->field, matrix2d_size(left))) {
+        return 1;
+    }
+
+    return 0;
+}
+
 void matrix2d_iterate_element(const matrix2d_pt m, const matrixed_iterator_fp iterator, void *args)
 {
     unsigned int i, ele_count;
@@ -213,16 +238,15 @@ matrix2d_pt matrix2d_scalar_mul(const matrix2d_pt left, const matrix2d_ele_t sca
 matrix2d_pt matrixed_transport(const matrix2d_pt src)
 {
     matrix2d_pt m;
-    unsigned int i, j, ele_count, off;
+    unsigned int i, j, off;
 
     if (!src) {
         return NULL;
     }
 
-    if (NULL == (m = matrix2d_alloc(src->line, src->column))) {
+    if (NULL == (m = matrix2d_alloc(src->column, src->line))) {
         return NULL;
     }
-    ele_count = m->line * m->column;
 
     off = 0;
     for (i = 0; i < src->column; i++) {
@@ -237,7 +261,7 @@ matrix2d_pt matrixed_transport(const matrix2d_pt src)
 matrix2d_pt matrix2d_make_identity(const unsigned int scale)
 {
     matrix2d_pt m;
-    unsigned int ele_count, i;
+    unsigned int i;
 
     if (0 == scale ) {
         return NULL;
@@ -246,7 +270,6 @@ matrix2d_pt matrix2d_make_identity(const unsigned int scale)
     if ( NULL == (m = matrix2d_alloc(scale, scale))) {
         return NULL;
     }
-    ele_count = scale * scale;
 
     for (i = 0; i < scale; i++) {
         m->field[i * scale + i] = 1;
