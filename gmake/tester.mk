@@ -52,7 +52,7 @@ LDFALGS_ADDON := -pthread -lrt -lcrypt -lm -lgtest -lgtest_main -L ./ -lnax
 # target architecture, can be one of  (X64/X8664/IA64/X86_64, X86/I386, ARM/ARM32, ARM64)
 ARCH := X64
 
-# directory to save intermediate file and output target ( ./gbuild/ by default), path MUST end with slash
+# directory to save intermediate file and output target ( ./build/ by default), path MUST end with slash
 BUILD_DIR :=
 
 # sub directory which you want to build relating by this make. using this as the top make entry
