@@ -8,8 +8,7 @@ VERSION := 1.0.1
 TARGET := $(PROGRAM).$(VERSION)
 
 # add include directory, path MUST end with slash
-INC_DIRS := 
-INC_DIRS += $(SOLUTION_DIR)include/
+INC_DIRS := $(SOLUTION_DIR)include/
 
 # add include directory, this variable allow framework force traverse and include all head files in entire directoy and it's sub directory
 # path MUST end with slash
@@ -20,7 +19,7 @@ SRC_DIRS := $(SOLUTION_DIR)src/
 
 # add source directory, this variable allow framework force traverse and include all source files in entire directoy and it's sub directory
 # path MUST end with slash
-SRC_ENTIRE_DIRS :=  $(SOLUTION_DIR)src/posix
+SRC_ENTIRE_DIRS := $(SOLUTION_DIR)src/posix
 
 # add some source file which didn't in any of $(SRC_DIRS)
 SRC_ADDON :=
@@ -64,3 +63,4 @@ POST_LINK_ORDER = ln -sf $(TAGS_DIR)$(TARGET) $(PROGRAM)
 
 # finally, we MUST include make framework to complete the job
 include  pattern.mk
+
