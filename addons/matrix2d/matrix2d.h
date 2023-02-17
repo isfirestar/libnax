@@ -54,7 +54,9 @@ matrix2d_function void *matrix2d_raw(matrix2d_pt m);
 matrix2d_function unsigned int matrix2d_size(const matrix2d_pt m);
 /* test two matrix a idential equal */
 matrix2d_function matrix2d_boolean_t matrix2d_equal(const matrix2d_pt left, const matrix2d_pt right);
+/* query element value by specify geometry position in matrix @m */
 matrix2d_function int matrix2d_query_element(const matrix2d_pt m, unsigned int line, unsigned int column, matrix2d_ele_t *output);
+/* iterate matrix @m from 3 dimemsion */
 matrix2d_function void matrix2d_iterate_element(const matrix2d_pt m, const matrixed_iterator_fp iterator, void *args);
 matrix2d_function void matrix2d_iterate_line(const matrix2d_pt m, unsigned int line, const matrixed_iterator_fp iterator, void *args);
 matrix2d_function void matrix2d_iterate_column(const matrix2d_pt m, unsigned int column, const matrixed_iterator_fp iterator, void *args);
@@ -87,7 +89,6 @@ matrix2d_function matrix2d_pt matrix2d_scalar_mul(const matrix2d_pt m, const mat
  * | 2,5,9 |
 */
 matrix2d_function matrix2d_pt matrixed_transport(const matrix2d_pt m);
-
 
 /* you will got a identity matrix like below when you specify scale==6 to invoke  @matrix2d_allocate_indentity
  * any matrix multiplied by the identity matrix is equal to itself
