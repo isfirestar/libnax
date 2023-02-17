@@ -50,6 +50,9 @@ ARCH := X64
 # directory to save intermediate file and output target ( ./gbuild/ by default), path MUST end with slash
 BUILD_DIR := build/
 
+# sub directory which you want to build relating by this make. using this as the top make entry
+SUB_DIRS :=
+
 #################################################################################################
 #      build framework, you didn't need to understand what below script have done 		#
 #################################################################################################
@@ -124,7 +127,7 @@ obj-$1 = $(patsubst %.$1,$3%.o,$(notdir $2))
 endef
 
 ifeq ($(BUILD_DIR),)
-BUILD_DIR := gbuild
+BUILD_DIR := ./build/
 endif
 
 # define the middle directory for build
@@ -141,9 +144,9 @@ VPATH := $(SRC_DIRS)
 OBJS = $(foreach i,$(SRC_SUFFIX),$(obj-$i))
 SRCS = $(foreach i,$(SRC_SUFFIX),$(src-$i))
 
-PHONY := clean .mkdir all detach
+PHONY := clean .mkdir .subdir all detach
 
-all: .mkdir $(TAGS_DIR)$(TARGET)
+all: .mkdir .subdir $(TAGS_DIR)$(TARGET)
 
 define build_obj_x
 $$(obj-$1): $2%.o: %.$1  $(MAKEFILE_LIST)
@@ -172,9 +175,13 @@ detach:
 	@if [ ! -d $(OBJS_DIR) ]; then mkdir -p $(OBJS_DIR); fi
 	@if [ ! -d $(TAGS_DIR) ]; then mkdir -p $(TAGS_DIR); fi
 
+.subdir:
+	@for i in $(SUB_DIRS); do make -C $$i; done
+	
 clean:
 	@echo cleaning project.
 	@rm -fr $(BUILD_DIR)
+	@for i in $(SUB_DIRS); do make -C $$i clean; done
 	
 .PHONY : $(PHONY)
 
