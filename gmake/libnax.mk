@@ -59,7 +59,7 @@ INVOKE_MK :=
 
 # both of below variable use to help you run shell script before/after gcc linker executive
 PRE_LINK_ORDER =
-POST_LINK_ORDER = @ln -sf $(TAGS_DIR)$(TARGET) $(PROGRAM)
+POST_LINK_ORDER = ln -sf $(TAGS_DIR)$(TARGET) $(PROGRAM)
 
 # finally, we MUST include make framework to complete the job
 include  pattern.mk
