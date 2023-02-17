@@ -1,5 +1,7 @@
 #pragma once
 
+#include "compiler.h"
+
 /* example of layout of field:  
 *      filed[3][4] := { { 1, 2, 3, 4 }, { 5, 6, 7, 8 }, { 9, 10, 11, 12 } }
  * in matrix2d:
@@ -18,6 +20,10 @@ typedef matrix2d_ele_t (*metriax2d_calc_fp)(matrix2d_ele_t left, matrix2d_ele_t 
 #define matrix2d_number_of_line(m)          (*((unsigned int *)(m) + 1))
 #define matrix2d_number_of_column(m)        (*((unsigned int *)(m) + 0))
 
+#if defined __cplusplus
+extern "C" {
+#endif
+
 static inline matrix2d_ele_t matrix2d_calc_add(matrix2d_ele_t left, matrix2d_ele_t right)
 {
     return left + right;
@@ -33,20 +39,20 @@ static inline matrix2d_ele_t matrix2d_calc_mul(matrix2d_ele_t left, matrix2d_ele
     return left * right;
 }
 
-extern void matrix2d_display(const matrix2d_pt m);
+void matrix2d_display(const matrix2d_pt m);
 
 /* assign and release method
  * after successful allocation, a standard null matrix in the meaning of methematic shall be returned
  * otherwise, return value shall be NULL */
-extern matrix2d_pt matrix2d_alloc(unsigned int line, unsigned int column);
-extern void matrix2d_free(matrix2d_pt m);
+matrix2d_pt matrix2d_alloc(unsigned int line, unsigned int column);
+void matrix2d_free(matrix2d_pt m);
 
 /* direct obtain the raw field pointer in matrix  */
-extern void *matrix2d_raw(matrix2d_pt m);
-extern int matrix2d_query_element(const matrix2d_pt m, unsigned int line, unsigned int column, matrix2d_ele_t *output);
-extern void matrix2d_iterate_element(const matrix2d_pt m, const matrixed_iterator_fp iterator, void *args);
-extern void matrix2d_iterate_line(const matrix2d_pt m, unsigned int line, const matrixed_iterator_fp iterator, void *args);
-extern void matrix2d_iterate_column(const matrix2d_pt m, unsigned int column, const matrixed_iterator_fp iterator, void *args);
+void *matrix2d_raw(matrix2d_pt m);
+int matrix2d_query_element(const matrix2d_pt m, unsigned int line, unsigned int column, matrix2d_ele_t *output);
+void matrix2d_iterate_element(const matrix2d_pt m, const matrixed_iterator_fp iterator, void *args);
+void matrix2d_iterate_line(const matrix2d_pt m, unsigned int line, const matrixed_iterator_fp iterator, void *args);
+void matrix2d_iterate_column(const matrix2d_pt m, unsigned int column, const matrixed_iterator_fp iterator, void *args);
 
 /* of course, you can invoke @matrix2d_alloc_add to implement subtract method
  * calling thread have ability to redirecte addition method during the matrix calculation by specify @addfn
@@ -54,7 +60,7 @@ extern void matrix2d_iterate_column(const matrix2d_pt m, unsigned int column, co
  *   | 1,2,3 |  +  | 7,8,9|  = | 1+7=8, 2+8=10,3+9=12 | = | 8, 10,12 |
  *   | 4,5,6 |     | 9,8,7|    | 4+9=13,5+8=13,6+7=13 |   | 13,13,13 |
  */
-extern matrix2d_pt matrix2d_add(const matrix2d_pt left, const matrix2d_pt right, const metriax2d_calc_fp addfn);
+matrix2d_pt matrix2d_add(const matrix2d_pt left, const matrix2d_pt right, const metriax2d_calc_fp addfn);
 
 /*  numer of column of matrix A MUST equal to numer of line of matrix B
  *  calling thread have ability to redirecte multiply and addition method during the matrix calculation by specify @mulfn and @addfn
@@ -63,8 +69,8 @@ extern matrix2d_pt matrix2d_add(const matrix2d_pt left, const matrix2d_pt right,
  *  | 4,5,6 |     | 1,2,3|    | 4*7+5*1+6*4=57 4*8+5*2+6*5=72 4*9+5*3+6*6=87 |   | 57,72,87 |
  *                | 4,5,6|
  */
-extern matrix2d_pt matrix2d_mul(const matrix2d_pt left, const matrix2d_pt right, const metriax2d_calc_fp mulfn, const metriax2d_calc_fp addfn);
-extern matrix2d_pt matrix2d_scalar_mul(const matrix2d_pt m, const matrix2d_ele_t scalar, const metriax2d_calc_fp mulfn);
+matrix2d_pt matrix2d_mul(const matrix2d_pt left, const matrix2d_pt right, const metriax2d_calc_fp mulfn, const metriax2d_calc_fp addfn);
+matrix2d_pt matrix2d_scalar_mul(const matrix2d_pt m, const matrix2d_ele_t scalar, const metriax2d_calc_fp mulfn);
 
 /* transport line and column element order like below
  *
@@ -75,7 +81,7 @@ extern matrix2d_pt matrix2d_scalar_mul(const matrix2d_pt m, const matrix2d_ele_t
  * | 1,4,7 |
  * | 2,5,9 |
 */
-extern matrix2d_pt matrixed_transport(const matrix2d_pt m);
+matrix2d_pt matrixed_transport(const matrix2d_pt m);
 
 
 /* you will got a identity matrix like below when you specify scale==6 to invoke  @matrix2d_allocate_indentity
@@ -88,4 +94,8 @@ extern matrix2d_pt matrixed_transport(const matrix2d_pt m);
  * | 0,0,0,0,1,0 |
  * | 0,0,0,0,0,1 |
 */
-extern matrix2d_pt matrix2d_make_identity(const unsigned int scale);
+matrix2d_pt matrix2d_make_identity(const unsigned int scale);
+    
+#if defined __cplusplus
+}
+#endif
