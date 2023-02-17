@@ -235,7 +235,7 @@ matrix2d_pt matrix2d_scalar_mul(const matrix2d_pt left, const matrix2d_ele_t sca
     return m;
 }
 
-matrix2d_pt matrixed_transport(const matrix2d_pt src)
+matrix2d_pt matrix2d_transport(const matrix2d_pt src)
 {
     matrix2d_pt m;
     unsigned int i, j, off;
