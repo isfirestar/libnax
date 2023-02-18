@@ -57,7 +57,7 @@ namespace nsp {
         std::string to_string(const double d)
         {
             char tmp[64];
-            crt_sprintf(tmp, cchof(tmp), "%.6f", d);
+            crt_sprintf(tmp, sizeof_array(tmp), "%.6f", d);
             return std::string().assign(tmp);
         }
 
@@ -65,7 +65,7 @@ namespace nsp {
         std::string to_string(const uint16_t d)
         {
             char tmp[64];
-            crt_sprintf(tmp, cchof(tmp), "%u", d);
+            crt_sprintf(tmp, sizeof_array(tmp), "%u", d);
             return std::string().assign(tmp);
         }
 
@@ -73,7 +73,7 @@ namespace nsp {
         std::string to_string(const int16_t d)
         {
             char tmp[64];
-            crt_sprintf(tmp, cchof(tmp), "%d", d);
+            crt_sprintf(tmp, sizeof_array(tmp), "%d", d);
             return std::string().assign(tmp);
         }
 
@@ -81,7 +81,7 @@ namespace nsp {
         std::string to_string(const uint32_t d)
         {
             char tmp[64];
-            crt_sprintf(tmp, cchof(tmp), "%u", d);
+            crt_sprintf(tmp, sizeof_array(tmp), "%u", d);
             return std::string().assign(tmp);
         }
 
@@ -89,7 +89,7 @@ namespace nsp {
         std::string to_string(const int32_t d)
         {
             char tmp[64];
-            crt_sprintf(tmp, cchof(tmp), "%d", d);
+            crt_sprintf(tmp, sizeof_array(tmp), "%d", d);
             return std::string().assign(tmp);
         }
 
@@ -97,7 +97,7 @@ namespace nsp {
         std::string to_string(const uint64_t d)
         {
             char tmp[64];
-            crt_sprintf(tmp, cchof(tmp), UINT64_STRFMT, d);
+            crt_sprintf(tmp, sizeof_array(tmp), UINT64_STRFMT, d);
             return std::string().assign(tmp);
         }
 
@@ -105,7 +105,7 @@ namespace nsp {
         std::string to_string(const int64_t d)
         {
             char tmp[64];
-            crt_sprintf(tmp, cchof(tmp), INT64_STRFMT, d);
+            crt_sprintf(tmp, sizeof_array(tmp), INT64_STRFMT, d);
             return std::string().assign(tmp);
         }
 

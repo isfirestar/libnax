@@ -4,6 +4,7 @@
 #include "object.h"
 #include "clist.h"
 #include "avltree.h"
+#include "zmalloc.h"
 
 struct etcr_file;
 

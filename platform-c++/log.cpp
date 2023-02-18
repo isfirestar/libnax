@@ -29,7 +29,7 @@ namespace nsp {
             loex::loex(const char *module, enum log_levels level) : level_(level)
             {
                 if (module) {
-                    crt_strcpy(module_, cchof(module_), module);
+                    crt_strcpy(module_, sizeof_array(module_), module);
                 }else{
                     ifos_path_buffer_t holder;
                     if (NSP_SUCCESS(ifos_getpename(&holder))) {

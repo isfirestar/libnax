@@ -61,6 +61,11 @@ endif
 INCS := $(addprefix -I, $(INC_DIRS))
 INCS += $(foreach i,$(INC_ENTIRE_DIRS),$(addprefix -I,$(shell find $(i) -type d -exec echo {}/ \;)))
 
+define add_newline
+$1
+
+endef
+
 #src-$1 = $(foreach d,$2,$(wildcard $d*.$1))
 define set_src_x
 src-$1 = $(filter-out $4,$(foreach d,$2,$(wildcard $d*.$1)) $(filter %.$1,$3))
@@ -85,8 +90,10 @@ SRC_DIRS += $(foreach i,$(SRC_ENTIRE_DIRS),$(shell find $(i) -type d -exec echo 
 
 $(eval $(foreach i,$(SRC_SUFFIX),$(call set_src_x,$i,$(SRC_DIRS),$(SRC_ADDON),$(SRC_EXCLUDE))))
 $(eval $(foreach i,$(SRC_SUFFIX),$(call set_obj_x,$i,$(src-$i),$(OBJS_DIR))))
+$(eval $(foreach f,$(SRC_ADDON),$(call add_newline,vpath $(notdir $f) $(dir $f))))
+$(eval $(foreach d,$(SRC_DIRS),$(foreach i,$(SRC_SUFFIX),$(call add_newline,vpath %.$i $d))))
 
-VPATH := $(SRC_DIRS)
+#VPATH := $(SRC_DIRS)
 OBJS = $(foreach i,$(SRC_SUFFIX),$(obj-$i))
 SRCS = $(foreach i,$(SRC_SUFFIX),$(src-$i))
 
@@ -112,7 +119,7 @@ $(TAGS_DIR)$(TARGET): LD = $(if $(strip $(src-cpp) $(src-cc) $(src-cxx)),$(G++),
 $(TAGS_DIR)$(TARGET): $(OBJS)
 	$(shell $(PRE_LINK_ORDER))
 	@echo linking $@
-	$(LD) -o $@ $^ $(LDFLAGS)
+	@$(LD) -o $@ $^ $(LDFLAGS)
 	$(shell $(POST_LINK_ORDER))
 endif
 
@@ -135,7 +142,7 @@ clean:
 	@rm -fr $(BUILD_DIR)
 	@for i in $(SUB_DIRS); do make -C $$i clean; done
 	@for i in $(INVOKE_MK); do make -f $$i clean; done
-  
+
 .PHONY : $(PHONY)
 
 # ifneq ($(MAKECMDGOALS), clean)

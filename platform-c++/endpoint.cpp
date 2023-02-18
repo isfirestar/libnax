@@ -150,9 +150,9 @@ namespace nsp {
 		{
 			char epstr[128];
 			if ( 0 == strlen( ipstr ) ) {
-				crt_sprintf( epstr, cchof( epstr ), "0.0.0.0:%u", po );
+				crt_sprintf( epstr, sizeof_array( epstr ), "0.0.0.0:%u", po );
 			} else {
-				crt_sprintf( epstr, cchof( epstr ), "%s:%u", ipstr, po );
+				crt_sprintf( epstr, sizeof_array( epstr ), "%s:%u", ipstr, po );
 			}
 			if ( endpoint::build( epstr, *this ) < 0 ) {
 				throw toolkit::base_exception( "failed build endpoint." );
@@ -162,7 +162,7 @@ namespace nsp {
 		endpoint::endpoint( const endpoint &rf )
 		{
 			if ( &rf != this ) {
-				crt_strcpy( ipstr_, cchof( ipstr_ ), rf.ipstr_ );
+				crt_strcpy( ipstr_, sizeof_array( ipstr_ ), rf.ipstr_ );
 				address_ = rf.address_;
 				port_ = rf.port_;
 			}
@@ -170,8 +170,8 @@ namespace nsp {
 
 		endpoint::endpoint( endpoint &&rf )
 		{
-			crt_strcpy( ipstr_, cchof( ipstr_ ), rf.ipstr_ );
-			memset( rf.ipstr_, 0, cchof( rf.ipstr_ ) );
+			crt_strcpy( ipstr_, sizeof_array( ipstr_ ), rf.ipstr_ );
+			memset( rf.ipstr_, 0, sizeof_array( rf.ipstr_ ) );
 			address_ = rf.address_;
 			rf.address_ = 0;
 			port_ = rf.port_;
@@ -180,7 +180,7 @@ namespace nsp {
 
 		endpoint &endpoint::operator=( endpoint &&rf )
 		{
-			crt_strcpy( ipstr_, cchof( ipstr_ ), rf.ipstr_ );
+			crt_strcpy( ipstr_, sizeof_array( ipstr_ ), rf.ipstr_ );
 			address_ = rf.address_;
 			port_ = rf.port_;
 			return *this;
@@ -256,14 +256,14 @@ namespace nsp {
 			do {
 				// 直接是有效的IP地址
 				if ( is_effective_ipv4( ipstr ) ) {
-					crt_strcpy( ipstr_, cchof( ipstr_ ), ipstr.c_str() );
+					crt_strcpy( ipstr_, sizeof_array( ipstr_ ), ipstr.c_str() );
 					break;
 				}
 
 				// 可以解析的域名
 				std::string domain_ipstr;
 				if ( endpoint::parse_domain( ipstr, domain_ipstr ) >= 0 ) {
-					crt_strcpy( ipstr_, cchof( ipstr_ ), domain_ipstr.c_str() );
+					crt_strcpy( ipstr_, sizeof_array( ipstr_ ), domain_ipstr.c_str() );
 					break;
 				}
 
@@ -287,7 +287,7 @@ namespace nsp {
 				abuff_naos_inet_t iptxt;
 				nsp_status_t status = ::naos_ipv4tos(address_, &iptxt);
 				if ( NSP_SUCCESS(status) ) {
-					crt_strcpy( ipstr_, cchof( ipstr_ ), iptxt.u.cst );
+					crt_strcpy( ipstr_, sizeof_array( ipstr_ ), iptxt.u.cst );
 				}
 			} else {
 				memset( ipstr_, 0, sizeof( ipstr_ ) );
@@ -332,7 +332,7 @@ namespace nsp {
 			}
 
 			char epstr[128];
-			crt_sprintf( epstr, cchof( epstr ), "%s:%u", ipstr, port );
+			crt_sprintf( epstr, sizeof_array( epstr ), "%s:%u", ipstr, port );
 			return endpoint::build( std::string( epstr ), ep );
 		}
 

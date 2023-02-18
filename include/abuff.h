@@ -95,11 +95,23 @@ PORTABLEAPI(char *) crt_strrev(char *src);
 #define abuff_size(abuff)   (sizeof(*(abuff)))
 
 #if __cplusplus
-#define abuff_strcpy(abuff, src) strncpy((abuff)->u.st, src, abuff_size((abuff)) - 1)
-#define abuff_strncpy(abuff, src, n) strncpy((abuff)->u.st, src, min(n, abuff_size((abuff)) - 1))
+#define abuff_strcpy(abuff, src) do { \
+        strncpy((abuff)->u.st, src, abuff_size((abuff)) - 1); \
+        (abuff)->u.st[abuff_size((abuff)) - 1] = 0; \
+    } while(0)
+#define abuff_strncpy(abuff, src, n) do { \
+        strncpy((abuff)->u.st, src, min(n, abuff_size((abuff)) - 1));   \
+        (abuff)->u.st[min(n, abuff_size((abuff)) - 1)] = 0; \
+    } while (0)
 #else
-#define abuff_strcpy(abuff, src) strncpy((abuff)->st, src, abuff_size((abuff)) - 1)
-#define abuff_strncpy(abuff, src, n) strncpy((abuff)->st, src, min(n, abuff_size((abuff)) - 1))
+#define abuff_strcpy(abuff, src) do { \
+        strncpy((abuff)->st, src, abuff_size((abuff)) - 1); \
+        (abuff)->st[abuff_size((abuff)) - 1] = 0; \
+    } while(0)
+#define abuff_strncpy(abuff, src, n) do { \
+        strncpy((abuff)->st, src, min(n, abuff_size((abuff)) - 1));   \
+        (abuff)->st[min(n, abuff_size((abuff)) - 1)] = 0; \
+    } while (0)
 #endif
 
 #if _WIN32

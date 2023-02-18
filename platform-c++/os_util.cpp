@@ -65,7 +65,7 @@ namespace nsp {
         std::basic_string<char> get_sysdir<char>()
         {
             char buffer[MAX_PATH];
-            if (!::GetSystemDirectoryA(buffer, cchof(buffer))) {
+            if (!::GetSystemDirectoryA(buffer, sizeof_array(buffer))) {
                 return "";
             }
             return buffer;
@@ -75,7 +75,7 @@ namespace nsp {
         std::basic_string<wchar_t> get_sysdir()
         {
             wchar_t buffer[MAX_PATH];
-            if (!::GetSystemDirectoryW(buffer, cchof(buffer))) {
+            if (!::GetSystemDirectoryW(buffer, sizeof_array(buffer))) {
                 return L"";
             }
             return buffer;
@@ -96,7 +96,7 @@ namespace nsp {
             if (!SHGetPathFromIDListA(idlst, document)) {
                 return "";
             }
-            GetShortPathNameA(document, dir, cchof(dir));
+            GetShortPathNameA(document, dir, sizeof_array(dir));
             return dir;
         }
 
@@ -115,7 +115,7 @@ namespace nsp {
             if (!SHGetPathFromIDListW(idlst, document)) {
                 return L"";
             }
-            GetShortPathNameW(document, dir, cchof(dir));
+            GetShortPathNameW(document, dir, sizeof_array(dir));
             return dir;
         }
 #endif

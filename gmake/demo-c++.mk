@@ -8,9 +8,9 @@ VERSION := 1.0.1
 TARGET := $(PROGRAM)
 
 # add include directory, path MUST end with slash
-INC_DIRS := 
-INC_DIRS += $(SOLUTION_DIR)demo-c++/ 
-INC_DIRS += $(SOLUTION_DIR)include/ 
+INC_DIRS :=
+INC_DIRS += $(SOLUTION_DIR)demo-c++/
+INC_DIRS += $(SOLUTION_DIR)include/
 INC_DIRS += $(SOLUTION_DIR)platform-c++/
 
 # add include directory, this variable allow framework force traverse and include all head files in entire directoy and it's sub directory
@@ -18,7 +18,7 @@ INC_DIRS += $(SOLUTION_DIR)platform-c++/
 INC_ENTIRE_DIRS :=
 
 # add source directory, compiler shall compile all files which with $(SRC_SUFFIX) in these folders, path MUST end with slash
-SRC_DIRS := $(SOLUTION_DIR)demo-c++/ 
+#SRC_DIRS := $(SOLUTION_DIR)demo-c++/
 SRC_DIRS += $(SOLUTION_DIR)platform-c++/
 
 # add source directory, this variable allow framework force traverse and include all source files in entire directoy and it's sub directory
@@ -26,7 +26,8 @@ SRC_DIRS += $(SOLUTION_DIR)platform-c++/
 SRC_ENTIRE_DIRS :=
 
 # add some source file which didn't in any of $(SRC_DIRS)
-SRC_ADDON :=
+SRC_ADDON := $(SOLUTION_DIR)demo-c++/args.cpp
+SRC_ADDON += $(SOLUTION_DIR)demo-c++/entry.cpp
 
 # exclude some source file which maybe in one of $(SRC_DIRS)
 SRC_EXCLUDE :=
