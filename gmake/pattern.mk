@@ -90,6 +90,7 @@ SRC_DIRS += $(foreach i,$(SRC_ENTIRE_DIRS),$(shell find $(i) -type d -exec echo 
 
 $(eval $(foreach i,$(SRC_SUFFIX),$(call set_src_x,$i,$(SRC_DIRS),$(SRC_ADDON),$(SRC_EXCLUDE))))
 $(eval $(foreach i,$(SRC_SUFFIX),$(call set_obj_x,$i,$(src-$i),$(OBJS_DIR))))
+# add location of both $SRC_DIRS and $SRC_ADDON to $VPATH
 $(eval $(foreach f,$(SRC_ADDON),$(call add_newline,vpath $(notdir $f) $(dir $f))))
 $(eval $(foreach d,$(SRC_DIRS),$(foreach i,$(SRC_SUFFIX),$(call add_newline,vpath %.$i $d))))
 
