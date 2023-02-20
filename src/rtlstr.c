@@ -141,7 +141,7 @@ PORTABLEIMPL(int) rtl_strncasecmp(const char *s1, const char *s2, size_t n)
         i++;
     }
 
-    return ( (*s1 < *s2) ? -1 : ((*s1 > *s2) ? 1 : 0) );
+    return 0;
 }
 
 PORTABLEIMPL(char *) rtl_strdup(const char *s, void *(*alloc)(size_t))
