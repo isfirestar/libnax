@@ -49,8 +49,8 @@ ARCH :=
 
 # directory to save intermediate file and output target ( ./build/ by default), path MUST end with slash
 BUILD_DIR :=
-
-# invoke other makefile or subdirs
+ 
+# invoke other makefile or subdirs, using this field in the top make entry
 INVOKE := libnax.mk demo.mk tester.mk demo-c++.mk
 
 # both of below variable use to help you run shell script before/after gcc linker executive
