@@ -50,11 +50,8 @@ ARCH :=
 # directory to save intermediate file and output target ( ./build/ by default), path MUST end with slash
 BUILD_DIR :=
 
-# sub directory which you want to build relating by this make. using this as the top make entry
-SUB_DIRS := 
-
-# other makefile which you want to invoke
-INVOKE_MK := libnax.mk demo.mk tester.mk demo-c++.mk
+# invoke other makefile or subdirs
+INVOKE := libnax.mk demo.mk tester.mk demo-c++.mk
 
 # both of below variable use to help you run shell script before/after gcc linker executive
 PRE_LINK_ORDER =
