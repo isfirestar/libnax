@@ -25,3 +25,4 @@ public:
     nsp_status_t start(int argc, char **argv);
     void on_tcp_recvdata(const std::basic_string<unsigned char> &data);
 };
+
