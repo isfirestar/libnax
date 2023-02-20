@@ -175,7 +175,7 @@ void args::display_statistic(double delta)
 
     for (int i = 0; i < 4; i++) {
         if (delta < 1024) {
-            std::cout << std::setprecision(3) << delta << " " << unit[i];
+            std::cout << std::fixed << std::setprecision(2) << delta << " " << unit[i];
             return;
         }
         delta /= 1024;
