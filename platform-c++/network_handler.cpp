@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <errno.h>
 
 #include "network_handler.h"
 #include "swnet.h"
@@ -42,38 +43,52 @@ namespace nsp {
             }
         }
 
-        int obtcp::create(const char *epstr)
+        nsp_status_t obtcp::create(const char *epstr)
         {
-            if (epstr) {
-                endpoint ep;
-                if (endpoint::build(epstr, ep) >= 0) {
-                    return create(ep);
-                }
+            if (!epstr) {
+                return posix__makeerror(EINVAL);
             }
-            return -1;
+
+            if (0 == rtl_strncasecmp(epstr, "ipc:", 4)) {
+                auto status = nsp::toolkit::singleton<swnet>::instance()->tcp_create(shared_from_this(), epstr, 0);
+                if (!NSP_SUCCESS(status)) {
+                    return status;
+                }
+                return ::tcp_settst(lnk_, &tst_);
+            }
+            
+            endpoint ep;
+            auto status = endpoint::build(epstr, ep);
+            if (NSP_SUCCESS(status)) {
+                return create(ep);
+            }
+
+            return status;
         }
 
-        int obtcp::create(const endpoint &ep)
+        nsp_status_t obtcp::create(const endpoint &ep)
         {
             if (INVALID_HTCPLINK != lnk_) {
-                return -1;
+                return posix__makeerror(EINVAL);
             }
 
+            nsp_status_t status;
             std::string ipstr = ep.ipv4();
             try {
-                if (nsp::toolkit::singleton<swnet>::instance()->tcp_create(
-                        shared_from_this(), ipstr.size() > 0 ? ipstr.c_str() : nullptr, ep.port()) < 0) {
-                    return -1;
+                status = nsp::toolkit::singleton<swnet>::instance()->tcp_create(
+                        shared_from_this(), ipstr.size() > 0 ? ipstr.c_str() : nullptr, ep.port());
+                if (!NSP_SUCCESS(status)) {
+                    return status;
                 }
             } catch (...) {
-                return -1;
+                return NSP_STATUS_FATAL;
             }
 
             ::tcp_settst(lnk_, &tst_);
-            return 0;
+            return NSP_STATUS_SUCCESSFUL;
         }
 
-        int obtcp::create()
+        nsp_status_t obtcp::create()
         {
             return create(endpoint("0.0.0.0", 0));
         }
@@ -112,34 +127,50 @@ namespace nsp {
             }
         }
 
-        int obtcp::connect(const char *epstr)
+        nsp_status_t obtcp::connect(const char *epstr)
         {
             if (INVALID_HTCPLINK == lnk_) {
-                return -1;
+                return NSP_STATUS_FATAL;
             }
 
-            if (epstr) {
-                endpoint ep;
-                if (endpoint::build(epstr, ep) >= 0) {
-                    return connect(ep);
-                }
+            if (!epstr) {
+                return posix__makeerror(EINVAL);
             }
-            return -1;
+
+            nsp_status_t status;
+            if (0 == rtl_strncasecmp(epstr, "ipc:", 4)) {
+                status = ::tcp_connect(lnk_, epstr, 0);
+                if (!NSP_SUCCESS(status)) {
+                    return status;
+                }
+                remote_.ipv4("");
+                remote_.port(0);
+                local_.ipv4("");
+                local_.port(0);
+                return status;
+            } 
+            
+            endpoint ep;
+            status = endpoint::build(epstr, ep);
+            if (NSP_SUCCESS(status)) {
+                status = connect(ep);
+            }
+            return status;
         }
 
-        int obtcp::connect(const endpoint &ep)
+        nsp_status_t obtcp::connect(const endpoint &ep)
         {
             if (INVALID_HTCPLINK == lnk_) {
-                return -1;
+                return NSP_STATUS_FATAL;
             }
 
             std::string ipstr = ep.ipv4();
             port_t port = ep.port();
             if (ipstr.length() <= 0 && port <= 0) {
-                return -1;
+                return NSP_STATUS_FATAL;
             }
             if (::tcp_connect(lnk_, ipstr.c_str(), port) < 0) {
-                return -1;
+                return NSP_STATUS_FATAL;
             }
 
             // 成功连接后, 可以取出对端和本地的地址信息
@@ -151,13 +182,13 @@ namespace nsp {
             ::tcp_getaddr(lnk_, LINK_ADDR_LOCAL, &actip, &actport);
             local_.ipv4(actip);
             local_.port(actport);
-            return 0;
+            return NSP_STATUS_SUCCESSFUL;
         }
 
-		int obtcp::connect2(const char *epstr)
+		nsp_status_t obtcp::connect2(const char *epstr)
         {
 			if (INVALID_HTCPLINK == lnk_) {
-				return -1;
+				return NSP_STATUS_FATAL;
 			}
 
 			if (epstr) {
@@ -166,35 +197,35 @@ namespace nsp {
 					return connect2(ep);
 				}
 			}
-			return -1;
+			return NSP_STATUS_FATAL;
 		}
 
-		int obtcp::connect2(const endpoint &ep)
+		nsp_status_t obtcp::connect2(const endpoint &ep)
         {
 			if (INVALID_HTCPLINK == lnk_) {
-				return -1;
+				return NSP_STATUS_FATAL;
 			}
 
 			std::string ipstr = ep.ipv4();
 			port_t port = ep.port();
 			if (ipstr.length() <= 0 && port <= 0) {
-				return -1;
+				return NSP_STATUS_FATAL;
 			}
 			if (::tcp_connect2(lnk_, ipstr.c_str(), port) < 0) {
-				return -1;
+				return NSP_STATUS_FATAL;
 			}
 
-			return 0;
+			return NSP_STATUS_SUCCESSFUL;
 		}
 
-        int obtcp::listen()
+        nsp_status_t obtcp::listen()
         {
             if (INVALID_HTCPLINK == lnk_) {
-                return -1;
+                return NSP_STATUS_FATAL;
             }
 
             if (::tcp_listen(lnk_, 5) < 0) {
-                return -1;
+                return NSP_STATUS_FATAL;
             }
 
             // 开始监听后, 肯定不会再出现对端地址
@@ -206,24 +237,24 @@ namespace nsp {
             ::tcp_getaddr(lnk_, LINK_ADDR_LOCAL, &actip, &actport);
             local_.ipv4(actip);
             local_.port(actport);
-            return 0;
+            return NSP_STATUS_SUCCESSFUL;
         }
 
         // 直接发送或者组包发送的基本方法
-        int obtcp::send(const unsigned char *data, int cb)
+        nsp_status_t obtcp::send(const unsigned char *data, int cb)
         {
             if (INVALID_HTCPLINK != lnk_ && cb > 0 && data) {
                 return ::tcp_write(lnk_, data, cb, NULL);
             }
-            return -1;
+            return NSP_STATUS_FATAL;
         }
 
-        int obtcp::send(const void *origin, int cb, const nis_serializer_fp serializer)
+        nsp_status_t obtcp::send(const void *origin, int cb, const nis_serializer_fp serializer)
         {
             if (INVALID_HTCPLINK != lnk_ && cb > 0 && origin && serializer) {
                 return ::tcp_write(lnk_, origin, cb, serializer);
             }
-            return -1;
+            return NSP_STATUS_FATAL;
         }
 
         const endpoint &obtcp::local() const
@@ -326,27 +357,28 @@ namespace nsp {
             close();
         }
 
-        int obudp::create(const int flag)
+        nsp_status_t obudp::create(const int flag)
         {
             return create(endpoint("0.0.0.0", 0), flag);
         }
 
-        int obudp::create(const endpoint &ep, const int flag)
+        nsp_status_t obudp::create(const endpoint &ep, const int flag)
         {
             std::string ipstr = ep.ipv4();
             port_t port = ep.port();
 
             if (INVALID_HUDPLINK != lnk_) {
-                return -1;
+                return NSP_STATUS_FATAL;
             }
 
             try {
-                if (nsp::toolkit::singleton<swnet>::instance()->
-                        udp_create(shared_from_this(), ipstr.size() > 0 ? ipstr.c_str() : nullptr, port, flag) < 0) {
-                    return -1;
+                nsp_status_t status = nsp::toolkit::singleton<swnet>::instance()->
+                        udp_create(shared_from_this(), ipstr.size() > 0 ? ipstr.c_str() : nullptr, port, flag);
+                if (!NSP_SUCCESS(status)) {
+                    return status;
                 }
             } catch (...) {
-                return -1;
+                return NSP_STATUS_FATAL;
             }
 
             uint32_t actip;
@@ -354,10 +386,10 @@ namespace nsp {
             ::udp_getaddr(lnk_, &actip, &actport);
             local_.ipv4(actip);
             local_.port(actport);
-            return 0;
+            return NSP_STATUS_SUCCESSFUL;
         }
 
-        int obudp::create(const char *epstr, const int flag)
+        nsp_status_t obudp::create(const char *epstr, const int flag)
         {
             if (epstr) {
                 endpoint ep;
@@ -365,7 +397,7 @@ namespace nsp {
                     return create(ep, flag);
                 }
             }
-            return -1;
+            return NSP_STATUS_FATAL;
         }
 
         void obudp::close()
@@ -375,20 +407,20 @@ namespace nsp {
             }
         }
 
-        int obudp::sendto(const unsigned char *data, int cb, const endpoint &ep)
+        nsp_status_t obudp::sendto(const unsigned char *data, int cb, const endpoint &ep)
         {
             if (INVALID_HUDPLINK != lnk_ && data && cb > 0) {
                 return ::udp_write(lnk_, data, cb, ep.ipv4(), ep.port(), NULL);
             }
-            return -1;
+            return NSP_STATUS_FATAL;
         }
 
-        int obudp::sendto(const void *origin, int cb, const endpoint &ep, const nis_serializer_fp serializer)
+        nsp_status_t obudp::sendto(const void *origin, int cb, const endpoint &ep, const nis_serializer_fp serializer)
         {
             if (INVALID_HUDPLINK != lnk_ && cb > 0 && origin && serializer) {
                 return ::udp_write(lnk_, origin, cb, ep.ipv4(), ep.port(), serializer);
             }
-            return -1;
+            return NSP_STATUS_FATAL;
         }
 
         const endpoint &obudp::local() const

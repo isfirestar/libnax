@@ -89,7 +89,7 @@ namespace nsp {
             ;
         }
 
-        int swnet::tcp_create(const std::shared_ptr<obtcp> &object, const char *ipstr, const port_t port) {
+        nsp_status_t swnet::tcp_create(const std::shared_ptr<obtcp> &object, const char *ipstr, const port_t port) {
             auto lnk = ::tcp_create(&swnet::tcp_io, ipstr, port);
             if (INVALID_HTCPLINK == lnk) {
                 return -1;
@@ -99,14 +99,14 @@ namespace nsp {
             return tcp_attach(lnk, object);
         }
 
-        int swnet::tcp_attach(HTCPLINK lnk, const std::shared_ptr<obtcp> &object) {
+        nsp_status_t swnet::tcp_attach(HTCPLINK lnk, const std::shared_ptr<obtcp> &object) {
             std::lock_guard < decltype(lock_tcp_redirection_) > guard(lock_tcp_redirection_);
             // std::pair<std::unorderd_map<HTCPLINK, std::shared_ptr<obtcp>>::iterator, bool>
             auto insr = tcp_object_.insert(std::pair<HTCPLINK, std::shared_ptr<obtcp>>(lnk,object));
             if (insr.second) {
-                return 0;
+                return NSP_STATUS_SUCCESSFUL;
             }
-            return -1;
+            return NSP_STATUS_FATAL;
         }
 
         void swnet::tcp_detach(HTCPLINK lnk) {
@@ -117,14 +117,14 @@ namespace nsp {
             }
         }
 
-        int swnet::tcp_search(const HTCPLINK lnk, std::shared_ptr<obtcp> &object) const {
+        nsp_status_t swnet::tcp_search(const HTCPLINK lnk, std::shared_ptr<obtcp> &object) const {
             std::lock_guard < decltype(lock_tcp_redirection_) > guard(lock_tcp_redirection_);
             auto iter = tcp_object_.find(lnk);
             if (tcp_object_.end() != iter) {
                 object = iter->second;
-                return 0;
+                return NSP_STATUS_SUCCESSFUL;
             }
-            return -1;
+            return NSP_STATUS_FATAL;
         }
 
         void swnet::tcp_refobj(const HTCPLINK lnk, const std::function<void( const std::shared_ptr<obtcp>)> &todo) {
@@ -137,10 +137,10 @@ namespace nsp {
         }
         ///////////////////////////////////////////////////////////   UDP /////////////////////////////////////////////////////////////
 
-        int swnet::udp_create(const std::shared_ptr<obudp> &object, const char* ipstr, const port_t port, int flag) {
+        nsp_status_t swnet::udp_create(const std::shared_ptr<obudp> &object, const char* ipstr, const port_t port, int flag) {
             auto lnk = ::udp_create(&swnet::udp_io, ipstr, port, flag);
             if (INVALID_HUDPLINK == lnk) {
-                return -1;
+                return NSP_STATUS_FATAL;
             }
 
             object->setlnk(lnk);
@@ -149,9 +149,9 @@ namespace nsp {
             // std::pair<std::unorderd_map<HUDPLINK, std::shared_ptr<obudp>>::iterator, bool>
             auto insr = udp_object_.insert(std::pair<HUDPLINK, std::shared_ptr<obudp>>(lnk,object));
             if (insr.second) {
-                return 0;
+                return NSP_STATUS_SUCCESSFUL;
             }
-            return -1;
+            return NSP_STATUS_FATAL;
         }
 
         void swnet::udp_detach(HUDPLINK lnk) {
@@ -162,14 +162,14 @@ namespace nsp {
             }
         }
 
-        int swnet::udp_search(const HUDPLINK lnk, std::shared_ptr<obudp> &object) const {
+        nsp_status_t swnet::udp_search(const HUDPLINK lnk, std::shared_ptr<obudp> &object) const {
             std::lock_guard < decltype(lock_udp_redirection_) > guard(lock_udp_redirection_);
             auto iter = udp_object_.find(lnk);
             if (udp_object_.end() != iter) {
                 object = iter->second;
-                return 0;
+                return NSP_STATUS_SUCCESSFUL;
             }
-            return -1;
+            return NSP_STATUS_FATAL;
         }
 
         void swnet::udp_refobj(const HUDPLINK lnk, const std::function<void( const std::shared_ptr<obudp>)> &todo) {

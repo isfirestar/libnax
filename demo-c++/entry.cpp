@@ -1,8 +1,8 @@
-﻿#include "args.h"
+﻿#include "dispatch.h"
 
 int main(int argc, char **argv)
 {
-    auto status = nsp::toolkit::singleton<args>::instance()->load_startup_parameters(argc, argv);
+    auto status = nsp::toolkit::singleton<dispatcher>::instance()->start(argc, argv);
     if (!NSP_SUCCESS(status)) {
         return 1;
     }

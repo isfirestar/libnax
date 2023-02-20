@@ -46,8 +46,6 @@ typedef union _ULARGE_INTEGER {
 
 namespace nsp {
 	namespace os {
-
-
 		// 获取分页信息
 		uint32_t get_pagesize();
 

@@ -22,14 +22,14 @@ namespace nsp {
             mutable std::recursive_mutex lock_tcp_redirection_;
             std::unordered_map<HTCPLINK, std::shared_ptr<obtcp>> tcp_object_;
 
-            int tcp_search(const HTCPLINK lnk, std::shared_ptr<obtcp> &object) const;
+            nsp_status_t tcp_search(const HTCPLINK lnk, std::shared_ptr<obtcp> &object) const;
             void tcp_refobj(const HTCPLINK lnk, const std::function<void( const std::shared_ptr<obtcp>)> &todo);
 
             // UDP
             mutable std::recursive_mutex lock_udp_redirection_;
             std::unordered_map<HUDPLINK, std::shared_ptr<obudp>> udp_object_;
 
-            int udp_search(const HUDPLINK lnk, std::shared_ptr<obudp> &object) const;
+            nsp_status_t udp_search(const HUDPLINK lnk, std::shared_ptr<obudp> &object) const;
             void udp_refobj(const HUDPLINK lnk, const std::function<void( const std::shared_ptr<obudp>)> &todo);
 
             // c-d
@@ -44,12 +44,12 @@ namespace nsp {
 
         public:
             // TCP
-            int tcp_create(const std::shared_ptr<obtcp> &object, const char *ipstr, const port_t port);
-            int tcp_attach(HTCPLINK lnk, const std::shared_ptr<obtcp> &object);
+            nsp_status_t tcp_create(const std::shared_ptr<obtcp> &object, const char *ipstr, const port_t port);
+            nsp_status_t tcp_attach(HTCPLINK lnk, const std::shared_ptr<obtcp> &object);
             void tcp_detach(HTCPLINK lnk);
 
             // UDP
-            int udp_create(const std::shared_ptr<obudp> &object, const char* ipstr, const port_t port, int flag = UDP_FLAG_NONE);
+            nsp_status_t udp_create(const std::shared_ptr<obudp> &object, const char* ipstr, const port_t port, int flag = UDP_FLAG_NONE);
             void udp_detach(HUDPLINK lnk);
         };
     }

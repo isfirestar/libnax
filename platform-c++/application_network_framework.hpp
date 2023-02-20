@@ -36,10 +36,10 @@
 
 namespace nsp {
     namespace tcpip {
-        inline int STDCALL packet_serialize(unsigned char *dest, const void *origin, int cb)
+        inline nsp_status_t STDCALL packet_serialize(unsigned char *dest, const void *origin, int cb)
         {
             const proto::proto_interface *package = (const proto::proto_interface *)origin;
-            return (NULL != package->serialize(dest)) ? 0 : -1;
+            return (NULL != package->serialize(dest)) ? NSP_STATUS_SUCCESSFUL : NSP_STATUS_FATAL;
         }
     };
 };
@@ -101,16 +101,22 @@ namespace nsp {
             }
 
             // begin the services
-            int begin(const endpoint &ep)
+            nsp_status_t begin(const endpoint &ep)
             {
-                return ( (create(ep) >= 0) ? listen() : -1);
+                nsp_status_t status = create(ep);
+                if (NSP_SUCCESS(status)) {
+                    return listen();
+                }
+
+                return status;
             }
 
-            int begin(const std::string &epstr)
+            nsp_status_t begin(const std::string &epstr)
             {
                 endpoint ep;
-                if (endpoint::build(epstr, ep) < 0) {
-                    return -1;
+                nsp_status_t status = endpoint::build(epstr, ep);
+                if (!NSP_SUCCESS(status)) {
+                    return NSP_STATUS_FATAL;
                 }
                 return begin(ep);
             }
@@ -125,24 +131,24 @@ namespace nsp {
                 }
             }
 
-            int notify_one(HTCPLINK lnk, const std::function<int( const std::shared_ptr<T> &client)> &todo)
+            nsp_status_t notify_one(HTCPLINK lnk, const std::function<nsp_status_t(const std::shared_ptr<T> &client)> &todo)
             {
                 std::shared_ptr<T> client;
                 {
                     std::lock_guard < decltype(client_locker_) > guard(client_locker_);
                     auto iter = client_set_.find(lnk);
                     if (client_set_.end() == iter) {
-                        return -1;
+                        return NSP_STATUS_FATAL;
                     }
 
                     if (iter->second.expired()) {
-                        return -1;
+                        return NSP_STATUS_FATAL;
                     }
 
                     auto obptr = iter->second.lock();
                     if (!obptr) {
                         client_set_.erase(iter);
-                        return -1;
+                        return NSP_STATUS_FATAL;
                     }
 
                     client = std::static_pointer_cast< T >(obptr);
@@ -151,10 +157,10 @@ namespace nsp {
                 if (todo) {
                     return todo(client);
                 }
-                return -1;
+                return NSP_STATUS_FATAL;
             }
 
-            void notify_all(const std::function<void( const std::shared_ptr<T> &client)> &todo)
+            void notify_all(const std::function<void(const std::shared_ptr<T> &client)> &todo)
             {
                 std::vector<std::weak_ptr < obtcp>> duplicated;
                 {
@@ -181,15 +187,15 @@ namespace nsp {
             }
 
             // search a client object by it's HTCPLINK flag
-            int search_client_by_link(const HTCPLINK lnk, std::shared_ptr<T> &client) const
+            nsp_status_t search_client_by_link(const HTCPLINK lnk, std::shared_ptr<T> &client) const
             {
                 std::lock_guard < decltype(client_locker_) > guard(client_locker_);
                 auto iter = client_set_.find(lnk);
                 if (client_set_.end() != iter) {
                     client = std::static_pointer_cast< T >(iter->second.lock());
-                    return 0;
+                    return NSP_STATUS_SUCCESSFUL;
                 } else {
-                    return -1;
+                    return NSP_STATUS_FATAL;
                 }
             }
         };
@@ -222,13 +228,13 @@ namespace nsp {
             // if using @proto::proto_interface mode to serialize or deserialize,
             // calling thread can send packets direct by @proto::proto_interface object
             // this operation is recommended by framework
-            int psend(const proto::proto_interface *package)
+            nsp_status_t psend(const proto::proto_interface *package)
             {
                 if (!package) {
-                    return -1;
+                    return posix__makeerror(EINVAL);
                 }
 
-                return obtcp::send(package, package->length(), &nsp::tcpip::packet_serialize);
+                return obtcp::send((const void *)package, package->length(), &nsp::tcpip::packet_serialize);
             }
 
             virtual void bind_object(const std::shared_ptr<obtcp> &object) override final
@@ -238,9 +244,9 @@ namespace nsp {
 
             // overwrite this virtual method to handle the event of inital connection created
             // return negative integer value to cancel the enstablished link
-            virtual int on_established()
+            virtual nsp_status_t on_established()
             {
-                return 0;
+                return NSP_STATUS_SUCCESSFUL;
             }
         protected:
             // finalize the virtual method @on_closed, instead by @on_disconnected
@@ -284,10 +290,10 @@ namespace nsp {
             }
 
             // like tcp session, support @psend method to send packet which using proto_interface serializer
-            int psend(const proto::proto_interface *package, const endpoint &ep)
+            nsp_status_t psend(const proto::proto_interface *package, const endpoint &ep)
             {
                 if (!package) {
-                    return -1;
+                    return posix__makeerror(EINVAL);
                 }
 
                 return obudp::sendto(package, package->length(), ep, &nsp::tcpip::packet_serialize);

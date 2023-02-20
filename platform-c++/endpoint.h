@@ -58,13 +58,13 @@ namespace nsp {
         public:
             // 释义: 为什么不提供 epstr 作为参数的 endpoint 构造函数
             // epstr 的解析不一定能成功, 如果提供构造函数, 将没有任何机会返回异常, 最多只能抛出异常, 增加了客户代码捕获异常的复杂度
-            static int build(const std::string &epstr, endpoint &ep);
-            static int build(const char *ipstr, uint16_t port, endpoint &ep);
+            static nsp_status_t build(const std::string &epstr, endpoint &ep);
+            static nsp_status_t build(const char *ipstr, uint16_t port, endpoint &ep);
             static endpoint boardcast(const port_t po);
 
         public:
-            static int parse_ep(const std::string & epstr, std::string &ipv4, port_t &port);
-            static int parse_domain(const std::string &domain, std::string &ipv4);
+            static nsp_status_t parse_ep(const std::string & epstr, std::string &ipv4, port_t &port);
+            static nsp_status_t parse_domain(const std::string &domain, std::string &ipv4);
             static nsp_boolean_t is_effective_ipv4(const std::string &ipstr);
             static nsp_boolean_t is_effective_port(const std::string &portstr, uint16_t &port);
         private:

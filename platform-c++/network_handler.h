@@ -23,18 +23,18 @@ namespace nsp {
             virtual ~obtcp();
 
         public:
-            int create();
-            int create(const char *epstr);
-            int create(const endpoint &ep);
+            nsp_status_t create();
+            nsp_status_t create(const char *epstr);
+            nsp_status_t create(const endpoint &ep);
             std::weak_ptr<obtcp> attach();
             void close();
-            int connect(const char *epstr);
-            int connect(const endpoint &ep);
-            int connect2(const char *epstr);
-            int connect2(const endpoint &ep);
-            int listen();
-            int send(const void *origin, int cb, const nis_serializer_fp serializer);
-            int send(const unsigned char *data, int cb);
+            nsp_status_t connect(const char *epstr);
+            nsp_status_t connect(const endpoint &ep);
+            nsp_status_t connect2(const char *epstr);
+            nsp_status_t connect2(const endpoint &ep);
+            nsp_status_t listen();
+            nsp_status_t send(const void *origin, int cb, const nis_serializer_fp serializer);
+            nsp_status_t send(const unsigned char *data, int cb);
             const endpoint &local() const;
             const endpoint &remote() const;
 
@@ -80,12 +80,12 @@ namespace nsp {
             virtual ~obudp();
 
         public:
-            int create(const int flag = UDP_FLAG_NONE);
-            int create(const endpoint &ep, const int flag = UDP_FLAG_NONE);
-            int create(const char *epstr, const int flag = UDP_FLAG_NONE);
+            nsp_status_t create(const int flag = UDP_FLAG_NONE);
+            nsp_status_t create(const endpoint &ep, const int flag = UDP_FLAG_NONE);
+            nsp_status_t create(const char *epstr, const int flag = UDP_FLAG_NONE);
             void close();
-            int sendto(const unsigned char *data, int cb, const endpoint &ep);
-            int sendto(const void *origin, int cb, const endpoint &ep, const nis_serializer_fp serializer);
+            nsp_status_t sendto(const unsigned char *data, int cb, const endpoint &ep);
+            nsp_status_t sendto(const void *origin, int cb, const endpoint &ep, const nis_serializer_fp serializer);
 
             const endpoint &local() const;
             void setlnk(const HUDPLINK lnk);

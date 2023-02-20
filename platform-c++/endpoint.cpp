@@ -82,25 +82,26 @@ namespace nsp {
 			return YES;
 		}
 
-		int endpoint::parse_domain( const std::string &domain, std::string &ipv4 )
+		nsp_status_t endpoint::parse_domain( const std::string &domain, std::string &ipv4 )
 		{
 			uint32_t ip;
 
 			// "localhost" 可以得到正确解析
-			if (::nis_gethost( domain.c_str(), &ip ) < 0 ) {
-				return -1;
+			nsp_status_t status = ::nis_gethost( domain.c_str(), &ip );
+			if ( !NSP_SUCCESS(status) ) {
+				return status;
 			}
 
 			abuff_naos_inet_t iptxt;
-			nsp_status_t status = ::naos_ipv4tos(ip, &iptxt);
+			status = ::naos_ipv4tos(ip, &iptxt);
 			if ( !NSP_SUCCESS(status) ) {
-				return -1;
+				return status;
 			}
 			ipv4.assign( iptxt.u.cst );
-			return 0;
+			return NSP_STATUS_SUCCESSFUL;
 		}
 
-		int endpoint::parse_ep( const std::string & epstr, std::string &ipv4, port_t &port )
+		nsp_status_t endpoint::parse_ep( const std::string & epstr, std::string &ipv4, port_t &port )
 		{
 			static const std::string delim = ":";
 
@@ -112,7 +113,7 @@ namespace nsp {
 			// 找不到有效的端口分割符
 			loc = epstr.find( delim, offset );
 			if ( ( 0 == loc ) || ( std::string::npos == loc ) ) {
-				return -1;
+				return NSP_STATUS_FATAL;
 			}
 			hoststr = epstr.substr( offset, loc - offset );
 			offset = loc + 1;
@@ -120,12 +121,12 @@ namespace nsp {
 
 			// 必须要有host域
 			if ( 0 == hoststr.length() ) {
-				return -1;
+				return NSP_STATUS_FATAL;
 			}
 
 			// 端口必须保证有效
 			if ( !endpoint::is_effective_port( portstr, port ) ) {
-				return -1;
+				return NSP_STATUS_FATAL;
 			}
 
 			// host 域直接是有效的IPv4地址
@@ -133,7 +134,7 @@ namespace nsp {
 			// 数字的网络地址， 不作 gethostbyaddr 有效性判断
 			if ( endpoint::is_effective_ipv4( hoststr ) ) {
 				ipv4 = hoststr;
-				return 0;
+				return NSP_STATUS_SUCCESSFUL;
 			}
 
 			// 允许解析域名/主机名
@@ -154,7 +155,8 @@ namespace nsp {
 			} else {
 				crt_sprintf( epstr, sizeof_array( epstr ), "%s:%u", ipstr, po );
 			}
-			if ( endpoint::build( epstr, *this ) < 0 ) {
+			nsp_status_t status = endpoint::build( epstr, *this );
+			if ( !NSP_SUCCESS(status) ) {
 				throw toolkit::base_exception( "failed build endpoint." );
 			}
 		}
@@ -313,22 +315,23 @@ namespace nsp {
 			return epstr;
 		}
 
-		int endpoint::build( const std::string &epstr, endpoint &ep )
+		nsp_status_t endpoint::build( const std::string &epstr, endpoint &ep )
 		{
 			std::string ipstr;
 			port_t port;
-			if ( endpoint::parse_ep( epstr, ipstr, port ) < 0 ) {
-				return -1;
+			nsp_status_t status = endpoint::parse_ep( epstr, ipstr, port );
+			if (!NSP_SUCCESS(status)) {
+				return status;
 			}
 			ep.ipv4( ipstr );
 			ep.port( port );
-			return 0;
+			return NSP_STATUS_SUCCESSFUL;
 		}
 
-		int endpoint::build( const char *ipstr, uint16_t port, endpoint &ep )
+		nsp_status_t endpoint::build( const char *ipstr, uint16_t port, endpoint &ep )
 		{
 			if ( !ipstr ) {
-				return -1;
+				return posix__makeerror(EINVAL);
 			}
 
 			char epstr[128];
