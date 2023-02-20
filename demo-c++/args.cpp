@@ -4,6 +4,7 @@
 
 #include <getopt.h>
 #include <iostream>
+#include <iomanip>
 
 enum ope_index {
     kOptIndex_GetHelp = 'h',
@@ -174,7 +175,7 @@ void args::display_statistic(double delta)
 
     for (int i = 0; i < 4; i++) {
         if (delta < 1024) {
-            std::cout << delta << " " << unit[i];
+            std::cout << std::setprecision(3) << delta << " " << unit[i];
             return;
         }
         delta /= 1024;
