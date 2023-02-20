@@ -124,6 +124,10 @@ void dispatcher::on_tcp_recvdata(const std::basic_string<unsigned char> &data)
     }
 }
 
+void dispatcher::on_disconnected(const HTCPLINK previous)
+{
+}
+
 nsp_status_t dispatcher::start(int argc, char **argv)
 {
     nsp_status_t status = argument_.load_startup_parameters(argc, argv);
