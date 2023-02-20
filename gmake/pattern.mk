@@ -98,9 +98,9 @@ $(eval $(foreach d,$(SRC_DIRS),$(foreach i,$(SRC_SUFFIX),$(call add_newline,vpat
 OBJS = $(foreach i,$(SRC_SUFFIX),$(obj-$i))
 SRCS = $(foreach i,$(SRC_SUFFIX),$(src-$i))
 
-PHONY := clean .mkdir .subdir .invoke all detach
+PHONY := clean .mkdir .invoke all detach
 
-all: .mkdir .subdir .invoke $(TAGS_DIR)$(TARGET)
+all: .mkdir .invoke $(TAGS_DIR)$(TARGET)
 
 define build_obj_x
 $$(obj-$1): $2%.$1.o: %.$1  $(MAKEFILE_LIST)
@@ -132,17 +132,21 @@ detach:
 	@if [ ! -d $(OBJS_DIR) ]; then mkdir -p $(OBJS_DIR); fi
 	@if [ ! -d $(TAGS_DIR) ]; then mkdir -p $(TAGS_DIR); fi
 
-.subdir:
-	@for i in $(SUB_DIRS); do make -C $$i; done
-
 .invoke:
-	@for i in $(INVOKE_MK); do make -f $$i; done
+	@for i in $(INVOKE); \
+	do \
+	if [ -f $$i ]; then make -f $$i; fi;\
+	if [ -d $$i ]; then make -C $$i; fi \
+	done
 
 clean:
 	@echo cleaning project.
 	@rm -fr $(BUILD_DIR)
-	@for i in $(SUB_DIRS); do make -C $$i clean; done
-	@for i in $(INVOKE_MK); do make -f $$i clean; done
+	@for i in $(INVOKE); \
+	do \
+	if [ -f $$i ]; then make -f $$i clean; fi;\
+	if [ -d $$i ]; then make -C $$i clean; fi \
+	done
 
 .PHONY : $(PHONY)
 
