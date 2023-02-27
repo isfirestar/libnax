@@ -29,7 +29,7 @@ ifeq ($(TARGET_TYPE), $(filter $(TARGET_TYPE), exe app))
 CFLAGS += -fPIE
 endif
 ifeq ($(TARGET_TYPE), $(filter $(TARGET_TYPE), dll so))
-CFLAGS += -fPIC -fvisibility=hidden
+CFLAGS += -fPIC
 endif
 MIN_GCC_VERSION = "4.9"
 GCC_VERSION := "`$(CC) -dumpversion`"
