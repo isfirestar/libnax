@@ -25,7 +25,7 @@ void demo_session::on_recvdata(const std::basic_string<unsigned char> &data)
 
 void demo_session::on_disconnected(const HTCPLINK previous)
 {
-    nsp::toolkit::singleton<dispatcher>::instance()->on_tcp_disconnected(previous);
+    nsp::toolkit::singleton<dispatcher>::instance()->on_disconnected(previous);
 }
 
 void demo_session::on_connected()
