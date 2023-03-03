@@ -9,7 +9,7 @@ OBJCOPY := $(CROSS_COMPILER_PREFIX)objcopy
 AR := $(CROSS_COMPILER_PREFIX)ar
 
 # ld options
-LDFLAGS := -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack
+LDFLAGS := -Wl,-z,relro -Wl,-z,now -Wl,-z,noexecstack -Wl,--gc-sections
 ifeq ($(TARGET_TYPE), $(filter $(TARGET_TYPE), dll so))
 LDFLAGS += -shared
 endif
@@ -25,6 +25,7 @@ LDFLAGS += $(LDFALGS_ADDON)
 CFLAGS :=
 COMPILE_TIME := $(shell date +" %Y-%m-%d %H:%M:%S")
 CFLAGS += $(INCS) -Wall -D_GNU_SOURCE -Wno-unused-function -D_BUILTIN_VERSION="\"$(VERSION) $(COMPILE_TIME)"\"
+CFLAGS += -ffunction-sections -fdata-sections
 ifeq ($(TARGET_TYPE), $(filter $(TARGET_TYPE), exe app))
 CFLAGS += -fPIE
 endif
@@ -42,19 +43,19 @@ endif
 ifeq ($(BUILD), debug)
 CFLAGS += -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -DDEBUG=1 $(STACK_PROT)
 else
-CFLAGS += -O2 -g -funroll-loops -D NO_DEBUG -fkeep-inline-functions -Winline
+CFLAGS += -O2 -g -funroll-loops -D NO_DEBUG -fkeep-inline-functions -Winline -ftree-vectorize
 endif
 ifeq ($(ARCH), $(filter $(ARCH), X86 x86 i386))
-CFLAGS  += -m32 -D_X86 -D_FILE_OFFSET_BITS=32
+CFLAGS  += -m32 -D_X86 -DX86 -D_FILE_OFFSET_BITS=32 -DFILE_OFFSET_BITS=32
 endif
 ifeq ($(ARCH), $(filter $(ARCH), X64 x64 x8664 X8664 IA64 X86_64 x86_64))
-CFLAGS  += -D_X64 -D_X8664 -D_FILE_OFFSET_BITS=64
+CFLAGS  += -D_X64 -DX64 -D_X8664 -DX8664 -D_FILE_OFFSET_BITS=64 -DFILE_OFFSET_BITS=64
 endif
 ifeq ($(ARCH), $(filter $(ARCH), ARM ARM32 arm arm32))
-CFLAGS  += -mfloat-abi=hard -mfpu=neon -D_ARM32 -D_FILE_OFFSET_BITS=32
+CFLAGS  += -mfloat-abi=hard -mfpu=neon -D_ARM32 -DARM32 -D_FILE_OFFSET_BITS=32 -DFILE_OFFSET_BITS=32
 endif
 ifeq ($(ARCH), $(filter $(ARCH), ARM64))
-CFLAGS  += -mfloat-abi=hard -mfpu=neon -D_ARM64 -D_FILE_OFFSET_BITS=64
+CFLAGS  += -mfloat-abi=hard -mfpu=neon -D_ARM64 -DARM64 -D_FILE_OFFSET_BITS=64 -DFILE_OFFSET_BITS=64
 endif
 
 # all includes
