@@ -458,47 +458,48 @@ PORTABLEIMPL(void) log_flush()
     } while (node);
 }
 
-PORTABLEIMPL(void) log_generical_print(const char *file, int line, const char *func, const char *fmt, ...)
+PORTABLEIMPL(void) log_generical_print(const char *file, const char *func, int line, const char *fmt, ...)
 {
-    char buffer[1024];
+    char buffer[1024], *pbuff;
     int pos;
-    va_list ap;
+    va_list ap,aq;
     int written;
-
-    pos = 0;
-    if (file && (pos < sizeof(buffer))) {
-        written = snprintf(buffer + pos, sizeof(buffer) - pos, "[%s:%d]", file, line);
-        if (written >= (sizeof(buffer) - pos)) {
-            return;
-        }
-        pos += written;
-    }
-
-    if (func && (pos < sizeof(buffer))) {
-        written = snprintf(buffer + pos, sizeof(buffer) - pos, "[%s] ", func);
-        if (written >= (sizeof(buffer) - pos)) {
-            return;
-        }
-        pos += written;
-    }
-
-    if (fmt && (pos < sizeof(buffer) - 4)) {
-        va_start(ap, fmt);
-        written = vsnprintf(buffer + pos, sizeof(buffer) - pos - 4, fmt, ap);
-        va_end(ap);
-        if (written >= (sizeof(buffer) - pos - 4)) {
-            return;
-        }
-        pos += written;
-    }
+    const char *slash;
+    int total;
 	
-     if (pos < sizeof(buffer) - 1) {
-	 written = snprintf(buffer + pos, sizeof(buffer) - pos, "%s", "\n");
-        if (written >= (sizeof(buffer) - pos)) {
-            return;
-        }
-	pos += written;
-     }
-
-    write(1, buffer, pos);
+    slash = strrchr(file, '/');
+    if (slash) {
+        slash++;
+    } else {
+        slash = file;
+    }
+    total = 0;
+    pbuff = buffer;
+	
+    va_start(ap,fmt);
+    va_copy(aq, ap);
+	
+    total = snprintf(NULL, 0, "[%s:%d] \n", slash, line;
+    total += vsnprintf(NULL, 0, fmt, aq);
+    do {
+	    if (total >= sizeof(buffer)) {
+		    pbuff = (char *)malloc(total + 1);
+		    if (!pbuff) {
+			    break;
+		    }
+	    }
+	    
+	    pos = 0;
+	    pos += snprintf(pbuff + pos, total - pos, "[%s:%d] ", slash, line);
+	    pos += vsnprintf(pbuff + pos, total - pos, fmt, ap);
+	    
+	    write(1, pbuff, pos);
+    }while(0);
+    
+    if (pbuff != &buffer[0]) {
+	    free(pbuff);
+    }
+    va_end(aq);
+    va_end(ap);
 }
+		     
