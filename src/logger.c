@@ -485,12 +485,20 @@ PORTABLEIMPL(void) log_generical_print(const char *file, int line, const char *f
     if (fmt && (pos < sizeof(buffer) - 4)) {
         va_start(ap, fmt);
         written = vsnprintf(buffer + pos, sizeof(buffer) - pos - 4, fmt, ap);
+        va_end(ap);
         if (written >= (sizeof(buffer) - pos - 4)) {
             return;
         }
         pos += written;
-        va_end(ap);
     }
+	
+     if (pos < sizeof(buffer) - 1) {
+	 written = snprintf(buffer + pos, sizeof(buffer) - pos, "%s", "\n");
+        if (written >= (sizeof(buffer) - pos)) {
+            return;
+        }
+	pos += written;
+     }
 
-    printf("%s\n", buffer);
+    write(1, buffer, pos);
 }
