@@ -463,10 +463,9 @@ PORTABLEIMPL(void) log_generical_print(const char *file, const char *func, int l
     char buffer[1024], *pbuff;
     int pos;
     va_list ap,aq;
-    int written;
     const char *slash;
     int total;
-	
+
     slash = strrchr(file, '/');
     if (slash) {
         slash++;
@@ -475,11 +474,11 @@ PORTABLEIMPL(void) log_generical_print(const char *file, const char *func, int l
     }
     total = 0;
     pbuff = buffer;
-	
+
     va_start(ap,fmt);
     va_copy(aq, ap);
-	
-    total = snprintf(NULL, 0, "[%s:%d] \n", slash, line;
+
+    total = snprintf(NULL, 0, "[%s:%d] \n", slash, line);
     total += vsnprintf(NULL, 0, fmt, aq);
     do {
 	    if (total >= sizeof(buffer)) {
@@ -488,18 +487,18 @@ PORTABLEIMPL(void) log_generical_print(const char *file, const char *func, int l
 			    break;
 		    }
 	    }
-	    
+
 	    pos = 0;
 	    pos += snprintf(pbuff + pos, total - pos, "[%s:%d] ", slash, line);
 	    pos += vsnprintf(pbuff + pos, total - pos, fmt, ap);
-	    
+
 	    write(1, pbuff, pos);
     }while(0);
-    
+
     if (pbuff != &buffer[0]) {
 	    free(pbuff);
     }
     va_end(aq);
     va_end(ap);
 }
-		     
+

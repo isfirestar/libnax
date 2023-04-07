@@ -27,7 +27,7 @@ PORTABLEAPI(void) log_init2(const char *rootdir);
 PORTABLEAPI(void) log_write(const char *module, enum log_levels level, int target, const char *format, ...);
 PORTABLEAPI(void) log_save(const char *module, enum log_levels level, int target, const char *format, ...);
 PORTABLEAPI(void) log_flush();
-PORTABLEIMPL(void) log_generical_print(const char *file, int line, const char *func, const char *fmt, ...);
+PORTABLEIMPL(void) log_generical_print(const char *file, const char *func, int line, const char *fmt, ...);
 
 #if _WIN32
 #define xprint(fmt, arg...) log_generical_print(NULL, NULL, NULL, fmt, ##__VA_ARGS__)
