@@ -52,7 +52,7 @@ struct _lwp_t
 };
 
 #define LWP_TYPE_INIT \
-           { .pid_ = 0, .key = 0 }
+           { .pid = 0, .key = 0 }
 
 #define LWP_TYPE_DECLARE(name)    \
             struct _lwp_t name = LWP_TYPE_INIT
