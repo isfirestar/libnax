@@ -40,7 +40,7 @@ BUILD := debug
 CROSS_COMPILER_PREFIX :=
 
 # user define complie-time options
-CFLAGS_ADDON := -D__USE_MISC
+CFLAGS_ADDON := -D__USE_MISC -fvisibility=hidden
 
 # user define link-time options
 LDFALGS_ADDON := -ldl

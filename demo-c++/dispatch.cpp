@@ -100,7 +100,7 @@ nsp_status_t dispatcher::start_client()
 
         // 开始进行统计
         int elapse = 0;
-        std::cout << "Tx\t\t" << "Rx" << std::endl;
+        std::cout << "Tx\t\t\t" << "Rx" << std::endl;
         while (1) {
             std::this_thread::sleep_for(std::chrono::seconds(1));
             elapse++;
@@ -124,6 +124,10 @@ void dispatcher::on_tcp_recvdata(const std::basic_string<unsigned char> &data)
     }
 }
 
+void dispatcher::on_disconnected(const HTCPLINK previous)
+{
+}
+
 nsp_status_t dispatcher::start(int argc, char **argv)
 {
     nsp_status_t status = argument_.load_startup_parameters(argc, argv);
@@ -142,3 +146,4 @@ nsp_status_t dispatcher::start(int argc, char **argv)
 
     return NSP_STATUS_SUCCESSFUL;
 }
+

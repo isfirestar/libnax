@@ -24,4 +24,6 @@ public:
     ~dispatcher();
     nsp_status_t start(int argc, char **argv);
     void on_tcp_recvdata(const std::basic_string<unsigned char> &data);
+    void on_disconnected(const HTCPLINK previous);
 };
+
