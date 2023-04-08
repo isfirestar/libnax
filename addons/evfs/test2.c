@@ -137,7 +137,7 @@ void evfs_test_read_entry_data(evfs_entry_handle_t handle, char *pcmd)
     if (!NSP_SUCCESS(status)) {
         printf("failed seek entry offset to %d\n", off);
         return;
-    }   
+    }
 
     buffer = (char *)malloc(maxlen + 1);
     if (!buffer) {
@@ -159,7 +159,7 @@ void evfs_test_read_entry_data(evfs_entry_handle_t handle, char *pcmd)
     nsp_status_t status;
     size_t bufferlen;
     char *buffer;
-    
+
     count = strsplit(pcmd, symbol, target, 2);
     if (count < 1) {
         printf("usage : evfs write [data][offset] \n");
@@ -172,7 +172,7 @@ void evfs_test_read_entry_data(evfs_entry_handle_t handle, char *pcmd)
         if (!NSP_SUCCESS(status)) {
             printf("failed seek entry offset to %d\n", off);
             return;
-        }   
+        }
     }
 
     bufferlen = strlen(target[0]) + 1;

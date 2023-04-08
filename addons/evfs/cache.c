@@ -6,6 +6,7 @@
 #include "atom.h"
 #include "threading.h"
 #include "clock.h"
+#include "logger.h"
 
 enum evfs_cache_node_state {
     kEvfsCacheBlockIdle = 0,
@@ -20,7 +21,7 @@ struct evfs_cache_node {
         struct list_head element_of_lru;            /* element of lru list */
         struct list_head element_of_idle;           /* element of idle list */
     };
-    struct list_head element_of_dirty;          /* element of dirty list */  
+    struct list_head element_of_dirty;          /* element of dirty list */
     int cluster_id;
     int state;
     unsigned char *data;
@@ -95,8 +96,8 @@ static struct {
     .cache_cluster_count = 0,
     .statistics = { 0, 0 },
     .merge = { .
-        thread = LWP_TYPE_INIT, 
-        .stop = 0,     
+        thread = LWP_TYPE_INIT,
+        .stop = 0,
         .io = { LIST_HEAD_INIT(__evfs_cache_mgr.merge.io.head), 0 },
         .mutex = { PTHREAD_MUTEX_INITIALIZER } },
     .ready = 0,
@@ -143,7 +144,7 @@ struct evfs_cache_node *__evfs_cache_search_lru(int cluster_id)
     if (!found) {
         return NULL;
     }
-        
+
     node = container_of(found, struct evfs_cache_node, leaf_of_lru_index);
     return node;
 }
@@ -262,13 +263,13 @@ static nsp_status_t __evfs_cache_write_to_lru(int cluster_id, const unsigned cha
     return NSP_STATUS_SUCCESSFUL;
 }
 
-/* try to fetch node from idle list and read from harddisk, 
+/* try to fetch node from idle list and read from harddisk,
  * on success, save this node to lru list and return successful, otherwise return error code */
 static nsp_status_t __evfs_cache_read_from_idle(int cluster_id, unsigned char *data, int offset, int length)
 {
     struct evfs_cache_node *node;
     nsp_status_t status;
-    
+
     node = __evfs_cache_pop_idle();
     if (!node) {
         return posix__makeerror(ENOMEM);
@@ -322,7 +323,7 @@ static nsp_status_t __evfs_cache_write_to_idle(int cluster_id, const unsigned ch
     return status;
 }
 
-/* read cluster data from harddisk, and replace the head node of lru list 
+/* read cluster data from harddisk, and replace the head node of lru list
  * if the replace node state is dirty, write it to harddisk
  * the node will be move to tail lru list and use to save user data in which cluster specify now
 */
@@ -352,11 +353,11 @@ static nsp_status_t __evfs_cache_replace_read_from_lru(int cluster_id, unsigned 
     /* copy data to user buffer */
     memcpy(data, node->data + offset, length);
     /* push to lru list */
-    __evfs_cache_push_lru(node); 
+    __evfs_cache_push_lru(node);
     return status;
 }
 
-/* write cluster data to harddisk, and replace the head node of lru list 
+/* write cluster data to harddisk, and replace the head node of lru list
  * if the replace node state is dirty, write it to harddisk
  * the node will be move to tail lru list and use to save user data in which cluster specify now */
 static nsp_status_t __evfs_cache_replace_write_to_lru(int cluster_id, const unsigned char *data, int offset, int length)
@@ -385,7 +386,7 @@ static nsp_status_t __evfs_cache_replace_write_to_lru(int cluster_id, const unsi
     /* set node state to dirty */
     __evfs_cache_push_dirty(node);
     /* push to lru list */
-    __evfs_cache_push_lru(node); 
+    __evfs_cache_push_lru(node);
     return status;
 }
 
@@ -431,7 +432,7 @@ static nsp_status_t __evfs_cache_write_harddisk(int cluster_id, const unsigned c
 /* read from cache
  * step 1, search the clsuter id in lru index, if found, copy data to user buffer and return successful
  * step 2, try to fetch node from idle list and read from harddisk,and save this node to lru list and return successful
- * step 3, replace the head node of lru list, if the replace node state is dirty, write it to harddisk, and read from harddisk, 
+ * step 3, replace the head node of lru list, if the replace node state is dirty, write it to harddisk, and read from harddisk,
  *          move the node to tail lru list and use to save user data in which cluster specify now.
  * step 4, if step 3 failed, return error code */
 static nsp_status_t __evfs_cache_read(int cluster_id, unsigned char *data, int offset, int length)
@@ -539,7 +540,7 @@ static nsp_status_t __evfs_cache_init_merge_thread()
     __evfs_cache_mgr.merge.stop = 0;
     INIT_LIST_HEAD(&__evfs_cache_mgr.merge.io.head);
     lwp_mutex_init(&__evfs_cache_mgr.merge.mutex, 0);
-    lwp_event_init(&__evfs_cache_mgr.merge.cond, LWPEC_SYNC);
+    lwp_event_init(&__evfs_cache_mgr.merge.cond, LWPEC_NOTIFY);
     return lwp_create(&__evfs_cache_mgr.merge.thread, 0, __evfs_cache_thread_merge_io, NULL);
 }
 
@@ -583,7 +584,7 @@ nsp_status_t evfs_cache_init(int cache_cluster_count)
     } else {
         atom_set(&__evfs_cache_mgr.ready, kEvmgrReady);
     }
-    
+
     return status;
 }
 
@@ -635,7 +636,7 @@ void evfs_cache_uninit()
 
     /* step 2. flush all dirty blocks */
     __evfs_cache_flush_buffer_all();
-    
+
     /* step 3. remove all nodes from lru list and free their memory */
     while (!list_empty(&__evfs_cache_mgr.lru.head)) {
         struct evfs_cache_node *node = container_of(__evfs_cache_mgr.lru.head.next, struct evfs_cache_node, element_of_lru);
@@ -672,7 +673,7 @@ void evfs_cache_uninit()
     atom_set(&__evfs_cache_mgr.ready, kEvmgrNotReady);
 }
 
-/* build a read task and insert it into the merge io list, ask the merge io thread to read the data from harddisk 
+/* build a read task and insert it into the merge io list, ask the merge io thread to read the data from harddisk
  * this proc will wait until the merge io thread read the data from harddisk and copy the data to the output buffer */
 nsp_status_t evfs_cache_read(int cluster_id, void *output, int offset, int length)
 {
@@ -721,7 +722,7 @@ nsp_status_t evfs_cache_read_userdata(int cluster_id, void *output, int offset, 
     return evfs_cache_read(cluster_id, output, offset + sizeof(struct evfs_cluster), length);
 }
 
-/* build a directly disk read task and insert it into the merge io list, ask the merge io thread to read the data from harddisk 
+/* build a directly disk read task and insert it into the merge io list, ask the merge io thread to read the data from harddisk
  * this proc will wait until the merge io thread read the data from harddisk and copy the data to the output buffer */
 nsp_status_t evfs_cache_read_directly(int cluster_id, void *output)
 {
@@ -787,7 +788,7 @@ nsp_status_t evfs_cache_read_head_directly(int cluster_id, evfs_cluster_pt clust
     return __evfs_cache_wait_background_compelete(task);
 }
 
-/* build a write task and insert it into the merge io list, ask the merge io thread to write the data to cache node 
+/* build a write task and insert it into the merge io list, ask the merge io thread to write the data to cache node
  * this proc will wait until the merge io thread write the data to cache node */
 nsp_status_t evfs_cache_write(int cluster_id, const void *input, int offset, int length)
 {
@@ -795,8 +796,8 @@ nsp_status_t evfs_cache_write(int cluster_id, const void *input, int offset, int
     nsp_status_t status;
 
     /* we didn't allow write zero cluster to cache */
-    if (cluster_id <= 0 || !input || offset < 0 || length < 0 || 
-        offset + length > __evfs_cache_mgr.cluster_size - sizeof(struct evfs_cluster) || kEvmgrReady != atom_get(&__evfs_cache_mgr.ready)) 
+    if (cluster_id <= 0 || !input || offset < 0 || length < 0 ||
+        offset + length > __evfs_cache_mgr.cluster_size - sizeof(struct evfs_cluster) || kEvmgrReady != atom_get(&__evfs_cache_mgr.ready))
     {
         return posix__makeerror(EINVAL);
     }
@@ -1026,7 +1027,7 @@ static int __evfs_cache_auto_flush(uint64_t previous_flust_timestamp, int writte
 
     now = clock_monotonic();
     if ((writtens >= 10000 && now - previous_flust_timestamp >= FLUSH_TIME_PERIOD_10000) ||
-        (writtens >= 10 && now - previous_flust_timestamp >= FLUSH_TIME_PERIOD_10) || 
+        (writtens >= 10 && now - previous_flust_timestamp >= FLUSH_TIME_PERIOD_10) ||
         (writtens >= 1 && now - previous_flust_timestamp >= FLUSH_TIME_PERIOD_1))
     {
         __evfs_cache_flush_buffer_all();
@@ -1037,95 +1038,84 @@ static int __evfs_cache_auto_flush(uint64_t previous_flust_timestamp, int writte
     return writtens;
 }
 
+/* execute task */
+static void __evfs_cache_exec_task(struct evfs_cache_io_task *task)
+{
+    switch(task->io_type) {
+    case kEvfsCacheIOTypeRead:
+        task->status = __evfs_cache_read(task->cluster_id, task->data, task->offset, task->length);
+        break;
+    case kEvfsCacheIOTypeReadDirectly:
+        task->status = evfs_cluster_read(task->cluster_id, task->data);
+        break;
+    case kEvfsCacheIOTypeReadHeadDirectly:
+        task->status = evfs_cluster_read_head(task->cluster_id, (struct evfs_cluster *)task->data);
+        break;
+    case kEvfsCacheIOTypeWrite:
+        task->status = __evfs_cache_write(task->cluster_id, task->data, task->offset, task->length);
+        break;
+    case kEvfsCacheIOTypeWriteDirectly:
+        task->status = evfs_cluster_write(task->cluster_id, task->data);
+        break;
+    case kEvfsCacheIOTypeFlushBufferAll:
+        __evfs_cache_flush_buffer_all();
+        task->status = NSP_STATUS_SUCCESSFUL;
+        break;
+    case kEvfsCacheIOTypeFlushBuffer:
+        __evfs_cache_flush_block(task->cluster_id);
+        task->status = NSP_STATUS_SUCCESSFUL;
+        break;
+    case kEvfsCacheIOTypeAddCacheBlock:
+        task->status = (0 == __evfs_cache_add_block_to_idle(task->length)) ?
+            posix__makeerror(ENOMEM) : NSP_STATUS_SUCCESSFUL;
+        break;
+    default:
+        task->status = posix__makeerror(EINVAL);
+        break;
+    }
+
+    if (!task->no_wait) {
+        lwp_event_awaken(&task->cond);
+    }
+}
+
 static void *__evfs_cache_thread_merge_io(void *parameter)
 {
     struct evfs_cache_io_task *task;
     nsp_status_t status;
-    static const int expire = 5 * 1000; 
-    int writtens;
-    uint64_t previous_flust_timestamp; 
-
-    writtens = 0;
-    previous_flust_timestamp = 0;
+    static const int expire = 5 * 1000;
 
     while (!__evfs_cache_mgr.merge.stop) {
-
-        /* record the startup timestamp */
-        if (0 == previous_flust_timestamp) {
-            previous_flust_timestamp = clock_monotonic();
-        }
-
         status = lwp_event_wait(&__evfs_cache_mgr.merge.cond, expire);
         if (!NSP_SUCCESS(status)) {
             /* no any IO request happend during 5 seconds, flush all dirty block to harddisk  */
             if (NSP_FAILED_AND_ERROR_EQUAL(status, ETIMEDOUT)) {
                 __evfs_cache_flush_buffer_all();
-                previous_flust_timestamp = clock_monotonic();
-                writtens = 0;
                 continue;
             }
             lwp_event_uninit(&__evfs_cache_mgr.merge.cond);
             break;
         }
+        lwp_event_block(&__evfs_cache_mgr.merge.cond);
 
-        lwp_mutex_lock(&__evfs_cache_mgr.merge.mutex);
-        task = NULL;
-        while (!list_empty(&__evfs_cache_mgr.merge.io.head)) {
-            task = container_of(__evfs_cache_mgr.merge.io.head.next, struct evfs_cache_io_task, element);
-            list_del(&task->element);
+        dprint("merge thread wakeup");
+
+        while (1) {
+            task = NULL;
+
+            lwp_mutex_lock(&__evfs_cache_mgr.merge.mutex);
+            task = list_first_entry_or_null(&__evfs_cache_mgr.merge.io.head, struct evfs_cache_io_task, element);
+            if (!task) {
+                lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
+                break;
+            }
+
+            list_del_init(&task->element);
             __evfs_cache_mgr.merge.io.count--;
-        }
-        lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
+            lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
 
-        if (task) {
-            switch(task->io_type) {
-            case kEvfsCacheIOTypeRead:
-                task->status = __evfs_cache_read(task->cluster_id, task->data, task->offset, task->length);
-                break;
-            case kEvfsCacheIOTypeReadDirectly:
-                task->status = evfs_cluster_read(task->cluster_id, task->data);
-                break;
-            case kEvfsCacheIOTypeReadHeadDirectly:
-                task->status = evfs_cluster_read_head(task->cluster_id, (struct evfs_cluster *)task->data);
-                break;
-            case kEvfsCacheIOTypeWrite:
-                task->status = __evfs_cache_write(task->cluster_id, task->data, task->offset, task->length);
-                if (NSP_SUCCESS(task->status)) {
-                    writtens++;
-                }
-                break;
-            case kEvfsCacheIOTypeWriteDirectly:
-                task->status = evfs_cluster_write(task->cluster_id, task->data);
-                break;
-            case kEvfsCacheIOTypeFlushBufferAll:
-                __evfs_cache_flush_buffer_all();
-                task->status = NSP_STATUS_SUCCESSFUL;
-                previous_flust_timestamp = clock_monotonic();
-                writtens = 0;
-                break;
-            case kEvfsCacheIOTypeFlushBuffer:
-                __evfs_cache_flush_block(task->cluster_id);
-                task->status = NSP_STATUS_SUCCESSFUL;
-                break;
-            case kEvfsCacheIOTypeAddCacheBlock:
-                task->status = (0 == __evfs_cache_add_block_to_idle(task->length)) ? 
-                    posix__makeerror(ENOMEM) : NSP_STATUS_SUCCESSFUL;
-                break;
-            default:
-                task->status = posix__makeerror(EINVAL);
-                break;
-            }
-
-            if (task->no_wait) {
-                zfree(task);
-            } else {
-                lwp_event_awaken(&task->cond);
-            }
-        }
-
-        writtens = __evfs_cache_auto_flush(previous_flust_timestamp, writtens);
-        if (0 == writtens) {
-            previous_flust_timestamp = clock_monotonic();
+            __evfs_cache_exec_task(task);
+            zfree(task);
         }
     }
     return NULL;
