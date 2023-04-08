@@ -10,6 +10,7 @@ TARGET := $(PROGRAM)
 # add include directory, path MUST end with slash
 INC_DIRS := $(SOLUTION_DIR)include/
 INC_DIRS += $(SOLUTION_DIR)addons/evfs/
+INC_DIRS += $(SOLUTION_DIR)src/posix/
 
 # add include directory, this variable allow framework force traverse and include all head files in entire directoy and it's sub directory
 # path MUST end with slash
@@ -17,10 +18,11 @@ INC_ENTIRE_DIRS :=
 
 # add source directory, compiler shall compile all files which with $(SRC_SUFFIX) in these folders, path MUST end with slash
 SRC_DIRS := $(SOLUTION_DIR)addons/evfs/
+SRC_DIRS += $(SOLUTION_DIR)src/
 
 # add source directory, this variable allow framework force traverse and include all source files in entire directoy and it's sub directory
 # path MUST end with slash
-SRC_ENTIRE_DIRS :=
+SRC_ENTIRE_DIRS := $(SOLUTION_DIR)src/posix
 
 # add some source file which didn't in any of $(SRC_DIRS)
 SRC_ADDON :=
@@ -29,7 +31,7 @@ SRC_ADDON :=
 SRC_EXCLUDE :=
 
 # specify the extension of source file name, can be one or more of (c/cc/cpp/cxx)
-SRC_SUFFIX := c cc
+SRC_SUFFIX := c
 
 # $(TARGET_TYPE) can be one of (dll/so, exe/app, lib/archive) corresponding to (dynamic-library, executive-elf, static-archive)
 TARGET_TYPE := app
@@ -44,7 +46,7 @@ CROSS_COMPILER_PREFIX :=
 CFLAGS_ADDON := -D__USE_MISC -Wno-multichar
 
 # user define link-time options
-LDFALGS_ADDON := -pthread -lrt -lcrypt -lm -L ./ -lnax
+LDFALGS_ADDON := -pthread -lrt -lcrypt -lm
 
 # target architecture, can be one of  (X64/X8664/IA64/X86_64, X86/I386, ARM/ARM32, ARM64)
 ARCH := X64
