@@ -103,7 +103,7 @@ static struct {
     .ready = 0,
 };
 
-static nsp_status_t __evfs_cache_push_task_and_notify_run(struct evfs_cache_io_task *task);
+static nsp_status_t __evfs_cache_push_task_and_notify_run(struct evfs_cache_io_task *task, int no_wait);
 static void *__evfs_cache_thread_merge_io(void *parameter);
 static nsp_status_t __evfs_cache_wait_background_compelete(struct evfs_cache_io_task *task);
 static void __evfs_cache_flush_buffer_all();
@@ -607,10 +607,9 @@ nsp_status_t evfs_cache_add_block(int cache_cluster_count)
     task->data = NULL;
     task->no_wait = 0;
     task->io_type = kEvfsCacheIOTypeAddCacheBlock;
-    lwp_event_init(&task->cond, LWPEC_NOTIFY);
 
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task);
+    status = __evfs_cache_push_task_and_notify_run(task, 0);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return status;
@@ -693,12 +692,10 @@ nsp_status_t evfs_cache_read(int cluster_id, void *output, int offset, int lengt
     task->offset = offset;
     task->length = length;
     task->data = output;
-    task->no_wait = 0;
     task->io_type = kEvfsCacheIOTypeRead;
-    lwp_event_init(&task->cond, LWPEC_NOTIFY);
 
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task);
+    status = __evfs_cache_push_task_and_notify_run(task, 0);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return status;
@@ -741,12 +738,10 @@ nsp_status_t evfs_cache_read_directly(int cluster_id, void *output)
     task->offset = 0;
     task->length = 0;
     task->data = output;
-    task->no_wait = 0;
     task->io_type = kEvfsCacheIOTypeReadDirectly;
-    lwp_event_init(&task->cond, LWPEC_NOTIFY);
 
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task);
+    status = __evfs_cache_push_task_and_notify_run(task, 0);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return status;
@@ -773,12 +768,10 @@ nsp_status_t evfs_cache_read_head_directly(int cluster_id, evfs_cluster_pt clust
     task->offset = 0;
     task->length = 0;
     task->ptr = clusterptr;
-    task->no_wait = 0;
     task->io_type = kEvfsCacheIOTypeReadHeadDirectly;
-    lwp_event_init(&task->cond, LWPEC_NOTIFY);
 
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task);
+    status = __evfs_cache_push_task_and_notify_run(task, 0);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return status;
@@ -810,13 +803,10 @@ nsp_status_t evfs_cache_write(int cluster_id, const void *input, int offset, int
     task->offset = offset;
     task->length = length;
     task->cdata = input;
-    task->no_wait = 0;
     task->io_type = kEvfsCacheIOTypeWrite;
-    lwp_event_init(&task->cond, LWPEC_NOTIFY);
 
     /* push task to io list and awaken the io thread */
-    /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task);
+    status = __evfs_cache_push_task_and_notify_run(task, 0);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return status;
@@ -857,12 +847,10 @@ nsp_status_t evfs_cache_write_directly(int cluster_id, const void *input)
     task->offset = 0;
     task->length = 0;
     task->cdata = input;
-    task->no_wait = 0;
     task->io_type = kEvfsCacheIOTypeWriteDirectly;
-    lwp_event_init(&task->cond, LWPEC_NOTIFY);
 
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task);
+    status = __evfs_cache_push_task_and_notify_run(task, 0);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return status;
@@ -905,12 +893,10 @@ void evfs_cache_flush(int no_wait)
     task->offset = 0;
     task->length = 0;
     task->data = NULL;
-    task->no_wait = no_wait;
     task->io_type = kEvfsCacheIOTypeFlushBufferAll;
-    lwp_event_init(&task->cond, LWPEC_NOTIFY);
 
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task);
+    status = __evfs_cache_push_task_and_notify_run(task, no_wait);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return;
@@ -947,12 +933,10 @@ void evfs_cache_flush_block(int cluster_id, int no_wait)
     task->offset = 0;
     task->length = 0;
     task->data = NULL;
-    task->no_wait = no_wait;
     task->io_type = kEvfsCacheIOTypeFlushBuffer;
-    lwp_event_init(&task->cond, LWPEC_NOTIFY);
 
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task);
+    status = __evfs_cache_push_task_and_notify_run(task, no_wait);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return;
@@ -981,8 +965,13 @@ float evfs_cache_hit_rate()
     return (float)count_of_hit / ((float)count_of_hit +  count_of_miss);
 }
 
-static nsp_status_t __evfs_cache_push_task_and_notify_run(struct evfs_cache_io_task *task)
+static nsp_status_t __evfs_cache_push_task_and_notify_run(struct evfs_cache_io_task *task, int no_wait)
 {
+    task->no_wait = no_wait;
+    if (!no_wait) {
+        lwp_event_init(&task->cond, LWPEC_NOTIFY);
+    }
+
     lwp_mutex_lock(&__evfs_cache_mgr.merge.mutex);
 
     if (__evfs_cache_mgr.merge.io.count >= EVFS_MAX_IO_PENDING_COUNT) {
@@ -1076,6 +1065,8 @@ static void __evfs_cache_exec_task(struct evfs_cache_io_task *task)
 
     if (!task->no_wait) {
         lwp_event_awaken(&task->cond);
+    } else{
+        zfree(task);
     }
 }
 
@@ -1115,7 +1106,6 @@ static void *__evfs_cache_thread_merge_io(void *parameter)
             lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
 
             __evfs_cache_exec_task(task);
-            zfree(task);
         }
     }
     return NULL;

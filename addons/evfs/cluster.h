@@ -2,7 +2,7 @@
 
 #include "compiler.h"
 
-/* evfs split file to many of cluster, every cluster has it's fix length, 
+/* evfs split file to many of cluster, every cluster has it's fix length,
  *  the cluster size must be power of 2, and the cluster size must be between 32 and 4096 bytes
  *   the total file size must be less than 1GB
 */
@@ -27,8 +27,7 @@ enum evfs_ready_stat {
 
 struct evfs_cluster
 {
-    //int cluster_id;
-    int data_seg_size; /* when the cluster is the head of entry, this field indicate the size of user data (in bytes) 
+    int data_seg_size; /* when the cluster is the head of entry, this field indicate the size of user data (in bytes)
                             particularly, if this field set to -1(CLUSTER_PLACEHOLDER), this case indicate cluster has been allocated with zero data length*/
     int next_cluster_id;
     int head_cluster_id; /* whe a entry consist of more than one cluster, this field are pointer to the head cluster-id of this entry */
