@@ -12,7 +12,8 @@ struct evfs_entry_head;
 enum evfs_entry_state
 {
     kEvfsEntryActived = 0,
-    kEvfsEntryCloseWait,
+    kEvfsEntryCloseWait = 1,
+    kEvfsEntryDeleted = 2,
 };
 
 struct evfs_entry_element 
@@ -56,8 +57,8 @@ static struct {
     .max_pre_userseg = 0,
 };
 
-static nsp_status_t __evfs_entries_reference_head(int viewid, struct evfs_entry_head **output);
-static nsp_status_t __evfs_entries_reference_named_head(const char *key, struct evfs_entry_head **output);
+static nsp_status_t __evfs_entries_reference_head(int viewid, struct evfs_entry_head **output, int permission);
+static nsp_status_t __evfs_entries_reference_head_by_name(const char *key, struct evfs_entry_head **output, int permission);
 static void __evfs_entries_dereference_head(struct evfs_entry_head *entry_head);
 static nsp_status_t __evfs_entries_try_delete_head(struct evfs_entry_head *entry_head);
 
@@ -112,12 +113,12 @@ static struct evfs_entry_head *__evfs_entries_search_named_head(const char *key)
     return found ? container_of(found, struct evfs_entry_head, leaf_of_named_entries_tree) : NULL;
 }
 
-static nsp_status_t __evfs_entries_check_reference_condition(struct evfs_entry_head *entry_head)
+static nsp_status_t __evfs_entries_check_reference_condition(struct evfs_entry_head *entry_head, int permission)
 {
     nsp_status_t status;
 
     lwp_mutex_lock(&entry_head->mutex);
-    if (entry_head->state == kEvfsEntryCloseWait) {
+    if (entry_head->state & ~permission) {
         status = posix__makeerror(EBADF);
     } else {
         entry_head->refcnt++;
@@ -128,7 +129,7 @@ static nsp_status_t __evfs_entries_check_reference_condition(struct evfs_entry_h
     return status;
 }
 
-static nsp_status_t __evfs_entries_reference_head(int viewid, struct evfs_entry_head **output)
+static nsp_status_t __evfs_entries_reference_head(int viewid, struct evfs_entry_head **output, int permission)
 {
     struct evfs_entry_head *entry_head;
     nsp_status_t status;
@@ -138,7 +139,7 @@ static nsp_status_t __evfs_entries_reference_head(int viewid, struct evfs_entry_
         return posix__makeerror(ENOENT);
     }
 
-    status = __evfs_entries_check_reference_condition(entry_head);
+    status = __evfs_entries_check_reference_condition(entry_head, permission);
     if (NSP_SUCCESS(status) && output) {
         *output = entry_head;
     }
@@ -146,7 +147,7 @@ static nsp_status_t __evfs_entries_reference_head(int viewid, struct evfs_entry_
     return status;
 }
 
-static nsp_status_t __evfs_entries_reference_named_head(const char *key, struct evfs_entry_head **output)
+static nsp_status_t __evfs_entries_reference_head_by_name(const char *key, struct evfs_entry_head **output, int permission)
 {
     struct evfs_entry_head *entry_head;
     nsp_status_t status;
@@ -156,7 +157,7 @@ static nsp_status_t __evfs_entries_reference_named_head(const char *key, struct 
         return posix__makeerror(ENOENT);
     }
     
-    status = __evfs_entries_check_reference_condition(entry_head);
+    status = __evfs_entries_check_reference_condition(entry_head, permission);
     if (NSP_SUCCESS(status) && output) {
         *output = entry_head;
     }
@@ -490,7 +491,7 @@ nsp_status_t evfs_entries_create_one(const char *key, int *entry_id)
             evfs_view_move_to_idle(view);
         }
     } else {
-        status = __evfs_entries_reference_head(entry_head->viewid, NULL);
+        status = __evfs_entries_reference_head(entry_head->viewid, NULL, 0);
     }
 
     return status;
@@ -498,10 +499,10 @@ nsp_status_t evfs_entries_create_one(const char *key, int *entry_id)
 
 nsp_status_t evfs_entries_open_one(int entry_id)
 {
-    return __evfs_entries_reference_head(entry_id, NULL);
+    return __evfs_entries_reference_head(entry_id, NULL, 0);
 }
 
-nsp_status_t evfs_entries_open_one_bykey(const char *key, int *entry_id)
+nsp_status_t evfs_entries_open_one_by_name(const char *key, int *entry_id)
 {
     struct evfs_entry_head *entry_head;
     nsp_status_t status;
@@ -510,7 +511,7 @@ nsp_status_t evfs_entries_open_one_bykey(const char *key, int *entry_id)
         return posix__makeerror(EINVAL);
     }
 
-    status = __evfs_entries_reference_named_head(key, &entry_head);
+    status = __evfs_entries_reference_head_by_name(key, &entry_head, 0);
     if (!NSP_SUCCESS(status)) {
         return posix__makeerror(ENOENT); 
     }
@@ -611,7 +612,7 @@ nsp_status_t evfs_entries_truncate(int entry_id, int size)
     int quota_of_elements_diff;
     nsp_status_t status;
 
-    status = __evfs_entries_reference_head(entry_id, &entry_head);
+    status = __evfs_entries_reference_head(entry_id, &entry_head, 0);
     if (!entry_head || !NSP_SUCCESS(status)) {
         return status;
     }
@@ -677,7 +678,7 @@ void evfs_entries_flush(int entry_id)
     struct list_head *pos, *n;
     nsp_status_t status;
 
-    status = __evfs_entries_reference_head(entry_id, &entry_head);
+    status = __evfs_entries_reference_head(entry_id, &entry_head, 0);
     if (!NSP_SUCCESS(status)) {
         return;
     }
@@ -703,7 +704,7 @@ nsp_status_t evfs_entries_lock_elements(int entry_id, int offset, int size)
         return posix__makeerror(EINVAL);
     }
 
-    status = __evfs_entries_reference_head(entry_id, &entry_head);
+    status = __evfs_entries_reference_head(entry_id, &entry_head, kEvfsEntryActived | kEvfsEntryCloseWait);
     if (!entry_head || !NSP_SUCCESS(status)) {
         return status;
     }
@@ -782,12 +783,13 @@ int evfs_entries_write_data(int entry_id, const char *data, int offset, int size
     struct list_head *pos, *n;
     int cp_ele_size;
     nsp_status_t status;
+    int wrcb;
 
     if (entry_id <= 0 || !data || size <= 0) {
         return posix__makeerror(EINVAL);
     }
 
-    status = __evfs_entries_reference_head(entry_id, &entry_head);
+    status = __evfs_entries_reference_head(entry_id, &entry_head, kEvfsEntryActived | kEvfsEntryCloseWait);
     if (!entry_head || !NSP_SUCCESS(status)) {
         return status;
     }
@@ -820,22 +822,33 @@ int evfs_entries_write_data(int entry_id, const char *data, int offset, int size
         }
     }
 
-    if (!entry_next_element) {
-        if (size - cpsize > 0) {
-            return posix__makeerror(ENOSPC);
+    wrcb = 0;
+    do {
+        if (!entry_next_element) {
+            if (size - cpsize > 0) {
+                wrcb = posix__makeerror(ENOSPC);
+                break;
+            }
+            wrcb = cpsize;
+            break;
         }
-        return cpsize;
-    }
 
-    if (0 == cpremain) {
-        return cpsize;
-    }
+        if (0 == cpremain) {
+            wrcb = cpsize;
+            break;
+        }
 
-    cp_ele_size = __evfs_entries_write_element(entry_next_element, data + cpsize, element_inner_offset, cpremain);
-    if (cp_ele_size <= 0) {
-        return cp_ele_size;
-    }
-    return cp_ele_size + cpsize;
+        cp_ele_size = __evfs_entries_write_element(entry_next_element, data + cpsize, element_inner_offset, cpremain);
+        if (cp_ele_size <= 0) {
+            wrcb = cp_ele_size;
+            break;
+        }
+
+        wrcb = cpsize + cp_ele_size;
+    } while (0);
+
+    __evfs_entries_dereference_head(entry_head);
+    return wrcb;
 }
 
 static int __evfs_entries_read_element(struct evfs_entry_element *entry_element, char *data, int element_inner_offset,int size)
@@ -895,18 +908,21 @@ int evfs_entries_read_data(int entry_id, char *data, int offset, int size)
     struct list_head *pos, *n;
     nsp_status_t status;
     int data_seg_size;
+    int rdcb;
+    int cp_ele_size;
 
     if (entry_id < 0 || !data || offset < 0 || size <= 0 ) {
         return posix__makeerror(EINVAL);
     }
 
-    status = __evfs_entries_reference_head(entry_id, &entry_head);
+    status = __evfs_entries_reference_head(entry_id, &entry_head, kEvfsEntryActived | kEvfsEntryCloseWait);
     if (!entry_head || !NSP_SUCCESS(status)) {
         return status;
     }
 
     data_seg_size = evfs_view_get_data_seg_size(entry_head->view);
     if (data_seg_size <= 0) {
+        __evfs_entries_dereference_head(entry_head);
         return 0;
     }
 
@@ -917,6 +933,7 @@ int evfs_entries_read_data(int entry_id, char *data, int offset, int size)
     cpoff = sizeof(entry_head->key) + offset;
     cpremain = min(data_seg_size - cpoff, size);
     if (cpremain <= 0) {
+        __evfs_entries_dereference_head(entry_head);
         return posix__makeerror(EINVAL);
     }
 
@@ -942,23 +959,33 @@ int evfs_entries_read_data(int entry_id, char *data, int offset, int size)
         }
     }
 
-    if (!entry_next_element) {
-        /* input buffer have enough space to save data but element of entries are insufficient */
-        if (cpremain > 0 && cpsize < (data_seg_size - sizeof(entry_head->key))) {
-            return posix__makeerror(ENOSPC);
+    do {
+        if (!entry_next_element) {
+            /* input buffer have enough space to save data but element of entries are insufficient */
+            if (cpremain > 0 && cpsize < (data_seg_size - sizeof(entry_head->key))) {
+                rdcb = posix__makeerror(ENOSPC);
+                break;
+            }
+            rdcb = cpsize;
+            break;
         }
-        return cpsize;
-    }
 
-    if (0 == cpremain) {
-        return cpsize;
-    }
+        if (0 == cpremain) {
+            rdcb = cpsize;
+            break;
+        }
 
-    status = __evfs_entries_read_element(entry_next_element, data + cpsize, element_inner_offset, cpremain);
-    if (!NSP_SUCCESS(status)) {
-        return status;
-    }
-    return cpsize + status;
+        cp_ele_size = __evfs_entries_read_element(entry_next_element, data + cpsize, element_inner_offset, cpremain);
+        if (!NSP_SUCCESS(cp_ele_size)) {
+            rdcb = cp_ele_size;
+            break;
+        }
+
+        rdcb = cpsize + status;
+    } while(0);
+    
+    __evfs_entries_dereference_head(entry_head);
+    return rdcb;
 }
 
 int evfs_entries_query_key(int entry_id, char *key)
@@ -967,7 +994,7 @@ int evfs_entries_query_key(int entry_id, char *key)
     size_t n;
     nsp_status_t status;
 
-    status = __evfs_entries_reference_head(entry_id, &entry_head);
+    status = __evfs_entries_reference_head(entry_id, &entry_head, kEvfsEntryActived | kEvfsEntryCloseWait);
     if (!entry_head || !NSP_SUCCESS(status)) {
         return status;
     }
@@ -987,7 +1014,7 @@ int evfs_entries_query_user_seg_size(int entry_id)
     nsp_status_t status;
     int data_seg_size;
 
-    status = __evfs_entries_reference_head(entry_id, &entry_head);
+    status = __evfs_entries_reference_head(entry_id, &entry_head, kEvfsEntryActived | kEvfsEntryCloseWait);
     if (!entry_head || !NSP_SUCCESS(status)) {
         return status;
     }
@@ -1003,6 +1030,7 @@ int evfs_entries_query_user_seg_size(int entry_id)
 int evfs_entries_iterate(struct list_head **pos)
 {
     int viewid;
+     struct evfs_entry_head *entry_head;
 
     if (!pos) {
         return -1;
@@ -1011,14 +1039,17 @@ int evfs_entries_iterate(struct list_head **pos)
     if (!*pos) {
         *pos = __evfs_entries_mgr.head_of_entries_list.next;
     }
-    
-    if (*pos == &__evfs_entries_mgr.head_of_entries_list) {
-        return -1;
+
+    while (*pos != &__evfs_entries_mgr.head_of_entries_list) {
+        entry_head = container_of(*pos, struct evfs_entry_head, element_of_entries_list);
+        *pos = (*pos)->next;
+        if (entry_head->state == kEvfsEntryActived) { // iterate active entry
+            viewid = entry_head->viewid;
+            return viewid;
+        }
     }
 
-    viewid = container_of(*pos, struct evfs_entry_head, element_of_entries_list)->viewid;
-    *pos = (*pos)->next;
-    return viewid;
+    return -1;
 }
 
 nsp_status_t evfs_entries_soft_delete(int entry_id)
@@ -1026,12 +1057,14 @@ nsp_status_t evfs_entries_soft_delete(int entry_id)
     struct evfs_entry_head *entry_head;
     nsp_status_t status;
 
-    status = __evfs_entries_reference_head(entry_id, &entry_head);
+    status = __evfs_entries_reference_head(entry_id, &entry_head, 0);
     if (!entry_head || !NSP_SUCCESS(status)) {
         return status;
     }
 
-    return __evfs_entries_try_delete_head(entry_head);
+    status = __evfs_entries_try_delete_head(entry_head);
+    __evfs_entries_dereference_head(entry_head);
+    return status;
 }
 
 nsp_status_t evfs_entries_hard_delete(int entry_id)
@@ -1039,12 +1072,29 @@ nsp_status_t evfs_entries_hard_delete(int entry_id)
     struct evfs_entry_head *entry_head;
     nsp_status_t status;
 
-    status = __evfs_entries_reference_head(entry_id, &entry_head);
+    status = __evfs_entries_reference_head(entry_id, &entry_head, 0);
     if (!entry_head || !NSP_SUCCESS(status)) {
         return status;
     }
 
     entry_head->hard_remove_on_detach = 1;
-    return __evfs_entries_try_delete_head(entry_head);
+    status = __evfs_entries_try_delete_head(entry_head);
+    __evfs_entries_dereference_head(entry_head);
+    return status;
 }
 
+nsp_status_t evfs_entries_hard_delete_by_name(const char *key)
+{
+    struct evfs_entry_head *entry_head;
+    nsp_status_t status;
+
+    status = __evfs_entries_reference_head_by_name(key, &entry_head, 0);
+    if (!entry_head || !NSP_SUCCESS(status)) {
+        return status;
+    }
+
+    entry_head->hard_remove_on_detach = 1;
+    status = __evfs_entries_try_delete_head(entry_head);
+    __evfs_entries_dereference_head(entry_head);
+    return status;
+}

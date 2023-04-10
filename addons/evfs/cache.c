@@ -6,7 +6,6 @@
 #include "atom.h"
 #include "threading.h"
 #include "clock.h"
-#include "logger.h"
 
 enum evfs_cache_node_state {
     kEvfsCacheBlockIdle = 0,
@@ -1088,8 +1087,6 @@ static void *__evfs_cache_thread_merge_io(void *parameter)
             break;
         }
         lwp_event_block(&__evfs_cache_mgr.merge.cond);
-
-        dprint("merge thread wakeup");
 
         while (1) {
             task = NULL;

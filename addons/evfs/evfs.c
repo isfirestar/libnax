@@ -354,7 +354,7 @@ evfs_entry_handle_t evfs_open_entry_bykey(const char *key)
         return -1;
     }
 
-    status = evfs_entries_open_one_bykey(key, &descriptor->entry_id);
+    status = evfs_entries_open_one_by_name(key, &descriptor->entry_id);
     if (!NSP_SUCCESS(status)) {
         zfree(descriptor);
         return -1;
@@ -549,6 +549,15 @@ nsp_status_t evfs_earse_entry(evfs_entry_handle_t handle)
     }
     __evfs_dereference_descriptor(descriptor);
     return status;
+}
+
+nsp_status_t evfs_earse_entry_by_name(const char *name)
+{
+    if (!name) {
+        return posix__makeerror(EINVAL);
+    }
+    
+    return evfs_entries_hard_delete_by_name(name);
 }
 
 evfs_iterator_pt evfs_iterate_entries(evfs_iterator_pt iterator)

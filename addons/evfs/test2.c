@@ -8,6 +8,7 @@
 
 #include "ifos.h"
 
+// trim string specify by parameter @str
 char *strtrim(char *str)
 {
     char *end;
@@ -359,6 +360,19 @@ void evfs_test_export_entry_to_file(char *pcmd, evfs_entry_handle_t handle)
     ifos_file_close(fd);
 }
 
+void evfs_test_delete_entry_by_name(char *pcmd)
+{
+    int count;
+    char symbol = 0x20, *target[1];
+
+    count = strsplit(pcmd, symbol, target,1);
+    if (count < 1) {
+        printf("usage : evfs delete [entry name]\n");
+        return;
+    }
+    evfs_earse_entry_by_name(target[0]);
+}
+
 int main(int argc, char **argv)
 {
     char file[255], command[128], *pcmd;
@@ -452,6 +466,7 @@ int main(int argc, char **argv)
             if (handle > 0) {
                 evfs_close_entry(handle);
                 printf("close entry %d ok\n", handle);
+                handle = -1;
             }
             continue;
         }
@@ -484,11 +499,7 @@ int main(int argc, char **argv)
         }
 
         if (0 == strncmp(pcmd, "delete", 6)) {
-            if (handle < 0) {
-                printf("you must open or create a entry frist.\n");
-                continue;
-            }
-            evfs_earse_entry(handle);
+            evfs_test_delete_entry_by_name(pcmd + 6);
             continue;
         }
 
