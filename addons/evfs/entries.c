@@ -1,5 +1,7 @@
 #include "entries.h"
 
+#include "view.h"
+
 #include "zmalloc.h"
 #include "atom.h"
 #include "threading.h"
@@ -337,7 +339,7 @@ static struct evfs_entry_element *__evfs_entries_alloc_element_for_head(struct e
     return entry_element;
 }
 
-void evfs_entries_raw_recognize(struct evfs_view_node *view)
+static void __evfs_entries_raw_recognize(struct evfs_view_node *view)
 {
     struct evfs_entry_head *entry_head;
     struct evfs_entry_element  *entry_element;
@@ -363,7 +365,7 @@ void evfs_entries_raw_recognize(struct evfs_view_node *view)
     }
 }
 
-void evfs_entries_initial()
+static void __evfs_entries_init()
 {
     struct evfs_entry_head *entry_head;
     struct list_head *pos, *n;
@@ -411,6 +413,32 @@ void evfs_entries_initial()
     __evfs_entries_mgr.max_pre_userseg = evfs_view_get_max_pre_userseg();
 }
 
+nsp_status_t evfs_entries_create()
+{
+    nsp_status_t status;
+
+    status = evfs_view_create();
+    if (!NSP_SUCCESS(status)) {
+        return status;
+    }
+
+    __evfs_entries_init();
+    return status;
+}
+
+nsp_status_t evfs_entries_load()
+{
+    nsp_status_t status;
+
+    status = evfs_view_load(__evfs_entries_raw_recognize);
+    if (!NSP_SUCCESS(status)) {
+        return status;
+    }
+
+    __evfs_entries_init();
+    return status;
+}
+
 extern void evfs_entries_uninit()
 {
     struct evfs_entry_head *entry_head, *next_entry_head;
@@ -428,11 +456,8 @@ extern void evfs_entries_uninit()
         __evfs_entries_try_delete_head(entry_head);
         entry_head = next_entry_head;
     }
-}
 
-int evfs_entries_query_total_count()
-{
-    return __evfs_entries_mgr.count_of_entries;
+    evfs_view_uninit();
 }
 
 nsp_status_t evfs_entries_create_one(const char *key, int *entry_id)
@@ -981,7 +1006,7 @@ int evfs_entries_read_data(int entry_id, char *data, int offset, int size)
             break;
         }
 
-        rdcb = cpsize + status;
+        rdcb = cpsize + cp_ele_size;
     } while(0);
     
     __evfs_entries_dereference_head(entry_head);
@@ -1097,4 +1122,15 @@ nsp_status_t evfs_entries_hard_delete_by_name(const char *key)
     status = __evfs_entries_try_delete_head(entry_head);
     __evfs_entries_dereference_head(entry_head);
     return status;
+}
+
+nsp_status_t evfs_entries_soft_stat(struct evfs_entries_stat *stat)
+{
+    if (!stat) {
+        return posix__makeerror(EINVAL);
+    }
+
+    evfs_view_get_count(&stat->idle_view_count, &stat->busy_view_count);
+    stat->total_entry_count = __evfs_entries_mgr.count_of_entries;
+    return NSP_STATUS_SUCCESSFUL;
 }

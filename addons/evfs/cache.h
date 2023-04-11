@@ -7,14 +7,18 @@
  */
 
 #include "compiler.h"
-#include "avltree.h"
-#include "clist.h"
-
 #include "cluster.h"
 
 struct evfs_cache_creator {
-    int cluster_size;
-    int cluster_count;
+    int hard_cluster_size;
+    int hard_cluster_count;
+};
+
+struct evfs_cache_stat {
+    int hard_cluster_size;
+    int hard_cluster_count;
+    int hard_max_pre_userseg;
+    int cache_block_count;
 };
 
 /* init evfs cache by specify fix cluster count, and the size of single cluster.
@@ -25,8 +29,8 @@ struct evfs_cache_creator {
  * @evfs_cache_add_block function add a new cache block to cache, and it will be used to store data of cluster
  */
 extern nsp_status_t evfs_cache_init(const char *file, int cache_cluster_count, const struct evfs_cache_creator *creator);
-extern nsp_status_t evfs_cache_add_block(int cache_cluster_count);
 extern void evfs_cache_uninit();
+extern nsp_status_t evfs_cache_add_block(int cache_cluster_count);
 
 /* read entire cluster data from cache,and store in legal output parameter @data
  * @cluster_id indicate the cluster id to be read, it must be in range [0, evfs_head_record_data::cluster_count)
@@ -63,8 +67,11 @@ extern nsp_status_t evfs_cache_write_directly(int cluster_id, const void *input)
 extern void evfs_cache_flush(int no_wait);
 extern void evfs_cache_flush_block(int cluster_id, int no_wait);
 
+/* expand file */
+extern int evfs_cache_expand(int *next_cluster_id);
+
 /* caculate the rate of hit */
 extern float evfs_cache_hit_rate();
 
 /* wrap hard state */
-extern nsp_status_t evfs_cache_hard_state(struct evfs_cache_creator *creator);
+extern nsp_status_t evfs_cache_hard_state(struct evfs_cache_stat *stat);

@@ -43,9 +43,6 @@ extern int evfs_view_get_viewid(const evfs_view_pt view);
 /* get view manager count status */
 extern void evfs_view_get_count(int *freeview, int *busyview);
 
-/* get the cache hit rate */
-extern float evfs_view_get_performance();
-
 /* tunnel cluster property */
 extern int evfs_view_get_max_pre_userseg();
 

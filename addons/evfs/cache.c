@@ -6,6 +6,8 @@
 #include "atom.h"
 #include "threading.h"
 #include "clock.h"
+#include "clist.h"
+#include "avltree.h"
 
 enum evfs_cache_node_state {
     kEvfsCacheBlockIdle = 0,
@@ -48,6 +50,8 @@ enum evfs_cache_iotype
     kEvfsCacheIOTypeExpandFile,
     kEvfsCacheIOTypeAddCacheBlock,
     kEvfsCacheIOTypeHardClose,
+    kEvfsCacheIOTypeHardState,
+    kEvfsCacheIOTypeHardExpand,
 };
 
 #define EVFS_MAX_IO_PENDING_COUNT   (160)
@@ -103,7 +107,7 @@ static struct {
     .ready = 0,
 };
 
-static nsp_status_t __evfs_cache_push_task_and_notify_run(struct evfs_cache_io_task *task, int no_wait);
+static nsp_status_t __evfs_cache_push_task_and_notify_run(struct evfs_cache_io_task *task);
 static void *__evfs_cache_thread_merge_io(void *parameter);
 static nsp_status_t __evfs_cache_wait_background_compelete(struct evfs_cache_io_task *task);
 static void __evfs_cache_flush_buffer_all();
@@ -558,7 +562,7 @@ nsp_status_t evfs_cache_init(const char *file, int cache_cluster_count, const st
         return posix__makeerror(EEXIST);
     }
 
-    status = (NULL != creator) ? evfs_hard_create(file, creator->cluster_size, creator->cluster_count) : evfs_hard_open(file);
+    status = (NULL != creator) ? evfs_hard_create(file, creator->hard_cluster_size, creator->hard_cluster_count) : evfs_hard_open(file);
     if (!NSP_SUCCESS(status)) {
         atom_set(&__evfs_cache_mgr.ready, kEvmgrNotReady);
         return status;
@@ -611,11 +615,10 @@ nsp_status_t evfs_cache_add_block(int cache_cluster_count)
     task->offset = 0;
     task->length = cache_cluster_count;
     task->data = NULL;
-    task->no_wait = 0;
     task->io_type = kEvfsCacheIOTypeAddCacheBlock;
-
+    task->no_wait = 0;
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task, 0);
+    status = __evfs_cache_push_task_and_notify_run(task);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return status;
@@ -644,13 +647,13 @@ void evfs_cache_uninit()
         task->offset = 0;
         task->length = 0;
         task->data = NULL;
-        task->no_wait = 0;
         task->io_type = kEvfsCacheIOTypeHardClose;
-        status = __evfs_cache_push_task_and_notify_run(task, 0);
-        if (NSP_SUCCESS(status)) {
-            __evfs_cache_wait_background_compelete(task);
-        } else {
+        task->no_wait = 0;
+        status = __evfs_cache_push_task_and_notify_run(task);
+        if (!NSP_SUCCESS(status)) {
             zfree(task);
+        } else {
+            __evfs_cache_wait_background_compelete(task);
         }
     }
 
@@ -721,9 +724,9 @@ nsp_status_t evfs_cache_read(int cluster_id, void *output, int offset, int lengt
     task->length = length;
     task->data = output;
     task->io_type = kEvfsCacheIOTypeRead;
-
+    task->no_wait = 0;
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task, 0);
+    status = __evfs_cache_push_task_and_notify_run(task);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return status;
@@ -767,9 +770,9 @@ nsp_status_t evfs_cache_read_directly(int cluster_id, void *output)
     task->length = 0;
     task->data = output;
     task->io_type = kEvfsCacheIOTypeReadDirectly;
-
+    task->no_wait = 0;
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task, 0);
+    status = __evfs_cache_push_task_and_notify_run(task);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return status;
@@ -797,9 +800,9 @@ nsp_status_t evfs_cache_read_head_directly(int cluster_id, evfs_cluster_pt clust
     task->length = 0;
     task->ptr = clusterptr;
     task->io_type = kEvfsCacheIOTypeReadHeadDirectly;
-
+    task->no_wait = 0;
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task, 0);
+    status = __evfs_cache_push_task_and_notify_run(task);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return status;
@@ -818,7 +821,7 @@ nsp_status_t evfs_cache_write(int cluster_id, const void *input, int offset, int
 
     /* we didn't allow write zero cluster to cache */
     if (cluster_id <= 0 || !input || offset < 0 || length < 0 ||
-        offset + length > __evfs_cache_mgr.cluster_size - sizeof(struct evfs_cluster) || kEvmgrReady != atom_get(&__evfs_cache_mgr.ready))
+        offset + length > __evfs_cache_mgr.cluster_size|| kEvmgrReady != atom_get(&__evfs_cache_mgr.ready))
     {
         return posix__makeerror(EINVAL);
     }
@@ -832,9 +835,9 @@ nsp_status_t evfs_cache_write(int cluster_id, const void *input, int offset, int
     task->length = length;
     task->cdata = input;
     task->io_type = kEvfsCacheIOTypeWrite;
-
+    task->no_wait = 0;
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task, 0);
+    status = __evfs_cache_push_task_and_notify_run(task);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return status;
@@ -876,9 +879,9 @@ nsp_status_t evfs_cache_write_directly(int cluster_id, const void *input)
     task->length = 0;
     task->cdata = input;
     task->io_type = kEvfsCacheIOTypeWriteDirectly;
-
+    task->no_wait = 0;
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task, 0);
+    status = __evfs_cache_push_task_and_notify_run(task);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return status;
@@ -902,6 +905,8 @@ static void __evfs_cache_flush_buffer_all()
         node = container_of(pos, struct evfs_cache_node, element_of_dirty);
         __evfs_cache_flush_block_if_dirty(node);
     }
+
+    evfs_hard_flush();
 }
 
 void evfs_cache_flush(int no_wait)
@@ -922,9 +927,9 @@ void evfs_cache_flush(int no_wait)
     task->length = 0;
     task->data = NULL;
     task->io_type = kEvfsCacheIOTypeFlushBufferAll;
-
+    task->no_wait = no_wait;
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task, no_wait);
+    status = __evfs_cache_push_task_and_notify_run(task);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return;
@@ -962,9 +967,9 @@ void evfs_cache_flush_block(int cluster_id, int no_wait)
     task->length = 0;
     task->data = NULL;
     task->io_type = kEvfsCacheIOTypeFlushBuffer;
-
+    task->no_wait = no_wait;
     /* push task to io list and awaken the io thread */
-    status = __evfs_cache_push_task_and_notify_run(task, no_wait);
+    status = __evfs_cache_push_task_and_notify_run(task);
     if (!NSP_SUCCESS(status)) {
         zfree(task);
         return;
@@ -972,6 +977,50 @@ void evfs_cache_flush_block(int cluster_id, int no_wait)
 
     /* wait for the io thread to finish the task */
     __evfs_cache_wait_background_compelete(task);
+}
+
+void __evfs_cache_expand(struct evfs_cache_io_task *task)
+{
+    task->offset = evfs_hard_expand(&task->cluster_id);
+    task->status = task->offset > 0 ? NSP_STATUS_SUCCESSFUL : NSP_STATUS_FATAL;
+}
+
+int evfs_cache_expand(int *next_cluster_id)
+{
+    struct evfs_cache_io_task *task;
+    nsp_status_t status;
+
+    if (kEvmgrReady != atom_get(&__evfs_cache_mgr.ready)) {
+        return -1;
+    }
+
+    task = (struct evfs_cache_io_task *)ztrymalloc(sizeof(*task));
+    if (!task) {
+        return -1;
+    }
+    task->cluster_id = 0;
+    task->offset = 0;
+    task->length = 0;
+    task->data = NULL;
+    task->io_type = kEvfsCacheIOTypeHardExpand;
+    task->no_wait = 0;
+    /* push task to io list and awaken the io thread */
+    status = __evfs_cache_push_task_and_notify_run(task);
+    if (!NSP_SUCCESS(status)) {
+        zfree(task);
+        return -1;
+    }
+
+    /* wait for the io thread to finish the task */
+    status = __evfs_cache_wait_background_compelete(task);
+    if (!NSP_SUCCESS(status)) {
+        return -1;
+    }
+
+    if (next_cluster_id) {
+        *next_cluster_id = task->cluster_id;
+    }
+    return task->offset;
 }
 
 float evfs_cache_hit_rate()
@@ -993,26 +1042,45 @@ float evfs_cache_hit_rate()
     return (float)count_of_hit / ((float)count_of_hit +  count_of_miss);
 }
 
-nsp_status_t evfs_cache_hard_state(struct evfs_cache_creator *creator)
+nsp_status_t evfs_cache_hard_state(struct evfs_cache_stat *stat)
 {
-    if (!creator) {
+    struct evfs_cache_io_task *task;
+    nsp_status_t status;
+
+    if (!stat) {
         return posix__makeerror(EINVAL);
     }
 
     if (kEvmgrReady != atom_get(&__evfs_cache_mgr.ready)) {
         return posix__makeerror(ENODEV);
     }
+    
+    task = (struct evfs_cache_io_task *)ztrymalloc(sizeof(*task));
+    if (!task) {
+        return posix__makeerror(ENOMEM);
+    }
+    task->cluster_id = 0;
+    task->offset = 0;
+    task->length = sizeof(*stat);
+    task->ptr = stat;
+    task->io_type = kEvfsCacheIOTypeHardState;
+    task->no_wait = 0;
+    /* push task to io list and awaken the io thread */
+    status = __evfs_cache_push_task_and_notify_run(task);
+    if (!NSP_SUCCESS(status)) {
+        zfree(task);
+        return status;
+    }
 
-    creator->cluster_count = evfs_hard_get_usable_cluster_count();
-    creator->cluster_size = evfs_hard_get_cluster_size();
-    return NSP_STATUS_SUCCESSFUL;
+    /* wait for the io thread to finish the task */
+    return __evfs_cache_wait_background_compelete(task);
 }
 
-static nsp_status_t __evfs_cache_push_task_and_notify_run(struct evfs_cache_io_task *task, int no_wait)
+static nsp_status_t __evfs_cache_push_task_and_notify_run(struct evfs_cache_io_task *task)
 {
     nsp_status_t status;
 
-    task->no_wait = no_wait;
+    status = NSP_STATUS_SUCCESSFUL;
     
     lwp_mutex_lock(&__evfs_cache_mgr.merge.mutex);
     do {
@@ -1033,7 +1101,7 @@ static nsp_status_t __evfs_cache_push_task_and_notify_run(struct evfs_cache_io_t
         return status;
     }
 
-    if (!no_wait) {
+    if (!task->no_wait) {
         lwp_event_init(&task->cond, LWPEC_NOTIFY);
     }
     lwp_event_awaken(&__evfs_cache_mgr.merge.cond);
@@ -1115,6 +1183,16 @@ static void __evfs_cache_exec_task(struct evfs_cache_io_task *task)
     case kEvfsCacheIOTypeHardClose:
         evfs_hard_close();
         task->status = NSP_STATUS_SUCCESSFUL;
+        break;
+    case kEvfsCacheIOTypeHardState:
+        ((struct evfs_cache_stat *)task->ptr)->hard_cluster_count = evfs_hard_get_usable_cluster_count();
+        ((struct evfs_cache_stat *)task->ptr)->hard_cluster_size = evfs_hard_get_cluster_size();
+        ((struct evfs_cache_stat *)task->ptr)->hard_max_pre_userseg = evfs_hard_get_max_pre_userseg();
+        ((struct evfs_cache_stat *)task->ptr)->cache_block_count = __evfs_cache_mgr.cache_cluster_count;
+        task->status = NSP_STATUS_SUCCESSFUL;
+        break;
+    case kEvfsCacheIOTypeHardExpand:
+        __evfs_cache_expand(task);
         break;
     default:
         task->status = posix__makeerror(EINVAL);

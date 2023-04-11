@@ -83,10 +83,10 @@ void showhelp()
                                     "close\n"
                                     "new\n"
                                     "flush\n"
-                                    "hit\n"
                                     "import\n"
                                     "export\n"
-                                    "delete\n";
+                                    "delete\n"
+                                    "stat\n";
     printf("%s\n", helplist);
 }
 
@@ -371,6 +371,26 @@ void evfs_test_delete_entry_by_name(char *pcmd)
     evfs_earse_entry_by_name(target);
 }
 
+void evfs_test_show_stat()
+{
+    evfs_stat_t stat;
+    nsp_status_t status;
+
+    status = evfs_query_stat(&stat);
+    if (!NSP_SUCCESS(status)) {
+        printf("stat failed, use openfs or createfs first.\n");
+        return;
+    }
+
+    printf("evfs stat:\n");
+    printf("  cluster size: %d\n", stat.cluster_size);
+    printf("  total cluster count: %d\n", stat.cluster_count);
+    printf("  idle cluster count: %d\n", stat.cluster_idle);
+    printf("  total entries count: %d\n", stat.entry_count);
+    printf("  cache block count: %d\n", stat.cache_block_count);
+    printf("  cache hit rate: %.2f%%\n", stat.cache_hit_rate);
+}
+
 int main(int argc, char **argv)
 {
     char file[255], command[128], *pcmd;
@@ -412,11 +432,6 @@ int main(int argc, char **argv)
 
         if (0 == strncmp(pcmd, "exit", 4)) {
             break;
-        }
-
-        if (0 == strncmp(pcmd, "hit", 3)) {
-            printf("cache hit rate:%.2f%%\n", evfs_query_cache_performance() * 100);
-            continue;
         }
 
         if (0 == strncmp(pcmd, "ls", 2)) {
@@ -498,6 +513,11 @@ int main(int argc, char **argv)
 
         if (0 == strncmp(pcmd, "delete", 6)) {
             evfs_test_delete_entry_by_name(pcmd + 6);
+            continue;
+        }
+
+        if (0 == strcmp(pcmd, "stat")) {
+            evfs_test_show_stat();
             continue;
         }
 

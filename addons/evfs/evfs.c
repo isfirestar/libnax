@@ -1,6 +1,6 @@
 #include "evfs.h"
+
 #include "cache.h"
-#include "view.h"
 #include "entries.h"
 
 #include "zmalloc.h"
@@ -193,17 +193,16 @@ nsp_status_t evfs_create(const char *path, int cluster_size_format, int cluster_
         return posix__makeerror(EEXIST);
     }
 
-    creator.cluster_size = cluster_size_format;
-    creator.cluster_count = cluster_count_format;
+    creator.hard_cluster_size = cluster_size_format;
+    creator.hard_cluster_count = cluster_count_format;
     status = evfs_cache_init(path, count_of_cache_cluster, &creator);
     if (!NSP_SUCCESS(status)) {
         atom_set(&__evfs_descriptor_mgr.ready, kEvmgrNotReady);
         return status;
     }
 
-    status = evfs_view_create();
+    status = evfs_entries_create();
     if (NSP_SUCCESS(status)) {
-        evfs_entries_initial();
         lwp_mutex_init(&__evfs_descriptor_mgr.mutex, 1);
         atom_set(&__evfs_descriptor_mgr.next_handle, 0);
         atom_set(&__evfs_descriptor_mgr.ready, kEvmgrReady);
@@ -235,9 +234,8 @@ nsp_status_t evfs_open(const char *path, int count_of_cache_cluster)
         return status;
     }
 
-    status = evfs_view_load(evfs_entries_raw_recognize);
+    status = evfs_entries_load();
     if (NSP_SUCCESS(status)) {
-        evfs_entries_initial();
         lwp_mutex_init(&__evfs_descriptor_mgr.mutex, 1);
         atom_set(&__evfs_descriptor_mgr.next_handle, 0);
         atom_set(&__evfs_descriptor_mgr.ready, kEvmgrReady);
@@ -264,7 +262,6 @@ void evfs_close()
     lwp_mutex_unlock(&__evfs_descriptor_mgr.mutex);
 
     evfs_entries_uninit();
-    evfs_view_uninit();
     evfs_cache_uninit();
 
     atom_set(&__evfs_descriptor_mgr.next_handle, -1);
@@ -272,31 +269,36 @@ void evfs_close()
 
 nsp_status_t evfs_query_stat(evfs_stat_t *evstat)
 {
-    struct evfs_cache_creator creator;
+    struct evfs_cache_stat hard;
+    struct evfs_entries_stat soft;
     nsp_status_t status;
 
     if (!evstat || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
     }
 
-    status = evfs_cache_hard_state(&creator);
+    /* hard stat */
+    status = evfs_cache_hard_state(&hard);
     if (!NSP_SUCCESS(status)) {
         return status;
     }
-    evstat->cluster_count = creator.cluster_count;
-    evstat->cluster_size = creator.cluster_size;
+    evstat->cluster_count = hard.hard_cluster_count;
+    evstat->cluster_size = hard.hard_cluster_size;
+    evstat->cache_block_count = hard.cache_block_count;
 
-    evfs_view_get_count(&evstat->cluster_idle, &evstat->cluster_busy);
-    evstat->entries = evfs_entries_query_total_count();
-    return NSP_STATUS_SUCCESSFUL;
-}
-
-float evfs_query_cache_performance()
-{
-    if (atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
-        return 0.0f;
+    /* soft state */
+    status = evfs_entries_soft_stat(&soft);
+    if (!NSP_SUCCESS(status)) {
+        return status;
     }
-    return evfs_view_get_performance();
+    evstat->entry_count = soft.total_entry_count;
+    evstat->cluster_busy = soft.busy_view_count;
+    evstat->cluster_idle = soft.idle_view_count;
+
+    /* cache hit rate */
+    evstat->cache_hit_rate = evfs_cache_hit_rate();
+
+    return NSP_STATUS_SUCCESSFUL;
 }
 
 evfs_entry_handle_t evfs_create_entry(const char *key)

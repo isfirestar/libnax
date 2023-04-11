@@ -65,6 +65,9 @@ extern nsp_status_t evfs_hard_write_cluster(int cluster_id, const void *buffer);
 extern nsp_status_t evfs_hard_read_cluster(int cluster_id, void *buffer);
 extern nsp_status_t evfs_hard_read_cluster_head(int cluster_id, struct evfs_cluster *clusterptr);
 
+/* flush file buffers */
+extern nsp_status_t evfs_hard_flush();
+
 /* manager value query */
 extern int evfs_hard_get_cluster_size();
 extern int evfs_hard_get_usable_cluster_count();

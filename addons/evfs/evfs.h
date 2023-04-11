@@ -31,10 +31,11 @@ typedef struct _evfs_stat
     int cluster_count;
     int cluster_idle;
     int cluster_busy;
-    int entries;
+    int entry_count;
+    int cache_block_count;
+    float cache_hit_rate;
 } evfs_stat_t;
 PORTABLEAPI(nsp_status_t)                   evfs_query_stat(evfs_stat_t *evstat);
-PORTABLEAPI(float)                          evfs_query_cache_performance();
 
 typedef int evfs_entry_handle_t;
 

@@ -352,11 +352,7 @@ nsp_status_t evfs_hard_write_cluster(int cluster_id, const void *buffer)
     }
 
     wrcb = ifos_file_write(__evfs_cluster_mgr.fd, buffer, __evfs_cluster_mgr.evhrd->cluster_size);
-    status = ((wrcb == __evfs_cluster_mgr.evhrd->cluster_size) ? NSP_STATUS_SUCCESSFUL : wrcb);
-    if (NSP_SUCCESS(status)) {
-        ifos_file_flush(__evfs_cluster_mgr.fd);
-    }
-    return status;
+    return wrcb == __evfs_cluster_mgr.evhrd->cluster_size ? NSP_STATUS_SUCCESSFUL : wrcb;
 }
 
 nsp_status_t evfs_hard_read_cluster(int cluster_id, void *buffer)
@@ -397,6 +393,15 @@ nsp_status_t evfs_hard_read_cluster_head(int cluster_id, struct evfs_cluster *cl
 
     rdcb = ifos_file_read(__evfs_cluster_mgr.fd, clusterptr, sizeof(struct evfs_cluster));
     return rdcb == sizeof(struct evfs_cluster) ? NSP_STATUS_SUCCESSFUL : rdcb;
+}
+
+nsp_status_t evfs_hard_flush()
+{
+    if (!__evfs_is_ready()) {
+        return posix__makeerror(EBFONT);
+    }
+
+    return ifos_file_flush(__evfs_cluster_mgr.fd);
 }
 
 int evfs_hard_get_cluster_size()

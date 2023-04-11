@@ -1,10 +1,13 @@
 #include "view.h"
 
 #include "cache.h"
+#include "cluster.h"
 
 #include "zmalloc.h"
 #include "threading.h"
 #include "atom.h"
+#include "clist.h"
+#include "avltree.h"
 
 #include <stdlib.h>
 #include <errno.h>
@@ -72,16 +75,18 @@ nsp_status_t evfs_view_create()
     nsp_status_t status;
     evfs_view_pt view;
     int expect;
+    struct evfs_cache_stat stat;
 
     if (atom_get(&__evfs_view_mgr.total_cluster_count) > 0 ) {
         return EEXIST;
     }
 
-    cluster_count = evfs_hard_get_usable_cluster_count();
-    if (cluster_count <= 0) {
-        return posix__makeerror(EINVAL);
+    status = evfs_cache_hard_state(&stat);
+    if (!NSP_SUCCESS(status)) {
+        return status;
     }
 
+    cluster_count = stat.hard_cluster_count;
     expect = 0;
     if (!atom_compare_exchange_strong(&__evfs_view_mgr.total_cluster_count, &expect, cluster_count)) {
         return EEXIST;
@@ -108,8 +113,8 @@ nsp_status_t evfs_view_create()
             zfree(view);
         }
     } else {
-        __evfs_view_mgr.cluster_size = evfs_hard_get_cluster_size();
-        __evfs_view_mgr.max_pre_userseg = evfs_hard_get_max_pre_userseg();
+        __evfs_view_mgr.cluster_size = stat.hard_cluster_size;
+        __evfs_view_mgr.max_pre_userseg = stat.hard_max_pre_userseg;
     }
     return status;
 }
@@ -141,13 +146,15 @@ nsp_status_t evfs_view_load(on_view_loaded_t on_loaded)
     nsp_status_t status;
     evfs_view_pt view;
     int expect;
+    struct evfs_cache_stat stat;
 
-    cluster_count = evfs_hard_get_usable_cluster_count();
-    if (cluster_count <= 0) {
-        return posix__makeerror(EINVAL);
+    status = evfs_cache_hard_state(&stat);
+    if (!NSP_SUCCESS(status)) {
+        return status;
     }
 
     expect = 0;
+    cluster_count = stat.hard_cluster_count;
     if (!atom_compare_exchange_strong(&__evfs_view_mgr.total_cluster_count, &expect, cluster_count)) {
         return EEXIST;
     }
@@ -180,8 +187,8 @@ nsp_status_t evfs_view_load(on_view_loaded_t on_loaded)
         }
     } else {
         __evfs_view_recognize_and_move_to_busy(on_loaded);
-        __evfs_view_mgr.cluster_size = evfs_hard_get_cluster_size();
-        __evfs_view_mgr.max_pre_userseg = evfs_hard_get_max_pre_userseg();
+        __evfs_view_mgr.cluster_size = stat.hard_cluster_size;
+        __evfs_view_mgr.max_pre_userseg = stat.hard_max_pre_userseg;
     }
     return status;
 }
@@ -193,7 +200,7 @@ nsp_status_t evfs_view_expand()
     int i;
     evfs_view_pt view;
 
-    number_of_clusters_expanded = evfs_hard_expand(&next_cluster_id);
+    number_of_clusters_expanded = evfs_cache_expand(&next_cluster_id);
     if (number_of_clusters_expanded <= 0) {
         return NSP_STATUS_FATAL;
     }
@@ -386,11 +393,6 @@ void evfs_view_flush(evfs_view_pt view)
     }
 
     evfs_cache_flush_block(view->viewid, 1);
-}
-
-float evfs_view_get_performance()
-{
-    return evfs_cache_hit_rate();
 }
 
 nsp_status_t evfs_view_set_next_cluster_id(evfs_view_pt view, const evfs_view_pt next_view)
