@@ -12,6 +12,11 @@
 
 #include "cluster.h"
 
+struct evfs_cache_creator {
+    int cluster_size;
+    int cluster_count;
+};
+
 /* init evfs cache by specify fix cluster count, and the size of single cluster.
  * the @cluster_size indicate how many bytes evfs_cache_node::data shall be allocate, and it must equal to evfs_head_record_data::cluster_size.
  * cache_cluster_count indicate how many evfs_cache_node shall be allocate, and it must equal to or less than evfs_head_record_data::cluster_count.
@@ -19,11 +24,8 @@
  * after success call to evfs_cache_init, the cache is empty.and caller has resposibility to destroy the cache by invoke @evfs_cache_uninit
  * @evfs_cache_add_block function add a new cache block to cache, and it will be used to store data of cluster
  */
-extern nsp_status_t evfs_cache_init(int cache_cluster_count);
+extern nsp_status_t evfs_cache_init(const char *file, int cache_cluster_count, const struct evfs_cache_creator *creator);
 extern nsp_status_t evfs_cache_add_block(int cache_cluster_count);
-
-/* uninit the cache module if successful inited
- */
 extern void evfs_cache_uninit();
 
 /* read entire cluster data from cache,and store in legal output parameter @data
@@ -60,6 +62,9 @@ extern nsp_status_t evfs_cache_write_directly(int cluster_id, const void *input)
 /* flush all dirty cache blocks to harddisk */
 extern void evfs_cache_flush(int no_wait);
 extern void evfs_cache_flush_block(int cluster_id, int no_wait);
+
 /* caculate the rate of hit */
 extern float evfs_cache_hit_rate();
 
+/* wrap hard state */
+extern nsp_status_t evfs_cache_hard_state(struct evfs_cache_creator *creator);

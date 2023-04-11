@@ -1,5 +1,7 @@
 #include "naos.h"
 
+#include <ctype.h>
+
 #include "abuff.h"
 #include "zmalloc.h"
 
@@ -198,4 +200,55 @@ PORTABLEIMPL(void) naos_hexdump(const unsigned char *buffer, uint16_t length, ui
         printf("%s\n",display);
     }
     zfree(display);
+}
+
+int naos_cmdline_like_analyze(char *cmdline, char **target, int max)
+{
+    int count;
+    char *cursor;
+    char *start;
+    char *end;
+
+    if (unlikely(!cmdline) || unlikely(target) || unlikely(max <= 0)) {
+        return -1;
+    }
+
+    cursor = cmdline;
+    start = NULL;
+    end = NULL;
+    count = 0;
+
+    while (cursor && count < max) {
+        if (0 == *cursor) {
+            break;
+        }
+
+        if (isspace(*cursor)) {
+            cursor++;
+            continue;
+        }
+
+        if ('"' == *cursor) {
+            start = cursor + 1;
+            end = strchr(start, '"');
+            if (NULL == end) {
+                return -1;
+            }
+            *end = 0;
+            cursor = end + 1;
+        } else {
+            start = cursor;
+            end = strchr(start, ' ');
+            if (NULL == end) {
+                end = start + strlen(start);
+            }
+            *end = 0;
+            cursor = end + 1;
+        }
+
+        target[count] = start;
+        count++;
+    }
+
+    return count;
 }

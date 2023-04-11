@@ -44,7 +44,7 @@ static int __evfs_cluster_offset(int cluster_id)
 }
 
 /* expand file from offset to the target size 
- * we try to use large block which have 65536 bytes to stretch file when the remain bytes is large than 65536
+ * we try to use large block which have 65536 bytes to stretch file when the remain bytes is large than or equal to it
 */
 static nsp_status_t __evfs_cluster_expand_file(file_descriptor_t fd, int cluster_size, int offset, int size)
 {
@@ -90,7 +90,7 @@ static nsp_status_t __evfs_cluster_expand_file(file_descriptor_t fd, int cluster
     return status;
 }
 
-nsp_status_t evfs_create_filesystem(const char *file, int cluster_size_format, int cluster_count_format)
+nsp_status_t evfs_hard_create(const char *file, int cluster_size_format, int cluster_count_format)
 {
     int expect;
     int cluster_size;
@@ -194,7 +194,7 @@ static nsp_status_t __evfs_check_hard_legal(const struct evfs_head_record_data *
     return NSP_STATUS_SUCCESSFUL;
 }
 
-nsp_status_t evfs_open_filesystem(const char *file)
+nsp_status_t evfs_hard_open(const char *file)
 {
     int fd;
     nsp_status_t status;
@@ -283,7 +283,7 @@ nsp_status_t evfs_open_filesystem(const char *file)
     return status;
 }
 
-void evfs_close_filesystem()
+void evfs_hard_close()
 {
     atom_set(&__evfs_cluster_mgr.ready, kEvmgrClosing);
 
@@ -302,7 +302,7 @@ void evfs_close_filesystem()
     atom_set(&__evfs_cluster_mgr.ready, kEvmgrNotReady);
 }
 
-int evfs_expand_filesystem(int *expanded_head_cluster_id)
+int evfs_hard_expand(int *expanded_head_cluster_id)
 {
     nsp_status_t status;
     int expand_size;
@@ -323,7 +323,7 @@ int evfs_expand_filesystem(int *expanded_head_cluster_id)
     __evfs_cluster_mgr.evhrd->cluster_count += __evfs_cluster_mgr.evhrd->expand_cluster_count;
 
     /* update the first cluster in harddisk */
-    status = evfs_cluster_write(0, __evfs_cluster_mgr.the_first_cluster);
+    status = evfs_hard_write_cluster(0, __evfs_cluster_mgr.the_first_cluster);
     if (!NSP_SUCCESS(status)) {
         return status;
     }
@@ -335,7 +335,7 @@ int evfs_expand_filesystem(int *expanded_head_cluster_id)
     return __evfs_cluster_mgr.evhrd->expand_cluster_count;
 }
 
-nsp_status_t evfs_cluster_write(int cluster_id, const void *buffer)
+nsp_status_t evfs_hard_write_cluster(int cluster_id, const void *buffer)
 {
     int wrcb;
     int off;
@@ -359,7 +359,7 @@ nsp_status_t evfs_cluster_write(int cluster_id, const void *buffer)
     return status;
 }
 
-nsp_status_t evfs_cluster_read(int cluster_id, void *buffer)
+nsp_status_t evfs_hard_read_cluster(int cluster_id, void *buffer)
 {
     int rdcb; 
     int off;
@@ -379,7 +379,7 @@ nsp_status_t evfs_cluster_read(int cluster_id, void *buffer)
     return rdcb == __evfs_cluster_mgr.evhrd->cluster_size ? NSP_STATUS_SUCCESSFUL : rdcb;
 }
 
-nsp_status_t evfs_cluster_read_head(int cluster_id, struct evfs_cluster *clusterptr)
+nsp_status_t evfs_hard_read_cluster_head(int cluster_id, struct evfs_cluster *clusterptr)
 {
     int rdcb; 
     int off;
@@ -399,22 +399,22 @@ nsp_status_t evfs_cluster_read_head(int cluster_id, struct evfs_cluster *cluster
     return rdcb == sizeof(struct evfs_cluster) ? NSP_STATUS_SUCCESSFUL : rdcb;
 }
 
-int evfs_cluster_get_size()
+int evfs_hard_get_cluster_size()
 {
     return __evfs_is_ready() ? __evfs_cluster_mgr.evhrd->cluster_size : 0;
 }
 
-int evfs_cluster_get_usable_count()
+int evfs_hard_get_usable_cluster_count()
 {
     return __evfs_is_ready() ? atom_get(&__evfs_cluster_mgr.evhrd->cluster_count) - 1 : 0;
 }
 
-int evfs_cluster_get_max_pre_userseg()
+int evfs_hard_get_max_pre_userseg()
 {
     return __evfs_is_ready() ? __evfs_cluster_mgr.max_pre_userseg : 0;
 }
 
-evfs_cluster_pt evfs_allocate_cluster_memory(const evfs_cluster_pt source)
+evfs_cluster_pt evfs_hard_allocate_cluster(const evfs_cluster_pt source)
 {
     struct evfs_cluster *clusterptr;
 
@@ -432,7 +432,7 @@ evfs_cluster_pt evfs_allocate_cluster_memory(const evfs_cluster_pt source)
     return clusterptr;
 }
 
-void evfs_free_cluster_memory(struct evfs_cluster *clusterptr)
+void evfs_hard_release_cluster(struct evfs_cluster *clusterptr)
 {
     if (clusterptr) {
         zfree(clusterptr);

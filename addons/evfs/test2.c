@@ -8,51 +8,48 @@
 
 #include "ifos.h"
 
-// trim string specify by parameter @str
-char *strtrim(char *str)
-{
-    char *end;
-
-    while (isspace(*str)) {
-        str++;
-    }
-
-    if (*str == 0) {
-        return str;
-    }
-
-    end = str + strlen(str) - 1;
-    while (end > str && isspace(*end)) {
-        end--;
-    }
-
-    *(end + 1) = 0;
-
-    return str;
-}
-
-// split string by specify symbol
-// @str: input string
-// @symbol: specify symbol
-// @target: output array, each element point to a string
-// @max: max element count of @target
-// @target allocate by this function, caller has responsibility to free it
-int strsplit(char *str, char symbol, char **target, int max)
+// parse command line
+// every command line is split by space
+// words which start with '"' will be treated as a whole string
+// output parameter @target MUST allocate by caller, @max parameter indicate the max element count of @target
+// on success, return the element count of @target, otherwise return -1
+int cmdparse(char *pcmd, char **target, int max)
 {
     int count = 0;
-    char *cursor = strtrim(str);
+    char *cursor = pcmd;
+    char *start = NULL;
+    char *end = NULL;
 
     while (cursor && count < max) {
         if (0 == *cursor) {
             break;
         }
-        target[count] = cursor;
-        count++;
-        cursor = strchr(cursor, symbol);
-        if (cursor) {
-            *cursor = 0;
+
+        if (isspace(*cursor)) {
             cursor++;
+            continue;
         }
+
+        if ('"' == *cursor) {
+            start = cursor + 1;
+            end = strchr(start, '"');
+            if (NULL == end) {
+                return -1;
+            }
+            *end = 0;
+            cursor = end + 1;
+        } else {
+            start = cursor;
+            end = strchr(start, ' ');
+            if (NULL == end) {
+                end = start + strlen(start);
+            }
+            *end = 0;
+            cursor = end + 1;
+        }
+
+        target[count] = start;
+        count++;
     }
 
     return count;
@@ -111,20 +108,19 @@ void evfs_test_iterate_all_entries()
 void evfs_test_read_entry_data(evfs_entry_handle_t handle, char *pcmd)
 {
     char *target[2];
-    int count, off, len, maxlen, i;
+    int count, off, len, maxlen, readlen;
     nsp_status_t status;
     char *buffer;
 
-    count = strsplit(pcmd, 0x20, target, 2);
-    if (count < 1) {
-        printf("usage : evfs read [offset][length] \n");
-        return;
-    }
-
-    off = atoi(target[0]);
+    count = cmdparse(pcmd, target, 2);
     if (count >= 2) {
-        len = atoi(target[1]);
+        off = atoi(target[1]);
+        len = atoi(target[0]);
+    } else if (count == 1) {
+        off = atoi(target[1]);
+        len = 0;
     } else {
+        off = 0;
         len = 0;
     }
 
@@ -133,6 +129,7 @@ void evfs_test_read_entry_data(evfs_entry_handle_t handle, char *pcmd)
         printf("illegal size? %d\n", maxlen);
         return;
     }
+    readlen = ((0 == len) ? maxlen : min(maxlen, len));
 
     status = evfs_seek_entry_offset(handle, off);
     if (!NSP_SUCCESS(status)) {
@@ -140,28 +137,31 @@ void evfs_test_read_entry_data(evfs_entry_handle_t handle, char *pcmd)
         return;
     }
 
-    buffer = (char *)malloc(maxlen + 1);
+    buffer = (char *)malloc(readlen + 1);
     if (!buffer) {
         return;
     }
-    memset(buffer, 0, maxlen + 1);
-    i = evfs_read_entry(handle, buffer, min(maxlen,len));
-    if (i > 0 ) {
-        printf("there are %d bytes reading from entry\n", i);
+    buffer[readlen] = 0;
+
+    count = evfs_read_entry(handle, buffer, readlen);
+    if (count > 0 ) {
+        printf("there are %d bytes reading from entry\n", count);
         printf("%s\n", buffer);
+    } else {
+        printf("failed read entry,status:%d\n", count);
     }
     free(buffer);
  }
 
  void evfs_test_write_entry_data(evfs_entry_handle_t handle, char *pcmd)
  {
-    char symbol = 0x20, *target[2];
+    char *target[2];
     int off, count;
     nsp_status_t status;
     size_t bufferlen;
     char *buffer;
 
-    count = strsplit(pcmd, symbol, target, 2);
+    count = cmdparse(pcmd, target, 2);
     if (count < 1) {
         printf("usage : evfs write [data][offset] \n");
         return;
@@ -176,14 +176,18 @@ void evfs_test_read_entry_data(evfs_entry_handle_t handle, char *pcmd)
         }
     }
 
-    bufferlen = strlen(target[0]) + 1;
+    bufferlen = strlen(target[0]);
     buffer = (char *)malloc(bufferlen);
     if (!buffer) {
         return;
     }
-    strcpy(buffer, target[0]);
+    memcpy(buffer, target[0], bufferlen);
     count = evfs_write_entry(handle, buffer, bufferlen);
-    printf("there are %d bytes written to entry\n",count);
+    if (count > 0) {
+        printf("there are %d bytes written to entry\n",count);
+    } else {
+        printf("failed write entry,status:%d\n", count);
+    }
     free(buffer);
  }
 
@@ -228,7 +232,6 @@ evfs_entry_handle_t evfs_test_new_entry(const char *pcmd)
 void evfs_test_import_file_to_entry(char *pcmd, evfs_entry_handle_t handle)
 {
     int count;
-    char symbol = 0x20, *target[1];
     char *filename;
     file_descriptor_t fd;
     nsp_status_t status;
@@ -236,13 +239,11 @@ void evfs_test_import_file_to_entry(char *pcmd, evfs_entry_handle_t handle)
     static const int max_file_size = 10 << 20;
     char *buffer;
 
-    count = strsplit(pcmd, symbol, target,1);
+    count = cmdparse(pcmd, &filename, 1);
     if (count < 1) {
         printf("usage : evfs import [file]\n");
         return;
     }
-
-    filename = target[0];
 
     // open the existing file
     status = ifos_file_open(filename, FF_RDACCESS | FF_OPEN_EXISTING, 0644, &fd);
@@ -297,7 +298,6 @@ void evfs_test_import_file_to_entry(char *pcmd, evfs_entry_handle_t handle)
 void evfs_test_export_entry_to_file(char *pcmd, evfs_entry_handle_t handle)
 {
     int count;
-    char symbol = 0x20, *target[1];
     char *filename;
     file_descriptor_t fd;
     nsp_status_t status;
@@ -305,13 +305,11 @@ void evfs_test_export_entry_to_file(char *pcmd, evfs_entry_handle_t handle)
     static const int max_file_size = 10 << 20;
     char *buffer;
 
-    count = strsplit(pcmd, symbol, target,1);
+    count = cmdparse(pcmd, &filename, 1);
     if (count < 1) {
         printf("usage : evfs export [file]\n");
         return;
     }
-
-    filename = target[0];
 
     // open the existing file
     status = ifos_file_open(filename, FF_WRACCESS | FF_CREATE_ALWAYS, 0644, &fd);
@@ -363,14 +361,14 @@ void evfs_test_export_entry_to_file(char *pcmd, evfs_entry_handle_t handle)
 void evfs_test_delete_entry_by_name(char *pcmd)
 {
     int count;
-    char symbol = 0x20, *target[1];
+    char *target;
 
-    count = strsplit(pcmd, symbol, target,1);
+    count = cmdparse(pcmd, &target, 1);
     if (count < 1) {
         printf("usage : evfs delete [entry name]\n");
         return;
     }
-    evfs_earse_entry_by_name(target[0]);
+    evfs_earse_entry_by_name(target);
 }
 
 int main(int argc, char **argv)

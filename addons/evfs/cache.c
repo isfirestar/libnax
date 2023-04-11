@@ -47,6 +47,7 @@ enum evfs_cache_iotype
     kEvfsCacheIOTypeFlushBufferAll,
     kEvfsCacheIOTypeExpandFile,
     kEvfsCacheIOTypeAddCacheBlock,
+    kEvfsCacheIOTypeHardClose,
 };
 
 #define EVFS_MAX_IO_PENDING_COUNT   (160)
@@ -124,7 +125,7 @@ int __evfs_cache_compare_by_cluster_id(const void *left, const void *right)
 static void __evfs_cache_flush_block_if_dirty(struct evfs_cache_node *node)
 {
     if (node->state == kEvfsCacheBlockDirty) {
-        evfs_cluster_write(node->cluster_id, node->data);
+        evfs_hard_write_cluster(node->cluster_id, node->data);
         node->state = kEvfsCacheBlockClean;
         /* remove from dirty list */
         list_del(&node->element_of_dirty);
@@ -275,7 +276,7 @@ static nsp_status_t __evfs_cache_read_from_idle(int cluster_id, unsigned char *d
     }
 
     /* read data from harddisk */
-    status = evfs_cluster_read(cluster_id, node->data);
+    status = evfs_hard_read_cluster(cluster_id, node->data);
     if (!NSP_SUCCESS(status)) {
         __evfs_cache_push_idle(node);  /* recycle to idle */
         return status;
@@ -306,7 +307,7 @@ static nsp_status_t __evfs_cache_write_to_idle(int cluster_id, const unsigned ch
     }
 
     /* read data from harddisk */
-    status = evfs_cluster_read(cluster_id, node->data);
+    status = evfs_hard_read_cluster(cluster_id, node->data);
     if (!NSP_SUCCESS(status)) {
         return status;
     }
@@ -339,7 +340,7 @@ static nsp_status_t __evfs_cache_replace_read_from_lru(int cluster_id, unsigned 
     /* if node state is dirty, write it to harddisk */
     __evfs_cache_flush_block_if_dirty(node);
     /* load cluster data from harddisk */
-    status = evfs_cluster_read(cluster_id, node->data);
+    status = evfs_hard_read_cluster(cluster_id, node->data);
     if (!NSP_SUCCESS(status)) {
         __evfs_cache_push_idle(node); /* recycle to idle */
         return status;
@@ -372,7 +373,7 @@ static nsp_status_t __evfs_cache_replace_write_to_lru(int cluster_id, const unsi
     /* if node state is dirty, write it to harddisk */
     __evfs_cache_flush_block_if_dirty(node);
     /* load cluster data from harddisk */
-    status = evfs_cluster_read(cluster_id, node->data);
+    status = evfs_hard_read_cluster(cluster_id, node->data);
     if (!NSP_SUCCESS(status)) {
         __evfs_cache_push_idle(node); /* recycle to idle */
         return status;
@@ -395,15 +396,15 @@ static nsp_status_t __evfs_cache_read_harddisk(int cluster_id, unsigned char *da
     nsp_status_t status;
     evfs_cluster_pt clusterptr;
 
-    clusterptr = (evfs_cluster_pt)evfs_allocate_cluster_memory(NULL);
+    clusterptr = (evfs_cluster_pt)evfs_hard_allocate_cluster(NULL);
     if (!clusterptr) {
         status = posix__makeerror(ENOMEM);
     } else {
-        status = evfs_cluster_read(cluster_id, clusterptr);
+        status = evfs_hard_read_cluster(cluster_id, clusterptr);
         if (NSP_SUCCESS(status)) {
             memcpy(data, (char *)clusterptr + offset, length);
         }
-        evfs_free_cluster_memory(clusterptr);
+        evfs_hard_release_cluster(clusterptr);
     }
     return status;
 }
@@ -414,16 +415,16 @@ static nsp_status_t __evfs_cache_write_harddisk(int cluster_id, const unsigned c
     nsp_status_t status;
     evfs_cluster_pt clusterptr;
 
-    clusterptr = (evfs_cluster_pt)evfs_allocate_cluster_memory(NULL);
+    clusterptr = (evfs_cluster_pt)evfs_hard_allocate_cluster(NULL);
     if (!clusterptr) {
         status = posix__makeerror(ENOMEM);
     } else {
-        status = evfs_cluster_read(cluster_id, clusterptr);
+        status = evfs_hard_read_cluster(cluster_id, clusterptr);
         if (NSP_SUCCESS(status)) {
             memcpy((char *)clusterptr + offset, data, length);
-            status = evfs_cluster_write(cluster_id, clusterptr);
+            status = evfs_hard_write_cluster(cluster_id, clusterptr);
         }
-        evfs_free_cluster_memory(clusterptr);
+        evfs_hard_release_cluster(clusterptr);
     }
     return status;
 }
@@ -543,7 +544,7 @@ static nsp_status_t __evfs_cache_init_merge_thread()
     return lwp_create(&__evfs_cache_mgr.merge.thread, 0, __evfs_cache_thread_merge_io, NULL);
 }
 
-nsp_status_t evfs_cache_init(int cache_cluster_count)
+nsp_status_t evfs_cache_init(const char *file, int cache_cluster_count, const struct evfs_cache_creator *creator)
 {
     int expect;
     nsp_status_t status;
@@ -557,8 +558,14 @@ nsp_status_t evfs_cache_init(int cache_cluster_count)
         return posix__makeerror(EEXIST);
     }
 
+    status = (NULL != creator) ? evfs_hard_create(file, creator->cluster_size, creator->cluster_count) : evfs_hard_open(file);
+    if (!NSP_SUCCESS(status)) {
+        atom_set(&__evfs_cache_mgr.ready, kEvmgrNotReady);
+        return status;
+    }
+
     do {
-        __evfs_cache_mgr.cluster_size = evfs_cluster_get_size();
+        __evfs_cache_mgr.cluster_size = evfs_hard_get_cluster_size();
         if (__evfs_cache_mgr.cluster_size <= 0) {
             status = posix__makeerror(EINVAL);
         }
@@ -621,23 +628,44 @@ nsp_status_t evfs_cache_add_block(int cache_cluster_count)
 void evfs_cache_uninit()
 {
     int expect;
+    struct evfs_cache_node *node;
+    struct evfs_cache_io_task *task;
+    nsp_status_t status;
 
     expect = kEvmgrReady;
     if (!atom_compare_exchange_strong(&__evfs_cache_mgr.ready, &expect, kEvmgrUninitializing)) {
         return;
     }
 
-    /* step 1. stop the auto flush thread */
-    __evfs_cache_mgr.merge.stop = 1;
+    /* step 1. push a task to worker thread to close filesystem and wait it complete */
+    task = (struct evfs_cache_io_task *)ztrymalloc(sizeof(*task));
+    if (task) {
+        task->cluster_id = 0;
+        task->offset = 0;
+        task->length = 0;
+        task->data = NULL;
+        task->no_wait = 0;
+        task->io_type = kEvfsCacheIOTypeHardClose;
+        status = __evfs_cache_push_task_and_notify_run(task, 0);
+        if (NSP_SUCCESS(status)) {
+            __evfs_cache_wait_background_compelete(task);
+        } else {
+            zfree(task);
+        }
+    }
+
+    /* step 2. stop the worker thread */
+    lwp_mutex_lock(&__evfs_cache_mgr.merge.mutex);
+    atom_set(&__evfs_cache_mgr.merge.stop, 1);
+    lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
+
     lwp_event_awaken(&__evfs_cache_mgr.merge.cond);
     lwp_join(&__evfs_cache_mgr.merge.thread, NULL);
 
-    /* step 2. flush all dirty blocks */
-    __evfs_cache_flush_buffer_all();
-
+    lwp_mutex_lock(&__evfs_cache_mgr.merge.mutex);
     /* step 3. remove all nodes from lru list and free their memory */
     while (!list_empty(&__evfs_cache_mgr.lru.head)) {
-        struct evfs_cache_node *node = container_of(__evfs_cache_mgr.lru.head.next, struct evfs_cache_node, element_of_lru);
+        node = container_of(__evfs_cache_mgr.lru.head.next, struct evfs_cache_node, element_of_lru);
         list_del_init(&node->element_of_lru);
         __evfs_cache_mgr.root_of_lru_index = avlremove(__evfs_cache_mgr.root_of_lru_index, &node->leaf_of_lru_index, NULL, &__evfs_cache_compare_by_cluster_id);
         __evfs_cache_mgr.lru.count--;
@@ -647,27 +675,28 @@ void evfs_cache_uninit()
 
     /* step 4. remove all unused idle block in list and free their memory */
     while (!list_empty(&__evfs_cache_mgr.idle.head)) {
-        struct evfs_cache_node *node = container_of(__evfs_cache_mgr.idle.head.next, struct evfs_cache_node, element_of_lru);
+        node = container_of(__evfs_cache_mgr.idle.head.next, struct evfs_cache_node, element_of_lru);
         list_del_init(&node->element_of_lru);
         __evfs_cache_mgr.idle.count--;
         zfree(node->data);
         zfree(node);
     }
+    lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
 
-    /* step 4. reset all list head */
+    /* step 5. reset all list head */
     INIT_LIST_HEAD(&__evfs_cache_mgr.idle.head);
     INIT_LIST_HEAD(&__evfs_cache_mgr.lru.head);
     INIT_LIST_HEAD(&__evfs_cache_mgr.dirty.head);
 
-    /* step 5. free all cache manager resources */
+    /* step 6. free all cache manager resources */
     lwp_mutex_uninit(&__evfs_cache_mgr.merge.mutex);
     lwp_event_uninit(&__evfs_cache_mgr.merge.cond);
 
-    /* step 6. reset all other fields in manger */
+    /* step 7. reset all other fields in manger */
     __evfs_cache_mgr.cluster_size = 0;
     __evfs_cache_mgr.cache_cluster_count = 0;
 
-    /* step 6. recover the ready states */
+    /* step 8. recover the ready states */
     atom_set(&__evfs_cache_mgr.ready, kEvmgrNotReady);
 }
 
@@ -964,23 +993,49 @@ float evfs_cache_hit_rate()
     return (float)count_of_hit / ((float)count_of_hit +  count_of_miss);
 }
 
+nsp_status_t evfs_cache_hard_state(struct evfs_cache_creator *creator)
+{
+    if (!creator) {
+        return posix__makeerror(EINVAL);
+    }
+
+    if (kEvmgrReady != atom_get(&__evfs_cache_mgr.ready)) {
+        return posix__makeerror(ENODEV);
+    }
+
+    creator->cluster_count = evfs_hard_get_usable_cluster_count();
+    creator->cluster_size = evfs_hard_get_cluster_size();
+    return NSP_STATUS_SUCCESSFUL;
+}
+
 static nsp_status_t __evfs_cache_push_task_and_notify_run(struct evfs_cache_io_task *task, int no_wait)
 {
+    nsp_status_t status;
+
     task->no_wait = no_wait;
+    
+    lwp_mutex_lock(&__evfs_cache_mgr.merge.mutex);
+    do {
+        if (__evfs_cache_mgr.merge.stop) {
+            status = posix__makeerror(ENODEV);
+            break;
+        }
+        if (__evfs_cache_mgr.merge.io.count >= EVFS_MAX_IO_PENDING_COUNT) {
+            status = posix__makeerror(ENOMEM);
+            break;
+        }
+        list_add_tail(&task->element, &__evfs_cache_mgr.merge.io.head);
+        __evfs_cache_mgr.merge.io.count++;
+    } while(0);
+    lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
+
+    if (!NSP_SUCCESS(status)) {
+        return status;
+    }
+
     if (!no_wait) {
         lwp_event_init(&task->cond, LWPEC_NOTIFY);
     }
-
-    lwp_mutex_lock(&__evfs_cache_mgr.merge.mutex);
-
-    if (__evfs_cache_mgr.merge.io.count >= EVFS_MAX_IO_PENDING_COUNT) {
-        lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
-        return posix__makeerror(ENOMEM);
-    }
-
-    list_add_tail(&task->element, &__evfs_cache_mgr.merge.io.head);
-    __evfs_cache_mgr.merge.io.count++;
-    lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
     lwp_event_awaken(&__evfs_cache_mgr.merge.cond);
 
     return NSP_STATUS_SUCCESSFUL;
@@ -1034,16 +1089,16 @@ static void __evfs_cache_exec_task(struct evfs_cache_io_task *task)
         task->status = __evfs_cache_read(task->cluster_id, task->data, task->offset, task->length);
         break;
     case kEvfsCacheIOTypeReadDirectly:
-        task->status = evfs_cluster_read(task->cluster_id, task->data);
+        task->status = evfs_hard_read_cluster(task->cluster_id, task->data);
         break;
     case kEvfsCacheIOTypeReadHeadDirectly:
-        task->status = evfs_cluster_read_head(task->cluster_id, (struct evfs_cluster *)task->data);
+        task->status = evfs_hard_read_cluster_head(task->cluster_id, (struct evfs_cluster *)task->data);
         break;
     case kEvfsCacheIOTypeWrite:
         task->status = __evfs_cache_write(task->cluster_id, task->data, task->offset, task->length);
         break;
     case kEvfsCacheIOTypeWriteDirectly:
-        task->status = evfs_cluster_write(task->cluster_id, task->data);
+        task->status = evfs_hard_write_cluster(task->cluster_id, task->data);
         break;
     case kEvfsCacheIOTypeFlushBufferAll:
         __evfs_cache_flush_buffer_all();
@@ -1057,6 +1112,10 @@ static void __evfs_cache_exec_task(struct evfs_cache_io_task *task)
         task->status = (0 == __evfs_cache_add_block_to_idle(task->length)) ?
             posix__makeerror(ENOMEM) : NSP_STATUS_SUCCESSFUL;
         break;
+    case kEvfsCacheIOTypeHardClose:
+        evfs_hard_close();
+        task->status = NSP_STATUS_SUCCESSFUL;
+        break;
     default:
         task->status = posix__makeerror(EINVAL);
         break;
@@ -1069,41 +1128,53 @@ static void __evfs_cache_exec_task(struct evfs_cache_io_task *task)
     }
 }
 
-static void *__evfs_cache_thread_merge_io(void *parameter)
+static void __evfs_cache_pop_task_until_empty()
 {
     struct evfs_cache_io_task *task;
+
+    lwp_mutex_lock(&__evfs_cache_mgr.merge.mutex);
+    while (NULL != (task = list_first_entry_or_null(&__evfs_cache_mgr.merge.io.head, struct evfs_cache_io_task, element))) {
+        list_del_init(&task->element);
+        __evfs_cache_mgr.merge.io.count--;
+        lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
+
+        __evfs_cache_exec_task(task);
+
+        lwp_mutex_lock(&__evfs_cache_mgr.merge.mutex);
+    }
+    lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
+}
+
+static void *__evfs_cache_thread_merge_io(void *parameter)
+{
     nsp_status_t status;
     static const int expire = 5 * 1000;
+    int stop;
 
-    while (!__evfs_cache_mgr.merge.stop) {
+    while (1) {
+        lwp_mutex_lock(&__evfs_cache_mgr.merge.mutex);
+        stop = __evfs_cache_mgr.merge.stop;
+        lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
+        if (stop) {
+            break;
+        }
+        
         status = lwp_event_wait(&__evfs_cache_mgr.merge.cond, expire);
         if (!NSP_SUCCESS(status)) {
             /* no any IO request happend during 5 seconds, flush all dirty block to harddisk  */
             if (NSP_FAILED_AND_ERROR_EQUAL(status, ETIMEDOUT)) {
                 __evfs_cache_flush_buffer_all();
                 continue;
-            }
-            lwp_event_uninit(&__evfs_cache_mgr.merge.cond);
-            break;
-        }
-        lwp_event_block(&__evfs_cache_mgr.merge.cond);
-
-        while (1) {
-            task = NULL;
-
-            lwp_mutex_lock(&__evfs_cache_mgr.merge.mutex);
-            task = list_first_entry_or_null(&__evfs_cache_mgr.merge.io.head, struct evfs_cache_io_task, element);
-            if (!task) {
-                lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
+            } else {
                 break;
             }
-
-            list_del_init(&task->element);
-            __evfs_cache_mgr.merge.io.count--;
-            lwp_mutex_unlock(&__evfs_cache_mgr.merge.mutex);
-
-            __evfs_cache_exec_task(task);
         }
+        lwp_event_block(&__evfs_cache_mgr.merge.cond);
+        
+        __evfs_cache_pop_task_until_empty();
     }
+
+    __evfs_cache_pop_task_until_empty();
+    lwp_event_uninit(&__evfs_cache_mgr.merge.cond);
     return NULL;
 }

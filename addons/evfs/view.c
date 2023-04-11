@@ -65,7 +65,7 @@ static void __evfs_view_insert_new_idle(evfs_view_pt view)
     lwp_mutex_unlock(&__evfs_view_mgr.mutex);
 }
 
-nsp_status_t evfs_view_create(int count_of_cache_cluster)
+nsp_status_t evfs_view_create()
 {
     int cluster_count;
     int i;
@@ -77,7 +77,7 @@ nsp_status_t evfs_view_create(int count_of_cache_cluster)
         return EEXIST;
     }
 
-    cluster_count = evfs_cluster_get_usable_count();
+    cluster_count = evfs_hard_get_usable_cluster_count();
     if (cluster_count <= 0) {
         return posix__makeerror(EINVAL);
     }
@@ -87,7 +87,6 @@ nsp_status_t evfs_view_create(int count_of_cache_cluster)
         return EEXIST;
     }
     lwp_mutex_init(&__evfs_view_mgr.mutex, 1);
-    evfs_cache_init(count_of_cache_cluster);
 
     status = NSP_STATUS_SUCCESSFUL;
     for (i = 1; i <= cluster_count; i++) {
@@ -109,8 +108,8 @@ nsp_status_t evfs_view_create(int count_of_cache_cluster)
             zfree(view);
         }
     } else {
-        __evfs_view_mgr.cluster_size = evfs_cluster_get_size();
-        __evfs_view_mgr.max_pre_userseg = evfs_cluster_get_max_pre_userseg();
+        __evfs_view_mgr.cluster_size = evfs_hard_get_cluster_size();
+        __evfs_view_mgr.max_pre_userseg = evfs_hard_get_max_pre_userseg();
     }
     return status;
 }
@@ -134,7 +133,7 @@ static void __evfs_view_recognize_and_move_to_busy(on_view_loaded_t on_loaded)
     }
 }
 
-nsp_status_t evfs_view_load(on_view_loaded_t on_loaded, int count_of_cache_cluster)
+nsp_status_t evfs_view_load(on_view_loaded_t on_loaded)
 {
     int cluster_count;
     int i;
@@ -143,7 +142,7 @@ nsp_status_t evfs_view_load(on_view_loaded_t on_loaded, int count_of_cache_clust
     evfs_view_pt view;
     int expect;
 
-    cluster_count = evfs_cluster_get_usable_count();
+    cluster_count = evfs_hard_get_usable_cluster_count();
     if (cluster_count <= 0) {
         return posix__makeerror(EINVAL);
     }
@@ -155,7 +154,6 @@ nsp_status_t evfs_view_load(on_view_loaded_t on_loaded, int count_of_cache_clust
     lwp_mutex_init(&__evfs_view_mgr.mutex, 1);
 
     status = NSP_STATUS_SUCCESSFUL;
-    evfs_cache_init(count_of_cache_cluster);
 
     /* load and push all views to idel list */
     for (i = 1; i <= cluster_count; i++) {
@@ -182,8 +180,8 @@ nsp_status_t evfs_view_load(on_view_loaded_t on_loaded, int count_of_cache_clust
         }
     } else {
         __evfs_view_recognize_and_move_to_busy(on_loaded);
-        __evfs_view_mgr.cluster_size = evfs_cluster_get_size();
-        __evfs_view_mgr.max_pre_userseg = evfs_cluster_get_max_pre_userseg();
+        __evfs_view_mgr.cluster_size = evfs_hard_get_cluster_size();
+        __evfs_view_mgr.max_pre_userseg = evfs_hard_get_max_pre_userseg();
     }
     return status;
 }
@@ -195,7 +193,7 @@ nsp_status_t evfs_view_expand()
     int i;
     evfs_view_pt view;
 
-    number_of_clusters_expanded = evfs_expand_filesystem(&next_cluster_id);
+    number_of_clusters_expanded = evfs_hard_expand(&next_cluster_id);
     if (number_of_clusters_expanded <= 0) {
         return NSP_STATUS_FATAL;
     }
@@ -216,7 +214,7 @@ nsp_status_t evfs_view_expand()
     return NSP_STATUS_SUCCESSFUL;
 }
 
-void evfs_view_cleanup()
+void evfs_view_uninit()
 {
     evfs_view_pt view;
 

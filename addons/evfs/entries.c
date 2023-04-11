@@ -411,7 +411,7 @@ void evfs_entries_initial()
     __evfs_entries_mgr.max_pre_userseg = evfs_view_get_max_pre_userseg();
 }
 
-extern void evfs_entries_uninitial()
+extern void evfs_entries_uninit()
 {
     struct evfs_entry_head *entry_head, *next_entry_head;
     int i;

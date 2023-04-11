@@ -5,10 +5,10 @@
 typedef struct evfs_view_node *evfs_view_pt;
 typedef void (*on_view_loaded_t)(evfs_view_pt view);
 
-extern nsp_status_t evfs_view_create(int count_of_cache_cluster);
-extern nsp_status_t evfs_view_load(on_view_loaded_t on_loaded, int count_of_cache_cluster);
+extern nsp_status_t evfs_view_create();
+extern nsp_status_t evfs_view_load(on_view_loaded_t on_loaded);
 extern nsp_status_t evfs_view_expand();
-extern void evfs_view_cleanup();
+extern void evfs_view_uninit();
 
 extern evfs_view_pt evfs_view_acquire_idle();
 extern nsp_status_t evfs_view_acquire_idle_more(int amount, evfs_view_pt *views);

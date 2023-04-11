@@ -55,21 +55,21 @@ typedef struct evfs_cluster *evfs_cluster_pt;
 
 /* create a new filesystem and dump the file to harddisk,
     in this proc, we only build the 1st cluster, other cluster acquire calling thread to initialize after this proc success returned */
-extern nsp_status_t evfs_create_filesystem(const char *file, int cluster_size_format, int cluster_count);
-extern nsp_status_t evfs_open_filesystem(const char *file);
-extern void evfs_close_filesystem();
-extern int evfs_expand_filesystem(int *expanded_head_cluster_id);
+extern nsp_status_t evfs_hard_create(const char *file, int cluster_size_format, int cluster_count);
+extern nsp_status_t evfs_hard_open(const char *file);
+extern void evfs_hard_close();
+extern int evfs_hard_expand(int *expanded_head_cluster_id);
 
 /* read/write request on harddisk in cluster */
-extern nsp_status_t evfs_cluster_write(int cluster_id, const void *buffer);
-extern nsp_status_t evfs_cluster_read(int cluster_id, void *buffer);
-extern nsp_status_t evfs_cluster_read_head(int cluster_id, struct evfs_cluster *clusterptr);
+extern nsp_status_t evfs_hard_write_cluster(int cluster_id, const void *buffer);
+extern nsp_status_t evfs_hard_read_cluster(int cluster_id, void *buffer);
+extern nsp_status_t evfs_hard_read_cluster_head(int cluster_id, struct evfs_cluster *clusterptr);
 
 /* manager value query */
-extern int evfs_cluster_get_size();
-extern int evfs_cluster_get_usable_count();
-extern int evfs_cluster_get_max_pre_userseg();
+extern int evfs_hard_get_cluster_size();
+extern int evfs_hard_get_usable_cluster_count();
+extern int evfs_hard_get_max_pre_userseg();
 
 /* cluster data memory block */
-extern evfs_cluster_pt evfs_allocate_cluster_memory(const evfs_cluster_pt clusterptr);
-extern void evfs_free_cluster_memory(evfs_cluster_pt clusterptr);
+extern evfs_cluster_pt evfs_hard_allocate_cluster(const evfs_cluster_pt clusterptr);
+extern void evfs_hard_release_cluster(evfs_cluster_pt clusterptr);

@@ -10,7 +10,7 @@
 /* entries initial/uninitial proc */
 extern void evfs_entries_raw_recognize(evfs_view_pt view);
 extern void evfs_entries_initial();
-extern void evfs_entries_uninitial();
+extern void evfs_entries_uninit();
 
 /* create a empty entry and set length as placeholder */
 extern nsp_status_t evfs_entries_create_one(const char *key, int *entry_id);

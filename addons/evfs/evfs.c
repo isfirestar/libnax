@@ -1,5 +1,5 @@
 #include "evfs.h"
-#include "cluster.h"
+#include "cache.h"
 #include "view.h"
 #include "entries.h"
 
@@ -41,13 +41,14 @@ typedef struct evfs_interator {
 } evfs_interator_t;
 
 static struct {
-    int atom_handle;
+    int ready;
+    int next_handle;
     struct avltree_node_t *root_of_descriptors;
     struct list_head head_of_descriptors;
     int count_of_descriptors;
     lwp_mutex_t mutex;
 } __evfs_descriptor_mgr = {
-    .atom_handle = -1,
+    .ready = kEvmgrNotReady,
     .root_of_descriptors = NULL,
     .head_of_descriptors = { &__evfs_descriptor_mgr.head_of_descriptors, &__evfs_descriptor_mgr.head_of_descriptors },
     .count_of_descriptors = 0,
@@ -138,20 +139,15 @@ static void __evfs_dereference_descriptor(struct evfs_entry_descriptor *descript
     lwp_mutex_unlock(&__evfs_descriptor_mgr.mutex);
 }
 
-static void __evfs_close_descriptor(evfs_entry_handle_t handle)
+static void __evfs_close_descriptor(struct evfs_entry_descriptor *descriptor)
 {
-    struct evfs_entry_descriptor *descriptor;
-
     lwp_mutex_lock(&__evfs_descriptor_mgr.mutex);
-    descriptor = __evfs_search_descriptor(handle);
-    if (descriptor) {
-        if ( kEvfsDescriptorActived == descriptor->stat) {
-            descriptor->stat = kEvfsDescriptorCloseWait;
-        }
-        if (0 == descriptor->refcnt) {
-            __evfs_dequeue_descriptor(descriptor);
-            zfree(descriptor);
-        }
+    if ( kEvfsDescriptorActived == descriptor->stat) {
+        descriptor->stat = kEvfsDescriptorCloseWait;
+    }
+    if (0 == descriptor->refcnt) {
+        __evfs_dequeue_descriptor(descriptor);
+        zfree(descriptor);
     }
     lwp_mutex_unlock(&__evfs_descriptor_mgr.mutex);
 }
@@ -185,23 +181,35 @@ static nsp_boolean_t __evfs_is_legal_key(const char *key)
 nsp_status_t evfs_create(const char *path, int cluster_size_format, int cluster_count_format, int count_of_cache_cluster)
 {
     nsp_status_t status;
+    int expect;
+    struct evfs_cache_creator creator;
 
-    if ( atom_get(&__evfs_descriptor_mgr.atom_handle) > 0) {
-        return EEXIST;
+    if (!path || cluster_size_format <= 0 || cluster_count_format <= 0) {
+        return posix__makeerror(EINVAL);
     }
 
-    status = evfs_create_filesystem(path, cluster_size_format, cluster_count_format);
+    expect = kEvmgrNotReady;
+    if (!atom_compare_exchange_strong(&__evfs_descriptor_mgr.ready, &expect, kEvmgrInitializing)) {
+        return posix__makeerror(EEXIST);
+    }
+
+    creator.cluster_size = cluster_size_format;
+    creator.cluster_count = cluster_count_format;
+    status = evfs_cache_init(path, count_of_cache_cluster, &creator);
     if (!NSP_SUCCESS(status)) {
+        atom_set(&__evfs_descriptor_mgr.ready, kEvmgrNotReady);
         return status;
     }
 
-    status = evfs_view_create(count_of_cache_cluster);
+    status = evfs_view_create();
     if (NSP_SUCCESS(status)) {
         evfs_entries_initial();
         lwp_mutex_init(&__evfs_descriptor_mgr.mutex, 1);
-        atom_set(&__evfs_descriptor_mgr.atom_handle, 0);
+        atom_set(&__evfs_descriptor_mgr.next_handle, 0);
+        atom_set(&__evfs_descriptor_mgr.ready, kEvmgrReady);
     } else {
-        evfs_close_filesystem();
+        evfs_cache_uninit();
+        atom_set(&__evfs_descriptor_mgr.ready, kEvmgrNotReady);
     }
 
     return status;
@@ -210,23 +218,32 @@ nsp_status_t evfs_create(const char *path, int cluster_size_format, int cluster_
 nsp_status_t evfs_open(const char *path, int count_of_cache_cluster)
 {
     nsp_status_t status;
+    int expect;
 
-    if ( atom_get(&__evfs_descriptor_mgr.atom_handle) > 0) {
-        return EEXIST;
+    if (!path) {
+        return posix__makeerror(EINVAL);
     }
 
-    status = evfs_open_filesystem(path);
+    expect = kEvmgrNotReady;
+    if (!atom_compare_exchange_strong(&__evfs_descriptor_mgr.ready, &expect, kEvmgrInitializing)) {
+        return posix__makeerror(EEXIST);
+    }
+
+    status = evfs_cache_init(path, count_of_cache_cluster, NULL);
     if (!NSP_SUCCESS(status)) {
+        atom_set(&__evfs_descriptor_mgr.ready, kEvmgrNotReady);
         return status;
     }
 
-    status = evfs_view_load(evfs_entries_raw_recognize, count_of_cache_cluster);
+    status = evfs_view_load(evfs_entries_raw_recognize);
     if (NSP_SUCCESS(status)) {
         evfs_entries_initial();
         lwp_mutex_init(&__evfs_descriptor_mgr.mutex, 1);
-        atom_set(&__evfs_descriptor_mgr.atom_handle, 0);
+        atom_set(&__evfs_descriptor_mgr.next_handle, 0);
+        atom_set(&__evfs_descriptor_mgr.ready, kEvmgrReady);
     } else {
-        evfs_close_filesystem();
+        evfs_cache_uninit();
+        atom_set(&__evfs_descriptor_mgr.ready, kEvmgrNotReady);
     }
     
     return status;
@@ -236,33 +253,39 @@ void evfs_close()
 {
     struct evfs_entry_descriptor *descriptor;
 
-    if ( atom_get(&__evfs_descriptor_mgr.atom_handle) < 0) {
+    if ( atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return;
     }
 
     lwp_mutex_lock(&__evfs_descriptor_mgr.mutex);
-
     while (NULL != (descriptor = list_first_entry_or_null(&__evfs_descriptor_mgr.head_of_descriptors, struct evfs_entry_descriptor, element_of_descriptor_list))) {
-        __evfs_close_descriptor(descriptor->handle);
+        __evfs_close_descriptor(descriptor);
     }
-
     lwp_mutex_unlock(&__evfs_descriptor_mgr.mutex);
 
-    evfs_entries_uninitial();
-    evfs_view_cleanup();
-    evfs_close_filesystem();
+    evfs_entries_uninit();
+    evfs_view_uninit();
+    evfs_cache_uninit();
 
-    atom_set(&__evfs_descriptor_mgr.atom_handle, -1);
+    atom_set(&__evfs_descriptor_mgr.next_handle, -1);
 }
 
 nsp_status_t evfs_query_stat(evfs_stat_t *evstat)
 {
-    if (!evstat || atom_get(&__evfs_descriptor_mgr.atom_handle) < 0) {
+    struct evfs_cache_creator creator;
+    nsp_status_t status;
+
+    if (!evstat || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
     }
 
-    evstat->cluster_count = evfs_cluster_get_usable_count();
-    evstat->cluster_size = evfs_cluster_get_size();
+    status = evfs_cache_hard_state(&creator);
+    if (!NSP_SUCCESS(status)) {
+        return status;
+    }
+    evstat->cluster_count = creator.cluster_count;
+    evstat->cluster_size = creator.cluster_size;
+
     evfs_view_get_count(&evstat->cluster_idle, &evstat->cluster_busy);
     evstat->entries = evfs_entries_query_total_count();
     return NSP_STATUS_SUCCESSFUL;
@@ -270,6 +293,9 @@ nsp_status_t evfs_query_stat(evfs_stat_t *evstat)
 
 float evfs_query_cache_performance()
 {
+    if (atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
+        return 0.0f;
+    }
     return evfs_view_get_performance();
 }
 
@@ -278,7 +304,7 @@ evfs_entry_handle_t evfs_create_entry(const char *key)
     nsp_status_t status;
     struct evfs_entry_descriptor *descriptor;
 
-    if (!key || atom_get(&__evfs_descriptor_mgr.atom_handle) < 0) {
+    if (!key || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
     }
 
@@ -297,7 +323,7 @@ evfs_entry_handle_t evfs_create_entry(const char *key)
         zfree(descriptor);
         return status;
     }
-    descriptor->handle = atom_addone(&__evfs_descriptor_mgr.atom_handle);
+    descriptor->handle = atom_addone(&__evfs_descriptor_mgr.next_handle);
     descriptor->offset = 0;
     descriptor->stat = kEvfsDescriptorActived;
 
@@ -312,7 +338,7 @@ evfs_entry_handle_t evfs_open_entry(int entry_id)
     nsp_status_t status;
     struct evfs_entry_descriptor *descriptor;
 
-    if (entry_id < 0 || atom_get(&__evfs_descriptor_mgr.atom_handle) < 0) {
+    if (entry_id < 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
     }
 
@@ -326,7 +352,7 @@ evfs_entry_handle_t evfs_open_entry(int entry_id)
         zfree(descriptor);
         return status;
     }
-    descriptor->handle = atom_addone(&__evfs_descriptor_mgr.atom_handle);
+    descriptor->handle = atom_addone(&__evfs_descriptor_mgr.next_handle);
     descriptor->entry_id = entry_id;
     descriptor->stat = kEvfsDescriptorActived;
     
@@ -341,7 +367,7 @@ evfs_entry_handle_t evfs_open_entry_bykey(const char *key)
     nsp_status_t status;
     struct evfs_entry_descriptor *descriptor;
 
-    if (!key || atom_get(&__evfs_descriptor_mgr.atom_handle) < 0) {
+    if (!key || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return -1;
     }
 
@@ -359,7 +385,7 @@ evfs_entry_handle_t evfs_open_entry_bykey(const char *key)
         zfree(descriptor);
         return -1;
     }
-    descriptor->handle = atom_addone(&__evfs_descriptor_mgr.atom_handle);
+    descriptor->handle = atom_addone(&__evfs_descriptor_mgr.next_handle);
     descriptor->stat = kEvfsDescriptorActived;
 
     /* queue the descriptor */
@@ -373,7 +399,7 @@ int evfs_get_entry_size(evfs_entry_handle_t handle)
     struct evfs_entry_descriptor *descriptor;
     int data_seg_size;
 
-    if (handle < 0) {
+    if (handle < 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return -1;
     }
 
@@ -391,7 +417,7 @@ void evfs_close_entry(evfs_entry_handle_t handle)
 {
     struct evfs_entry_descriptor *descriptor;
 
-    if (handle < 0) {
+    if (handle < 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return;
     }
 
@@ -404,7 +430,8 @@ void evfs_close_entry(evfs_entry_handle_t handle)
         evfs_entries_close_one(descriptor->entry_id);
     }
     
-    __evfs_close_descriptor(handle);
+    __evfs_dereference_descriptor(descriptor);
+    __evfs_close_descriptor(descriptor);
 }
 
 int evfs_write_entry(evfs_entry_handle_t handle, const char *data, int size)
@@ -413,7 +440,7 @@ int evfs_write_entry(evfs_entry_handle_t handle, const char *data, int size)
     struct evfs_entry_descriptor *descriptor;
     int wrcb;
 
-    if ( handle <= 0 || !data || size <= 0) {
+    if ( handle <= 0 || !data || size <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
     }
 
@@ -444,7 +471,7 @@ int evfs_read_entry(evfs_entry_handle_t handle, char *data, int size)
     struct evfs_entry_descriptor *descriptor;
     int rdcb;
 
-    if (handle <= 0 || !data || size <= 0) {
+    if (handle <= 0 || !data || size <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
     }
 
@@ -463,7 +490,7 @@ int evfs_read_entry(evfs_entry_handle_t handle, char *data, int size)
 
 int evfs_read_iterator_entry(const evfs_iterator_pt iterator, char *data, int size)
 {
-    if (!iterator || !data || size <= 0) {
+    if (!iterator || !data || size <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
     }
 
@@ -478,6 +505,10 @@ int evfs_query_entry_length(evfs_entry_handle_t handle)
 {
     struct evfs_entry_descriptor *descriptor;
     int length;
+
+    if (handle <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
+        return posix__makeerror(EINVAL);
+    }
 
     descriptor = __evfs_reference_descriptor(handle);
     if (!descriptor) {
@@ -494,6 +525,10 @@ nsp_status_t evfs_seek_entry_offset(evfs_entry_handle_t handle, int seek)
 {
     struct evfs_entry_descriptor *descriptor;
 
+    if (handle <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady || seek < 0) {
+        return posix__makeerror(EINVAL);
+    }
+
     descriptor = __evfs_reference_descriptor(handle);
     if (!descriptor) {
         return posix__makeerror(ENOENT);
@@ -509,6 +544,10 @@ nsp_status_t evfs_truncate_entry(evfs_entry_handle_t handle, int size)
     struct evfs_entry_descriptor *descriptor;
     nsp_status_t status;
 
+    if (handle <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady || size < 0) {
+        return posix__makeerror(EINVAL);
+    }
+
     descriptor = __evfs_reference_descriptor(handle);
     if (!descriptor) {
         return posix__makeerror(ENOENT);
@@ -522,6 +561,10 @@ nsp_status_t evfs_truncate_entry(evfs_entry_handle_t handle, int size)
 void evfs_flush_entry_buffer(evfs_entry_handle_t handle)
 {
     struct evfs_entry_descriptor *descriptor;
+
+    if (handle <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
+        return;
+    }
 
     descriptor = __evfs_reference_descriptor(handle);
     if (!descriptor) {
@@ -538,6 +581,10 @@ nsp_status_t evfs_earse_entry(evfs_entry_handle_t handle)
     struct evfs_entry_descriptor *descriptor;
     nsp_status_t status;
 
+    if (handle <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
+        return posix__makeerror(EINVAL);
+    }
+
     descriptor = __evfs_reference_descriptor(handle);
     if (!descriptor) {
         return posix__makeerror(ENOENT);
@@ -553,7 +600,7 @@ nsp_status_t evfs_earse_entry(evfs_entry_handle_t handle)
 
 nsp_status_t evfs_earse_entry_by_name(const char *name)
 {
-    if (!name) {
+    if (!name || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
     }
     
@@ -563,6 +610,10 @@ nsp_status_t evfs_earse_entry_by_name(const char *name)
 evfs_iterator_pt evfs_iterate_entries(evfs_iterator_pt iterator)
 {
     evfs_iterator_pt iter;
+
+    if (atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
+        return NULL;
+    }
 
     iter = iterator;
     if (!iter) {

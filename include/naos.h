@@ -31,4 +31,12 @@ PORTABLEAPI(nsp_boolean_t) naos_is_legal_ipv4(const char *inetstr);
  * the upper restrict of @length is 8192 byte */
 PORTABLEAPI(void) naos_hexdump(const unsigned char *buffer, uint16_t length, uint8_t columns, void (*on_dump)(const char *text, uint32_t length));
 
+/* parse a command line like string @cmdline to @target
+ * every command line is split by space
+ * words which start with '"' will be treated as a whole string
+ * output parameter @target MUST allocate by caller, @max parameter indicate the max element count of @target
+ * on success, return the element count of @target, otherwise return -1
+ * warning: after this method called, source buffer which pointer to by @cmdline are already been destroied(the splitor space are overridden by \0) */
+PORTABLEAPI(int) naos_cmdline_like_analyze(char *cmdline, char **target, int max);
+
 #endif
