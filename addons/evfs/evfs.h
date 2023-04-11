@@ -21,21 +21,23 @@
 
 typedef struct evfs_interator *evfs_iterator_pt;
 
-PORTABLEAPI(nsp_status_t)                   evfs_create(const char *path, int cluster_size_format, int cluster_count_format, int count_of_cache_cluster);
-PORTABLEAPI(nsp_status_t)                   evfs_open(const char *path, int count_of_cache_cluster);
+PORTABLEAPI(nsp_status_t)                   evfs_create(const char *path, int cluster_size_format, int cluster_count_format, int cache_block_num);
+PORTABLEAPI(nsp_status_t)                   evfs_open(const char *path, int cache_block_num);
 PORTABLEAPI(void)                           evfs_close();
 
 typedef struct _evfs_stat
 {
+    int file_size;
     int cluster_size;
     int cluster_count;
     int cluster_idle;
     int cluster_busy;
     int entry_count;
-    int cache_block_count;
+    int cache_block_num;
     float cache_hit_rate;
 } evfs_stat_t;
 PORTABLEAPI(nsp_status_t)                   evfs_query_stat(evfs_stat_t *evstat);
+PORTABLEAPI(nsp_status_t)                   evfs_set_cache_block_num(int cache_block_num);
 
 typedef int evfs_entry_handle_t;
 

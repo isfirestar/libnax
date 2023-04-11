@@ -404,6 +404,11 @@ nsp_status_t evfs_hard_flush()
     return ifos_file_flush(__evfs_cluster_mgr.fd);
 }
 
+int evfs_hard_get_filesize()
+{
+    return __evfs_is_ready() ? __evfs_cluster_mgr.fsize : 0;
+}
+
 int evfs_hard_get_cluster_size()
 {
     return __evfs_is_ready() ? __evfs_cluster_mgr.evhrd->cluster_size : 0;

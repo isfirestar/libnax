@@ -15,10 +15,11 @@ struct evfs_cache_creator {
 };
 
 struct evfs_cache_stat {
+    int file_size;
     int hard_cluster_size;
     int hard_cluster_count;
     int hard_max_pre_userseg;
-    int cache_block_count;
+    int cache_block_num;
 };
 
 /* init evfs cache by specify fix cluster count, and the size of single cluster.
@@ -69,6 +70,9 @@ extern void evfs_cache_flush_block(int cluster_id, int no_wait);
 
 /* expand file */
 extern int evfs_cache_expand(int *next_cluster_id);
+
+/* change cache block count */
+extern nsp_status_t evfs_cache_set_block_num(int cache_block_num);
 
 /* caculate the rate of hit */
 extern float evfs_cache_hit_rate();

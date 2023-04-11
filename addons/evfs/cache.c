@@ -52,6 +52,7 @@ enum evfs_cache_iotype
     kEvfsCacheIOTypeHardClose,
     kEvfsCacheIOTypeHardState,
     kEvfsCacheIOTypeHardExpand,
+    kEvfsCacheIOTypeChangeBlockCount,
 };
 
 #define EVFS_MAX_IO_PENDING_COUNT   (160)
@@ -87,7 +88,7 @@ static struct {
     struct list_with_count dirty;
     struct list_with_count idle;
     int cluster_size;
-    int cache_cluster_count;
+    int cache_block_num;
     struct evfs_cache_efficiency_statistcs statistics;
     struct evfs_cache_merge_thread merge;
     int ready;
@@ -97,7 +98,7 @@ static struct {
     .dirty = { LIST_HEAD_INIT(__evfs_cache_mgr.dirty.head), 0 },
     .idle = { LIST_HEAD_INIT(__evfs_cache_mgr.idle.head), 0 },
     .cluster_size = 0,
-    .cache_cluster_count = 0,
+    .cache_block_num = 0,
     .statistics = { 0, 0 },
     .merge = { .
         thread = LWP_TYPE_INIT,
@@ -447,7 +448,7 @@ static nsp_status_t __evfs_cache_read(int cluster_id, unsigned char *data, int o
 
     do {
         /* if cache module have been disabled, we read data from harddisk directly */
-        if (0 == __evfs_cache_mgr.cache_cluster_count) {
+        if (0 == __evfs_cache_mgr.cache_block_num) {
             status = __evfs_cache_read_harddisk(cluster_id, data, offset, length);
             break;
         }
@@ -486,7 +487,7 @@ static nsp_status_t __evfs_cache_write(int cluster_id, const unsigned char *data
 
     do {
         /* if cache module have been disabled, we write data to harddisk directly */
-        if (0 == __evfs_cache_mgr.cache_cluster_count) {
+        if (0 == __evfs_cache_mgr.cache_block_num) {
             status = __evfs_cache_write_harddisk(cluster_id, data, offset, length);
             break;
         }
@@ -511,12 +512,12 @@ static nsp_status_t __evfs_cache_write(int cluster_id, const unsigned char *data
 }
 
 /* add some blocks and push all of them to idle list */
-static int __evfs_cache_add_block_to_idle(int cache_cluster_count)
+static int __evfs_cache_add_block_to_idle(int cache_block_num)
 {
     int i;
     struct evfs_cache_node *node;
 
-    for (i = 0; i < cache_cluster_count; i++) {
+    for (i = 0; i < cache_block_num; i++) {
         node = (struct evfs_cache_node *)ztrymalloc(sizeof(*node));
         if (!node) {
             break;
@@ -532,10 +533,10 @@ static int __evfs_cache_add_block_to_idle(int cache_cluster_count)
         /* insert into idle list */
         list_add_tail(&node->element_of_lru, &__evfs_cache_mgr.idle.head);
         __evfs_cache_mgr.idle.count++;
-        __evfs_cache_mgr.cache_cluster_count++;
+        __evfs_cache_mgr.cache_block_num++;
     }
 
-    __evfs_cache_mgr.cache_cluster_count += i;
+    __evfs_cache_mgr.cache_block_num += i;
     return i;
 }
 
@@ -548,12 +549,12 @@ static nsp_status_t __evfs_cache_init_merge_thread()
     return lwp_create(&__evfs_cache_mgr.merge.thread, 0, __evfs_cache_thread_merge_io, NULL);
 }
 
-nsp_status_t evfs_cache_init(const char *file, int cache_cluster_count, const struct evfs_cache_creator *creator)
+nsp_status_t evfs_cache_init(const char *file, int cache_block_num, const struct evfs_cache_creator *creator)
 {
     int expect;
     nsp_status_t status;
 
-    if (cache_cluster_count < 0) {
+    if (cache_block_num < 0) {
         return posix__makeerror(EINVAL);
     }
 
@@ -575,12 +576,12 @@ nsp_status_t evfs_cache_init(const char *file, int cache_cluster_count, const st
         }
 
         /* zero cache count means disable cache module, this is not a error */
-        if (0 == cache_cluster_count) {
+        if (0 == cache_block_num) {
             status = NSP_STATUS_SUCCESSFUL;
         }
 
         /* create blocks and push all to idle list */
-        if (0 == (__evfs_cache_mgr.cache_cluster_count = __evfs_cache_add_block_to_idle(cache_cluster_count))) {
+        if (0 == (__evfs_cache_mgr.cache_block_num = __evfs_cache_add_block_to_idle(cache_block_num))) {
             status = posix__makeerror(ENOMEM);
         }
 
@@ -598,7 +599,7 @@ nsp_status_t evfs_cache_init(const char *file, int cache_cluster_count, const st
     return status;
 }
 
-nsp_status_t evfs_cache_add_block(int cache_cluster_count)
+nsp_status_t evfs_cache_add_block(int cache_block_num)
 {
     struct evfs_cache_io_task *task;
     nsp_status_t status;
@@ -613,7 +614,7 @@ nsp_status_t evfs_cache_add_block(int cache_cluster_count)
     }
     task->cluster_id = 0;
     task->offset = 0;
-    task->length = cache_cluster_count;
+    task->length = cache_block_num;
     task->data = NULL;
     task->io_type = kEvfsCacheIOTypeAddCacheBlock;
     task->no_wait = 0;
@@ -697,7 +698,7 @@ void evfs_cache_uninit()
 
     /* step 7. reset all other fields in manger */
     __evfs_cache_mgr.cluster_size = 0;
-    __evfs_cache_mgr.cache_cluster_count = 0;
+    __evfs_cache_mgr.cache_block_num = 0;
 
     /* step 8. recover the ready states */
     atom_set(&__evfs_cache_mgr.ready, kEvmgrNotReady);
@@ -1023,6 +1024,98 @@ int evfs_cache_expand(int *next_cluster_id)
     return task->offset;
 }
 
+nsp_status_t __evfs_cache_set_block_num(int cache_block_num)
+{
+    int i;
+    struct evfs_cache_node *node;
+
+    if (kEvmgrReady != atom_get(&__evfs_cache_mgr.ready) || cache_block_num < 0) {
+        return posix__makeerror(EINVAL);
+    }
+
+    /* if the target number of cache block large than existing, allocate the increment and push to idle list */
+    if (cache_block_num > __evfs_cache_mgr.cache_block_num) {
+        for (i = __evfs_cache_mgr.cache_block_num; i < cache_block_num; i++) {
+            node = (struct evfs_cache_node *)ztrymalloc(sizeof(*node));
+            if (!node) {
+                return posix__makeerror(ENOMEM);
+            }
+            node->cluster_id = 0;
+            node->state = kEvfsCacheBlockIdle;
+            node->data = (unsigned char *)ztrymalloc(__evfs_cache_mgr.cluster_size);
+            if (!node->data) {
+                zfree(node);
+                return posix__makeerror(ENOMEM);
+            }
+            list_add_tail(&node->element_of_idle, &__evfs_cache_mgr.idle.head);
+            __evfs_cache_mgr.idle.count++;
+            __evfs_cache_mgr.cache_block_num++;
+        }
+    }
+
+    /* otherwise, remove the node from idle list and lru list until existed block number equal to target */
+    else if (cache_block_num < __evfs_cache_mgr.cache_block_num) {
+        while (NULL != (node = list_first_entry_or_null(&__evfs_cache_mgr.idle.head, struct evfs_cache_node, element_of_idle))) {
+            list_del(&node->element_of_idle);
+            __evfs_cache_mgr.idle.count--;
+            zfree(node->data);
+            zfree(node);
+            __evfs_cache_mgr.cache_block_num--;
+            if (cache_block_num == __evfs_cache_mgr.cache_block_num) {
+                break;
+            }
+        }
+
+        while (NULL != (node = list_first_entry_or_null(&__evfs_cache_mgr.lru.head, struct evfs_cache_node, element_of_lru))) {
+            list_del(&node->element_of_lru);
+            __evfs_cache_mgr.lru.count--;
+            zfree(node->data);
+            zfree(node);
+            __evfs_cache_mgr.cache_block_num--;
+            if (cache_block_num == __evfs_cache_mgr.cache_block_num) {
+                break;
+            }
+        }
+    }
+
+    /* nothing to do when target equal to now */
+    else if (cache_block_num == __evfs_cache_mgr.cache_block_num) {
+        ;
+    }
+
+    return NSP_STATUS_SUCCESSFUL;
+}
+
+/* create task with kEvfsCacheIOTypeChangeBlockCount and post to worker thread */
+nsp_status_t evfs_cache_set_block_num(int cache_block_num)
+{
+    struct evfs_cache_io_task *task;
+    nsp_status_t status;
+
+    if (kEvmgrReady != atom_get(&__evfs_cache_mgr.ready) || cache_block_num < 0) {
+        return posix__makeerror(EINVAL);
+    }
+
+    task = (struct evfs_cache_io_task *)ztrymalloc(sizeof(*task));
+    if (!task) {
+        return posix__makeerror(ENOMEM);
+    }
+    task->cluster_id = 0;
+    task->offset = 0;
+    task->length = cache_block_num;
+    task->data = NULL;
+    task->io_type = kEvfsCacheIOTypeChangeBlockCount;
+    task->no_wait = 0;
+    /* push task to io list and awaken the io thread */
+    status = __evfs_cache_push_task_and_notify_run(task);
+    if (!NSP_SUCCESS(status)) {
+        zfree(task);
+        return posix__makeerror(ENOMEM);
+    }
+
+    return __evfs_cache_wait_background_compelete(task);
+}
+
 float evfs_cache_hit_rate()
 {
     int count_of_hit;
@@ -1188,11 +1281,15 @@ static void __evfs_cache_exec_task(struct evfs_cache_io_task *task)
         ((struct evfs_cache_stat *)task->ptr)->hard_cluster_count = evfs_hard_get_usable_cluster_count();
         ((struct evfs_cache_stat *)task->ptr)->hard_cluster_size = evfs_hard_get_cluster_size();
         ((struct evfs_cache_stat *)task->ptr)->hard_max_pre_userseg = evfs_hard_get_max_pre_userseg();
-        ((struct evfs_cache_stat *)task->ptr)->cache_block_count = __evfs_cache_mgr.cache_cluster_count;
+        ((struct evfs_cache_stat *)task->ptr)->cache_block_num = __evfs_cache_mgr.cache_block_num;
+        ((struct evfs_cache_stat *)task->ptr)->file_size = evfs_hard_get_filesize();
         task->status = NSP_STATUS_SUCCESSFUL;
         break;
     case kEvfsCacheIOTypeHardExpand:
         __evfs_cache_expand(task);
+        break;
+    case kEvfsCacheIOTypeChangeBlockCount:
+        __evfs_cache_set_block_num(task->length);
         break;
     default:
         task->status = posix__makeerror(EINVAL);

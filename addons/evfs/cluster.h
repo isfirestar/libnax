@@ -69,6 +69,7 @@ extern nsp_status_t evfs_hard_read_cluster_head(int cluster_id, struct evfs_clus
 extern nsp_status_t evfs_hard_flush();
 
 /* manager value query */
+extern int evfs_hard_get_filesize();
 extern int evfs_hard_get_cluster_size();
 extern int evfs_hard_get_usable_cluster_count();
 extern int evfs_hard_get_max_pre_userseg();

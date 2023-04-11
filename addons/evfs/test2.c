@@ -76,6 +76,7 @@ void showhelp()
 {
     static const char helplist[] = "openfs\n"
                                     "createfs\n"
+                                    "closefs\n"
                                     "ls\n"
                                     "exit\n"
                                     "read\n"
@@ -86,7 +87,8 @@ void showhelp()
                                     "import\n"
                                     "export\n"
                                     "delete\n"
-                                    "stat\n";
+                                    "stat\n"
+                                    "setcache\n";
     printf("%s\n", helplist);
 }
 
@@ -383,12 +385,50 @@ void evfs_test_show_stat()
     }
 
     printf("evfs stat:\n");
+    printf("  file size: %d\n", stat.file_size);
     printf("  cluster size: %d\n", stat.cluster_size);
-    printf("  total cluster count: %d\n", stat.cluster_count);
-    printf("  idle cluster count: %d\n", stat.cluster_idle);
-    printf("  total entries count: %d\n", stat.entry_count);
-    printf("  cache block count: %d\n", stat.cache_block_count);
-    printf("  cache hit rate: %.2f%%\n", stat.cache_hit_rate);
+    printf("  idle/total cluster count: %d/%d\n", stat.cluster_idle, stat.cluster_count);
+    printf("  entry count: %d\n", stat.entry_count);
+    printf("  cache blocks: %d\n", stat.cache_block_num);
+    printf("  hit rate: %.2f%%\n", stat.cache_hit_rate);
+}
+
+void evfs_test_createfs(const char *file, char *pcmd)
+{
+    char *target;
+    nsp_status_t status;
+    int cluster_count_format;
+    int count;
+
+    cluster_count_format = 32;
+    count = cmdparse(pcmd, &target, 1);
+    if (count > 0) {
+        cluster_count_format = atoi(target);
+    }
+
+    // 80% cache
+    status = evfs_create(file, 128, cluster_count_format, cluster_count_format * 4 / 5);
+    if (!NSP_SUCCESS(status)) {
+        printf("create evfs failed with code:%ld\n", status);
+        return;
+    }
+    printf("create file %s ok.\n", file);
+}
+
+void evfs_test_set_cache_size(char *pcmd)
+{
+    char *target;
+    int count;
+    int cache_block_num;
+
+    count = cmdparse(pcmd, &target, 1);
+    if (count < 1) {
+        printf("usage : evfs setcache [block-num]\n");
+        return;
+    }
+
+    cache_block_num = atoi(target);
+    evfs_set_cache_block_num(cache_block_num);
 }
 
 int main(int argc, char **argv)
@@ -420,14 +460,19 @@ int main(int argc, char **argv)
         }
 
         if (0 == strncmp(pcmd, "createfs", 8)) {
-            status = evfs_create(file, 128, 16, 8);
-            if (!NSP_SUCCESS(status)) {
-                printf("create evfs failed with code:%ld\n", status);
-                break;
-            }
-            printf("create file %s ok.\n", file);
+            evfs_test_createfs(argv[1], pcmd + 8);
             is_opened = 1;
             continue;
+        }
+
+        if (0 == strncmp(pcmd, "closefs", 7)) {
+            if (handle > 0) {
+                printf("order to close entry %d\n", handle);
+                evfs_close_entry(handle);
+                handle = -1;
+            }
+            evfs_close();
+            is_opened = 0;
         }
 
         if (0 == strncmp(pcmd, "exit", 4)) {
@@ -518,6 +563,11 @@ int main(int argc, char **argv)
 
         if (0 == strcmp(pcmd, "stat")) {
             evfs_test_show_stat();
+            continue;
+        }
+
+        if (0 == strncmp(pcmd, "setcache", 8)) {
+            evfs_test_set_cache_size(pcmd + 8);
             continue;
         }
 

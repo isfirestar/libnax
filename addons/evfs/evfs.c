@@ -178,7 +178,7 @@ static nsp_boolean_t __evfs_is_legal_key(const char *key)
     return 1;
 }
 
-nsp_status_t evfs_create(const char *path, int cluster_size_format, int cluster_count_format, int count_of_cache_cluster)
+nsp_status_t evfs_create(const char *path, int cluster_size_format, int cluster_count_format, int cache_block_num)
 {
     nsp_status_t status;
     int expect;
@@ -195,7 +195,7 @@ nsp_status_t evfs_create(const char *path, int cluster_size_format, int cluster_
 
     creator.hard_cluster_size = cluster_size_format;
     creator.hard_cluster_count = cluster_count_format;
-    status = evfs_cache_init(path, count_of_cache_cluster, &creator);
+    status = evfs_cache_init(path, cache_block_num, &creator);
     if (!NSP_SUCCESS(status)) {
         atom_set(&__evfs_descriptor_mgr.ready, kEvmgrNotReady);
         return status;
@@ -214,7 +214,7 @@ nsp_status_t evfs_create(const char *path, int cluster_size_format, int cluster_
     return status;
 }
 
-nsp_status_t evfs_open(const char *path, int count_of_cache_cluster)
+nsp_status_t evfs_open(const char *path, int cache_block_num)
 {
     nsp_status_t status;
     int expect;
@@ -228,7 +228,7 @@ nsp_status_t evfs_open(const char *path, int count_of_cache_cluster)
         return posix__makeerror(EEXIST);
     }
 
-    status = evfs_cache_init(path, count_of_cache_cluster, NULL);
+    status = evfs_cache_init(path, cache_block_num, NULL);
     if (!NSP_SUCCESS(status)) {
         atom_set(&__evfs_descriptor_mgr.ready, kEvmgrNotReady);
         return status;
@@ -282,9 +282,10 @@ nsp_status_t evfs_query_stat(evfs_stat_t *evstat)
     if (!NSP_SUCCESS(status)) {
         return status;
     }
+    evstat->file_size = hard.file_size;
     evstat->cluster_count = hard.hard_cluster_count;
     evstat->cluster_size = hard.hard_cluster_size;
-    evstat->cache_block_count = hard.cache_block_count;
+    evstat->cache_block_num = hard.cache_block_num;
 
     /* soft state */
     status = evfs_entries_soft_stat(&soft);
@@ -299,6 +300,15 @@ nsp_status_t evfs_query_stat(evfs_stat_t *evstat)
     evstat->cache_hit_rate = evfs_cache_hit_rate();
 
     return NSP_STATUS_SUCCESSFUL;
+}
+
+nsp_status_t evfs_set_cache_block_num(int cache_block_num)
+{
+    if (atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
+        return posix__makeerror(EINVAL);
+    }
+
+    return evfs_cache_set_block_num(cache_block_num);
 }
 
 evfs_entry_handle_t evfs_create_entry(const char *key)
