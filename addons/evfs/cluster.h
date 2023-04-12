@@ -7,10 +7,6 @@
  *   the total file size must be less than 1GB
 */
 
-#define MINIMUM_CLUSTER_SIZE    (32)
-#define DEFAULT_CLUSTER_SIZE    (128)
-#define MAXIMUM_CLUSTER_SIZE    (4096)
-
 #define MAXIMUM_FILE_SIZE       (1 << 30)   /* 1GB */
 #define EVFS_MAGIC              ((int)'sfvE')
 

@@ -110,13 +110,14 @@ nsp_status_t evfs_hard_create(const char *file, int cluster_size_format, int clu
     clusterptr = NULL;
     fd = INVALID_FILE_DESCRIPTOR;
     do {
-        if (cluster_size_format >= MINIMUM_CLUSTER_SIZE && cluster_size_format <= MAXIMUM_CLUSTER_SIZE && 
-            is_powerof_2(cluster_size_format)) 
+        if (cluster_size_format < MINIMUM_CLUSTER_SIZE || cluster_size_format > MAXIMUM_CLUSTER_SIZE ||
+            !is_powerof_2(cluster_size_format)) 
         {
-            cluster_size = cluster_size_format;
-        } else {
-            cluster_size = DEFAULT_CLUSTER_SIZE;
+            status = posix__makeerror(EINVAL);
+            break;
         }
+        cluster_size = cluster_size_format;
+        
 
         if (cluster_size * cluster_count_format >= MAXIMUM_FILE_SIZE) {
             status = posix__makeerror(EINVAL);
@@ -173,6 +174,10 @@ nsp_status_t evfs_hard_create(const char *file, int cluster_size_format, int clu
     if (fd > 0 && fd != __evfs_cluster_mgr.fd) {
         ifos_file_close(fd);
     }
+
+    /* reset ready state when failed. */
+    expect = kEvmgrInitializing;
+    atom_compare_exchange_strong(&__evfs_cluster_mgr.ready, &expect, kEvmgrNotReady);
     return status;
 }
 
@@ -280,6 +285,9 @@ nsp_status_t evfs_hard_open(const char *file)
     if (fd > 0 && fd != __evfs_cluster_mgr.fd) {
         ifos_file_close(fd);
     }
+    /* reset ready state when failed. */
+    expectval = kEvmgrInitializing;
+    atom_compare_exchange_strong(&__evfs_cluster_mgr.ready, &expectval, kEvmgrNotReady);
     return status;
 }
 

@@ -265,6 +265,7 @@ void evfs_close()
     evfs_cache_uninit();
 
     atom_set(&__evfs_descriptor_mgr.next_handle, -1);
+    atom_set(&__evfs_descriptor_mgr.ready, kEvmgrNotReady);
 }
 
 nsp_status_t evfs_query_stat(evfs_stat_t *evstat)

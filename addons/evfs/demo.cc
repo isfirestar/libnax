@@ -5,6 +5,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <ctype.h>
+#include <gtest/gtest.h>
 
 #include "ifos.h"
 
@@ -131,7 +132,7 @@ void evfs_test_read_entry_data(evfs_entry_handle_t handle, char *pcmd)
         printf("illegal size? %d\n", maxlen);
         return;
     }
-    readlen = ((0 == len) ? maxlen : min(maxlen, len));
+    readlen = ((0 == len) ? maxlen : std::min(maxlen, len));
 
     status = evfs_seek_entry_offset(handle, off);
     if (!NSP_SUCCESS(status)) {
@@ -442,11 +443,15 @@ int main(int argc, char **argv)
         printf("usage : evfs [file]\n");
         return 1;
     }
+    strcpy(file, argv[1]);
+
+    testing::InitGoogleTest(&argc, argv);
+    auto testres = RUN_ALL_TESTS(); 
+    printf("gtest return %d\n", testres);
 
     handle = -1;
     is_opened = 0;
-    strcpy(file, argv[1]);
-
+    
     while (NULL != (pcmd = display_prompt_and_waitting_for_input(command, sizeof(command)))) {
         if (0 == strncmp(pcmd, "openfs", 6)) {
             status = evfs_open(file, 8);

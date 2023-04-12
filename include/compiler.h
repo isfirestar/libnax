@@ -182,6 +182,7 @@ typedef int nsp_boolean_t;
     #define MAXPATH (0x7f)
 #endif
 
+/* use std::min std::max instead it */
 #ifndef __cplusplus
     #if !defined max
         #define max(a,b)    (((a) > (b)) ? (a) : (b))

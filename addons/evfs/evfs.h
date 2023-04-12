@@ -19,6 +19,10 @@
 
 #include "compiler.h"
 
+#define MINIMUM_CLUSTER_SIZE    (32)
+#define DEFAULT_CLUSTER_SIZE    (128)
+#define MAXIMUM_CLUSTER_SIZE    (4096)
+
 typedef struct evfs_interator *evfs_iterator_pt;
 
 PORTABLEAPI(nsp_status_t)                   evfs_create(const char *path, int cluster_size_format, int cluster_count_format, int cache_block_num);
