@@ -629,6 +629,18 @@ nsp_status_t evfs_cache_add_block(int cache_block_num)
     return __evfs_cache_wait_background_compelete(task);
 }
 
+void __evfs_cache_uninit(struct evfs_cache_io_task *task)
+{
+    /* flush all dirty blocks */
+    __evfs_cache_flush_buffer_all();
+    
+    /* hard close */
+    evfs_hard_close();
+
+    /* always success */
+    task->status = NSP_STATUS_SUCCESSFUL;
+}
+
 void evfs_cache_uninit()
 {
     int expect;
@@ -1274,8 +1286,7 @@ static void __evfs_cache_exec_task(struct evfs_cache_io_task *task)
             posix__makeerror(ENOMEM) : NSP_STATUS_SUCCESSFUL;
         break;
     case kEvfsCacheIOTypeHardClose:
-        evfs_hard_close();
-        task->status = NSP_STATUS_SUCCESSFUL;
+        __evfs_cache_uninit(task);
         break;
     case kEvfsCacheIOTypeHardState:
         ((struct evfs_cache_stat *)task->ptr)->hard_cluster_count = evfs_hard_get_usable_cluster_count();

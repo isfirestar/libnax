@@ -566,7 +566,7 @@ nsp_status_t evfs_truncate_entry(evfs_entry_handle_t handle, int size)
         return posix__makeerror(ENOENT);
     }
 
-    status = evfs_entries_truncate(descriptor->entry_id, size);
+    status = evfs_entries_truncate(descriptor->entry_id, size + MAX_ENTRY_NAME_LENGTH);
     __evfs_dereference_descriptor(descriptor);
     return status;
 }
