@@ -395,38 +395,61 @@ void evfs_view_flush(evfs_view_pt view)
     evfs_cache_flush_block(view->viewid, 1);
 }
 
-nsp_status_t evfs_view_set_next_cluster_id(evfs_view_pt view, const evfs_view_pt next_view)
+nsp_status_t evfs_view_set_next(evfs_view_pt view, const evfs_view_pt next_view)
 {
     if (!view) {
         return posix__makeerror(EINVAL);
     }
 
-    if (next_view) {
-        view->cluster.next_cluster_id = next_view->viewid;
-    } else {
-        view->cluster.next_cluster_id = 0;
+    view->cluster.next_cluster_id = (NULL != next_view) ? next_view->viewid : 0;
+    return evfs_cache_write_head(view->viewid, &view->cluster);
+}
+
+nsp_status_t evfs_view_set_head(evfs_view_pt view, const evfs_view_pt head_view)
+{
+    if (!view) {
+        return posix__makeerror(EINVAL);
     }
 
+    view->cluster.head_cluster_id = (NULL != head_view) ? head_view->viewid : view->viewid;
     return evfs_cache_write_head(view->viewid, &view->cluster);
 }
 
 int evfs_view_get_next_cluster_id(const evfs_view_pt view)
 {
-    if (!view) {
-        return 0;
-    }
-
-    return view->cluster.next_cluster_id;
+    return (NULL != view) ? view->cluster.next_cluster_id : 0;
 }
 
-nsp_status_t evfs_view_truncate_size(evfs_view_pt view, int size)
+nsp_status_t evfs_view_set_head_data_seg_size(evfs_view_pt view, int size)
 {
+    int head_data_seg_size;
+
     if (!view) {
         return posix__makeerror(EINVAL);
     }
 
-    if (view->cluster.data_seg_size != size) {
-        view->cluster.data_seg_size = size;
+    head_data_seg_size = (size <= 0 ? size : (size | 0x80000000));
+
+    if (view->cluster.data_seg_size != head_data_seg_size) {
+        view->cluster.data_seg_size = head_data_seg_size;
+        return evfs_cache_write_head(view->viewid, &view->cluster);
+    }
+
+    return NSP_STATUS_SUCCESSFUL;
+}
+
+nsp_status_t evfs_view_set_element_data_seg_size(evfs_view_pt view, int size)
+{
+    int element_data_seg_size;
+
+    if (!view) {
+        return posix__makeerror(EINVAL);
+    }
+
+    element_data_seg_size = (size >= 0 ? size : (size & ~0x80000000));
+
+    if (view->cluster.data_seg_size != element_data_seg_size) {
+        view->cluster.data_seg_size = element_data_seg_size;
         return evfs_cache_write_head(view->viewid, &view->cluster);
     }
 
@@ -438,41 +461,22 @@ int evfs_view_get_data_seg_size(const evfs_view_pt view)
     if (!view) {
         return 0;
     }
+    
+    if (view->cluster.data_seg_size < 0) {
+        return (view->cluster.data_seg_size & ~0x80000000);
+    }
 
     return view->cluster.data_seg_size;
 }
 
-nsp_status_t evfs_view_set_head_cluster_id(evfs_view_pt view, const evfs_view_pt head_view)
-{
-    if (!view) {
-        return posix__makeerror(EINVAL);
-    }
-
-    if (head_view) {
-        view->cluster.head_cluster_id = head_view->viewid;
-    } else {
-        view->cluster.head_cluster_id = 0;
-    }
-
-    return evfs_cache_write_head(view->viewid, &view->cluster);
-}
-
 int evfs_view_get_head_cluster_id(const evfs_view_pt view)
 {
-    if (!view) {
-        return -1;
-    }
-
-    return view->cluster.head_cluster_id;
+    return (NULL != view) ? view->cluster.head_cluster_id : -1;
 }
 
 int evfs_view_get_viewid(const evfs_view_pt view)
 {
-    if (!view) {
-        return -1;
-    }
-
-    return view->viewid;
+    return (NULL != view) ? view->viewid : -1;
 }
 
 int evfs_view_get_max_pre_userseg()
@@ -493,3 +497,7 @@ int evfs_view_transfer_size_to_cluster_count(int size)
     return quota_of_clusters_require;
 }
 
+int evfs_view_looks_like_head(const evfs_view_pt view)
+{
+    return (NULL != view) ? (view->cluster.data_seg_size & 0x80000000) : 0;
+}

@@ -282,3 +282,41 @@ TEST(DoCreateTruncate, CreateTruncate)
     // close the evfs file
     evfs_close();
 }
+
+// test the filesystem state function and cache modify function
+TEST(DoTestCacheAndStateQuery, CacheAndStateQuery)
+{
+    nsp_status_t status;
+    evfs_stat_t stat;
+
+    // canonical open, MUST success
+    status = evfs_create("./evfstest.db", 128, 100, 85);
+    EXPECT_EQ(status, NSP_STATUS_SUCCESSFUL);
+
+    // query the filesystem state, MUST success
+    // compare the state with the state we set when create the filesystem
+    status = evfs_query_stat(&stat);
+    EXPECT_EQ(status, NSP_STATUS_SUCCESSFUL);
+    EXPECT_EQ(stat.cluster_size, 128);
+    EXPECT_EQ(stat.cluster_count, 99);
+    EXPECT_EQ(stat.cluster_idle, 99);
+    EXPECT_EQ(stat.entry_count, 0);
+    EXPECT_EQ(stat.cluster_busy, 0);
+    EXPECT_EQ(stat.cache_block_num, 85);
+
+    // add cache node and then query the state again, MUST success
+    // compare the state with the state we set when create the filesystem
+    status = evfs_set_cache_block_num(120);
+    EXPECT_EQ(status, NSP_STATUS_SUCCESSFUL);
+    status = evfs_query_stat(&stat);
+    EXPECT_EQ(stat.cache_block_num, 120);
+
+    // decrease cache node number and query again
+    status = evfs_set_cache_block_num(80);
+    EXPECT_EQ(status, NSP_STATUS_SUCCESSFUL);
+    status = evfs_query_stat(&stat);
+    EXPECT_EQ(stat.cache_block_num, 80);
+
+    // close the evfs file
+    evfs_close();
+}

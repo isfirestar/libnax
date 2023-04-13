@@ -345,11 +345,15 @@ static struct evfs_entry_head *__evfs_entries_alloc_head(struct evfs_view_node *
     if (!entry_head) {
         return NULL;
     }
+
     /* load the entry name */
     if (view) {
-        evfs_view_read_userdata(view, entry_head->key, 0, sizeof(entry_head->key));
+        if (!key) {
+            evfs_view_read_userdata(view, entry_head->key, 0, sizeof(entry_head->key));
+        }
         entry_head->viewid = evfs_view_get_viewid(view);
         entry_head->view = view;
+        evfs_view_set_head(view, NULL);
     }
 
     if (key) {
@@ -378,7 +382,7 @@ static struct evfs_entry_element *__evfs_entries_alloc_element_for_head(struct e
 
     if (view) {
         if (entry_head) {
-            evfs_view_set_head_cluster_id(view, entry_head->view);
+            evfs_view_set_head(view, entry_head->view);
         }
         entry_element->view = view;
         entry_element->viewid = evfs_view_get_viewid(view);
@@ -400,11 +404,8 @@ static void __evfs_entries_raw_recognize(struct evfs_view_node *view)
 {
     struct evfs_entry_head *entry_head;
     struct evfs_entry_element  *entry_element;
-    int data_seg_size;
 
-    data_seg_size = evfs_view_get_data_seg_size(view);
-
-    if (data_seg_size > 0) {
+    if (evfs_view_looks_like_head(view)) {
         entry_head = __evfs_entries_alloc_head(view, NULL);
         if (!entry_head) {
             return;
@@ -544,7 +545,7 @@ nsp_status_t evfs_entries_create_one(const char *key, int *entry_id)
             break;
         }
         /* initial states always have 32 bytes occupy by entry name */
-        status = evfs_view_truncate_size(entry_head->view, sizeof(entry_head->key));
+        status = evfs_view_set_head_data_seg_size(entry_head->view, sizeof(entry_head->key));
         if (!NSP_SUCCESS(status)) {
             break;
         }
@@ -653,7 +654,7 @@ static nsp_status_t __evfs_entries_alloc_idle_element_for_head(struct evfs_entry
             break;
         }
 
-        evfs_view_set_next_cluster_id(entry_last_element ? entry_last_element->view : entry_head->view, views[i]);
+        evfs_view_set_next(entry_last_element ? entry_last_element->view : entry_head->view, views[i]);
         entry_last_element = entry_element;
     }
 
@@ -715,7 +716,7 @@ nsp_status_t evfs_entries_truncate(int entry_id, int size)
         /* elements didn't need any modify */
         if (quota_of_elements_require == entry_head->count_of_elements) {
             /* adjust user data seg length in head entry */
-            status = evfs_view_truncate_size(entry_head->view, size);
+            status = evfs_view_set_head_data_seg_size(entry_head->view, size);
             break;
         }
 
@@ -732,20 +733,20 @@ nsp_status_t evfs_entries_truncate(int entry_id, int size)
             /* mark the next view of head or element */
             if ( entry_head->count_of_elements > 0 ) {
                 entry_element = container_of(entry_head->head_of_entry_elements.prev, struct evfs_entry_element, element_of_head_entry);
-                evfs_view_set_next_cluster_id(entry_element->view, NULL);
+                evfs_view_set_next(entry_element->view, NULL);
             } else {
                 /* all elements have been removed, change the link region of head entry */
-                evfs_view_set_next_cluster_id(entry_head->view, NULL);
+                evfs_view_set_next(entry_head->view, NULL);
             }
 
             /* adjust user data seg length in head entry */
-            status = evfs_view_truncate_size(entry_head->view, size);
+            status = evfs_view_set_head_data_seg_size(entry_head->view, size);
             break;
         }
 
         if (quota_of_elements_require > entry_head->count_of_elements) {
             /* adjust user data seg length in head entry */
-            status = evfs_view_truncate_size(entry_head->view, size);
+            status = evfs_view_set_head_data_seg_size(entry_head->view, size);
             if (!NSP_SUCCESS(status)) {
                 break;
             }

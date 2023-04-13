@@ -268,6 +268,15 @@ void evfs_close()
     atom_set(&__evfs_descriptor_mgr.ready, kEvmgrNotReady);
 }
 
+void evfs_flush()
+{
+    if ( atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
+        return;
+    }
+
+    evfs_cache_flush(1);
+}
+
 nsp_status_t evfs_query_stat(evfs_stat_t *evstat)
 {
     struct evfs_cache_stat hard;

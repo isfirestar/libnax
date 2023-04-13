@@ -23,10 +23,18 @@ enum evfs_ready_stat {
 
 struct evfs_cluster
 {
-    int data_seg_size; /* when the cluster is the head of entry, this field indicate the size of user data (in bytes)
-                            particularly, if this field set to -1(CLUSTER_PLACEHOLDER), this case indicate cluster has been allocated with zero data length*/
+    /* in head cluster of a entry, this field is a negative number, which highest bit is 1, other 31 bits represent the real total legth of the entry
+       if this cluster is a sub block of a entry, this field indicate how many bytes a there in this cluster are effective
+       the zero cluster -- evfs_hrd have not this restriction, it always be a postivie number */
+    int data_seg_size;
+
+    /* pointer to the next cluster id in this entry */
     int next_cluster_id;
-    int head_cluster_id; /* whe a entry consist of more than one cluster, this field are pointer to the head cluster-id of this entry */
+
+    /* pointer to the head cluster id of this entry, this field shall be zero either cluster is idle or it's a head cluster of entry */
+    int head_cluster_id; 
+
+    /* the data context of this cluster */
     unsigned char data[0];
 };
 
@@ -45,10 +53,10 @@ struct evfs_head_record_data
 
 typedef struct evfs_cluster *evfs_cluster_pt;
 
-#define evfs_cluster_userdata(clusterptr)           ((clusterptr)->data)
-#define evfs_cluster_size_legal(size)               ((size) >= MINIMUM_CLUSTER_SIZE && (size) <= DEFAULT_CLUSTER_SIZE && is_powerof_2((size)))
-#define evfs_cluster_looks_like_busy(clusterptr)    ((0 != (clusterptr)->data_seg_size) || (clusterptr)->head_cluster_id > 0)
-
+#define evfs_cluster_userdata(clusterptr)               ((clusterptr)->data)
+#define evfs_cluster_size_legal(size)                   ((size) >= MINIMUM_CLUSTER_SIZE && (size) <= DEFAULT_CLUSTER_SIZE && is_powerof_2((size)))
+#define evfs_cluster_looks_like_busy(clusterptr)        ((0 != (clusterptr)->data_seg_size) || (clusterptr)->head_cluster_id > 0)
+        
 /* create a new filesystem and dump the file to harddisk,
     in this proc, we only build the 1st cluster, other cluster acquire calling thread to initialize after this proc success returned */
 extern nsp_status_t evfs_hard_create(const char *file, int cluster_size_format, int cluster_count);

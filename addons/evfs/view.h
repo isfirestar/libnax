@@ -26,15 +26,16 @@ extern nsp_status_t evfs_view_write_head(evfs_view_pt view);
 extern nsp_status_t evfs_view_write_userdata(const evfs_view_pt view, const void *buffer, int offset, int length);
 
 /* change or get the next cluster id of view */
-extern nsp_status_t evfs_view_set_next_cluster_id(evfs_view_pt view, const evfs_view_pt next_view);
+extern nsp_status_t evfs_view_set_next(evfs_view_pt view, const evfs_view_pt next_view);
 extern int evfs_view_get_next_cluster_id(const evfs_view_pt view);
 
-/* change or get the user data seg size of view */
-extern nsp_status_t evfs_view_truncate_size(evfs_view_pt view, int size);
+/* change or get the user data seg size of view, in get function */
+extern nsp_status_t evfs_view_set_head_data_seg_size(evfs_view_pt view, int size);
+extern nsp_status_t evfs_view_set_element_data_seg_size(evfs_view_pt view, int size);
 extern int evfs_view_get_data_seg_size(const evfs_view_pt view);
 
 /* change or get the head cluster id of view */
-extern nsp_status_t evfs_view_set_head_cluster_id(evfs_view_pt view, const evfs_view_pt head_view);
+extern nsp_status_t evfs_view_set_head(evfs_view_pt view, const evfs_view_pt head_view);
 extern int evfs_view_get_head_cluster_id(const evfs_view_pt view);
 
 /* get cluster id of view */
@@ -48,4 +49,7 @@ extern int evfs_view_get_max_pre_userseg();
 
 /* exchange bytes to cluster count */
 extern int evfs_view_transfer_size_to_cluster_count(int size);
+
+/* estimate the view(cluster) is a head of entry */
+extern int evfs_view_looks_like_head(const evfs_view_pt view);
 

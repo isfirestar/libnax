@@ -439,15 +439,18 @@ int main(int argc, char **argv)
     int is_opened;
     evfs_entry_handle_t handle;
 
+    testing::InitGoogleTest(&argc, argv);
+    auto testres = RUN_ALL_TESTS(); 
+    if (0 != testres) {
+        printf("gtest failed, exit.\n");
+        return testres;
+    }
+
     if (argc < 2) {
         printf("usage : evfs [file]\n");
         return 1;
     }
     strcpy(file, argv[1]);
-
-    testing::InitGoogleTest(&argc, argv);
-    auto testres = RUN_ALL_TESTS(); 
-    printf("gtest return %d\n", testres);
 
     handle = -1;
     is_opened = 0;
