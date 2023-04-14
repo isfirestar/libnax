@@ -1291,7 +1291,7 @@ static void __evfs_cache_exec_task(struct evfs_cache_io_task *task)
     case kEvfsCacheIOTypeHardState:
         ((struct evfs_cache_stat *)task->ptr)->hard_cluster_count = evfs_hard_get_usable_cluster_count();
         ((struct evfs_cache_stat *)task->ptr)->hard_cluster_size = evfs_hard_get_cluster_size();
-        ((struct evfs_cache_stat *)task->ptr)->hard_max_pre_userseg = evfs_hard_get_max_pre_userseg();
+        ((struct evfs_cache_stat *)task->ptr)->hard_max_data_seg_size = evfs_hard_get_max_data_seg_size();
         ((struct evfs_cache_stat *)task->ptr)->cache_block_num = __evfs_cache_mgr.cache_block_num;
         ((struct evfs_cache_stat *)task->ptr)->file_size = evfs_hard_get_filesize();
         task->status = NSP_STATUS_SUCCESSFUL;

@@ -29,7 +29,7 @@ static struct {
     lwp_mutex_t mutex;
     int total_cluster_count;
     int cluster_size;
-    int max_pre_userseg;
+    int max_data_seg_size;
 } __evfs_view_mgr = {
     .root_of_view_tree = NULL,
     .head_of_view_busylist = { &__evfs_view_mgr.head_of_view_busylist,  &__evfs_view_mgr.head_of_view_busylist },
@@ -38,7 +38,7 @@ static struct {
     .count_of_idle_views = 0,
     .total_cluster_count = 0,
     .cluster_size = 0,
-    .max_pre_userseg = 0,
+    .max_data_seg_size = 0,
 };
 
 static int __evfs_view_compare(const void *left, const void *right)
@@ -114,7 +114,7 @@ nsp_status_t evfs_view_create()
         }
     } else {
         __evfs_view_mgr.cluster_size = stat.hard_cluster_size;
-        __evfs_view_mgr.max_pre_userseg = stat.hard_max_pre_userseg;
+        __evfs_view_mgr.max_data_seg_size = stat.hard_max_data_seg_size;
     }
     return status;
 }
@@ -188,7 +188,7 @@ nsp_status_t evfs_view_load(on_view_loaded_t on_loaded)
     } else {
         __evfs_view_recognize_and_move_to_busy(on_loaded);
         __evfs_view_mgr.cluster_size = stat.hard_cluster_size;
-        __evfs_view_mgr.max_pre_userseg = stat.hard_max_pre_userseg;
+        __evfs_view_mgr.max_data_seg_size = stat.hard_max_data_seg_size;
     }
     return status;
 }
@@ -292,6 +292,7 @@ evfs_view_pt evfs_view_acquire_idle()
     evfs_view_pt view;
     struct list_head *node;
     nsp_status_t status;
+    evfs_cluster_pt zero_cluster_context;
 
     if (atom_get(&__evfs_view_mgr.total_cluster_count) <= 0) {
         return NULL;
@@ -310,6 +311,9 @@ evfs_view_pt evfs_view_acquire_idle()
 
     node = __evfs_view_mgr.head_of_view_idlelist.next;
     view = container_of(node, struct evfs_view_node, element_of_view_list);
+    view->cluster.data_seg_size = 0;
+    view->cluster.head_cluster_id = 0;
+    view->cluster.next_cluster_id = 0;
     /* erase from idle */
     list_del_init(&view->element_of_view_list);
     __evfs_view_mgr.count_of_idle_views--;
@@ -318,6 +322,14 @@ evfs_view_pt evfs_view_acquire_idle()
     __evfs_view_mgr.count_of_busy_views++;
 
     lwp_mutex_unlock(&__evfs_view_mgr.mutex);
+
+    /* maybe obsolute data in harddisk, clear all  */
+    zero_cluster_context = evfs_hard_allocate_cluster(&view->cluster);
+    if (!zero_cluster_context) {
+        return NULL;
+    }
+    evfs_cache_write(view->viewid, zero_cluster_context, 0, __evfs_view_mgr.cluster_size);
+    evfs_hard_release_cluster(zero_cluster_context);
 
     return view;
 }
@@ -350,40 +362,58 @@ nsp_status_t evfs_view_acquire_idle_more(int amount, evfs_view_pt *views)
     return NSP_STATUS_SUCCESSFUL;
 }
 
-nsp_status_t evfs_view_write_head(evfs_view_pt view)
+int evfs_view_write_head(evfs_view_pt view)
 {
+    nsp_status_t status;
+
     if (!view || atom_get(&__evfs_view_mgr.total_cluster_count) <= 0) {
-        return posix__makeerror(EINVAL);
+        return 0;
     }
 
-    return evfs_cache_write_head(view->viewid, &view->cluster);
+    status = evfs_cache_write_head(view->viewid, &view->cluster);
+    if (!NSP_SUCCESS(status)) {
+        return 0;
+    }
+    return sizeof(view->cluster);
 }
 
-nsp_status_t evfs_view_write_userdata(const evfs_view_pt view, const void *buffer, int offset, int length)
+int evfs_view_write_userdata(const evfs_view_pt view, const void *buffer, int offset, int length)
 {
+    nsp_status_t status;
+
     if (!view || !buffer || offset < 0 || length <= 0 || atom_get(&__evfs_view_mgr.total_cluster_count) <= 0) {
-        return posix__makeerror(EINVAL);
+        return 0;
     }
 
     /* neither a head view nor a element view */
     if (0 == view->cluster.data_seg_size && 0 == view->cluster.head_cluster_id) {
-        return posix__makeerror(EINVAL);
+        return 0;
     }
 
-    return evfs_cache_write_userdata(view->viewid, buffer, offset, length);
+    status = evfs_cache_write_userdata(view->viewid, buffer, offset, length);
+    if (!NSP_SUCCESS(status)) {
+        return 0;
+    }
+    return length;
 }
 
-nsp_status_t evfs_view_read_userdata(const evfs_view_pt view, void *buffer, int offset, int length)
+int evfs_view_read_userdata(const evfs_view_pt view, void *buffer, int offset, int length)
 {
+    nsp_status_t status;
+
     if (!view || !buffer || offset < 0 || length <= 0 || atom_get(&__evfs_view_mgr.total_cluster_count) <= 0) {
-        return posix__makeerror(EINVAL);
+        return 0;
     }
 
     if (0 == view->cluster.data_seg_size && 0 == view->cluster.head_cluster_id) {
-        return posix__makeerror(EINVAL);
+        return 0;
     }
 
-    return evfs_cache_read_userdata(view->viewid, buffer, offset, length);
+    status = evfs_cache_read_userdata(view->viewid, buffer, offset, length);
+    if (!NSP_SUCCESS(status)) {
+        return 0;
+    }
+    return length;
 }
 
 void evfs_view_flush(evfs_view_pt view)
@@ -479,21 +509,21 @@ int evfs_view_get_viewid(const evfs_view_pt view)
     return (NULL != view) ? view->viewid : -1;
 }
 
-int evfs_view_get_max_pre_userseg()
+int evfs_view_get_max_data_seg_size()
 {
-    return __evfs_view_mgr.max_pre_userseg;
+    return __evfs_view_mgr.max_data_seg_size;
 }
 
 int evfs_view_transfer_size_to_cluster_count(int size)
 {
     int quota_of_clusters_require;
 
-    if (size <= 0 || __evfs_view_mgr.max_pre_userseg <= 0) {
+    if (size <= 0 || __evfs_view_mgr.max_data_seg_size <= 0) {
         return 0;
     }
     
-    quota_of_clusters_require = size / __evfs_view_mgr.max_pre_userseg;
-    quota_of_clusters_require += (0 == size % __evfs_view_mgr.max_pre_userseg) ? 0 : 1;
+    quota_of_clusters_require = size / __evfs_view_mgr.max_data_seg_size;
+    quota_of_clusters_require += (0 == size % __evfs_view_mgr.max_data_seg_size) ? 0 : 1;
     return quota_of_clusters_require;
 }
 

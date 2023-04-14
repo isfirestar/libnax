@@ -18,7 +18,7 @@ struct evfs_cache_stat {
     int file_size;
     int hard_cluster_size;
     int hard_cluster_count;
-    int hard_max_pre_userseg;
+    int hard_max_data_seg_size;
     int cache_block_num;
 };
 

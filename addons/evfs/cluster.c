@@ -13,23 +13,25 @@ static struct {
     struct evfs_cluster *the_first_cluster;
     struct evfs_head_record_data *evhrd;
     int ready;
-    int max_pre_userseg;
+    int max_data_seg_size;
     int64_t fsize;
 } __evfs_cluster_mgr = {
     .fd = INVALID_FILE_DESCRIPTOR,
     .the_first_cluster = NULL,
     .evhrd = NULL,
     .ready = kEvmgrNotReady,
-    .max_pre_userseg = 0,
+    .max_data_seg_size = 0,
     .fsize = 0,
 };
+
+const char* evfs_simple_128bytes_cluster_data = "this string is a simple cluster data demo, it's 128 bytes long, this block are available for a evfs tester, create in 2023-04-14";
 
 static nsp_boolean_t __evfs_is_ready()
 {
     if (kEvmgrReady != atom_get(&__evfs_cluster_mgr.ready) ||
         !__evfs_cluster_mgr.evhrd || 
         !__evfs_cluster_mgr.the_first_cluster || 
-        INVALID_FILE_DESCRIPTOR == __evfs_cluster_mgr.fd || 0 == __evfs_cluster_mgr.fsize || 0 == __evfs_cluster_mgr.max_pre_userseg)
+        INVALID_FILE_DESCRIPTOR == __evfs_cluster_mgr.fd || 0 == __evfs_cluster_mgr.fsize || 0 == __evfs_cluster_mgr.max_data_seg_size)
     {
         return nsp_false;
     }
@@ -160,7 +162,7 @@ nsp_status_t evfs_hard_create(const char *file, int cluster_size_format, int clu
         /* all ok. fill the manger filed */
         __evfs_cluster_mgr.the_first_cluster = clusterptr;
         __evfs_cluster_mgr.evhrd = evhrd;
-        __evfs_cluster_mgr.max_pre_userseg = __evfs_cluster_mgr.evhrd->cluster_size - sizeof(struct evfs_cluster);
+        __evfs_cluster_mgr.max_data_seg_size = __evfs_cluster_mgr.evhrd->cluster_size - sizeof(struct evfs_cluster);
         __evfs_cluster_mgr.fd = fd;
         __evfs_cluster_mgr.fsize = cluster_size * cluster_count_format;
         atom_set(&__evfs_cluster_mgr.ready, kEvmgrReady);
@@ -268,7 +270,7 @@ nsp_status_t evfs_hard_open(const char *file)
         /* all ok, fill manager */
         __evfs_cluster_mgr.the_first_cluster = clusterptr;
         __evfs_cluster_mgr.evhrd = (struct evfs_head_record_data *)clusterptr->data;
-        __evfs_cluster_mgr.max_pre_userseg = __evfs_cluster_mgr.evhrd->cluster_size - sizeof(struct evfs_cluster);
+        __evfs_cluster_mgr.max_data_seg_size = __evfs_cluster_mgr.evhrd->cluster_size - sizeof(struct evfs_cluster);
         __evfs_cluster_mgr.fd = fd;
         __evfs_cluster_mgr.fsize = fsize;
         atom_set(&__evfs_cluster_mgr.ready, kEvmgrReady);
@@ -427,9 +429,9 @@ int evfs_hard_get_usable_cluster_count()
     return __evfs_is_ready() ? atom_get(&__evfs_cluster_mgr.evhrd->cluster_count) - 1 : 0;
 }
 
-int evfs_hard_get_max_pre_userseg()
+int evfs_hard_get_max_data_seg_size()
 {
-    return __evfs_is_ready() ? __evfs_cluster_mgr.max_pre_userseg : 0;
+    return __evfs_is_ready() ? __evfs_cluster_mgr.max_data_seg_size : 0;
 }
 
 evfs_cluster_pt evfs_hard_allocate_cluster(const evfs_cluster_pt source)

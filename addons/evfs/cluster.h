@@ -76,7 +76,7 @@ extern nsp_status_t evfs_hard_flush();
 extern int evfs_hard_get_filesize();
 extern int evfs_hard_get_cluster_size();
 extern int evfs_hard_get_usable_cluster_count();
-extern int evfs_hard_get_max_pre_userseg();
+extern int evfs_hard_get_max_data_seg_size();
 
 /* cluster data memory block */
 extern evfs_cluster_pt evfs_hard_allocate_cluster(const evfs_cluster_pt clusterptr);

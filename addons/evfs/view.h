@@ -18,12 +18,10 @@ extern evfs_view_pt evfs_view_acquire_idle();
 
 extern void evfs_view_flush(evfs_view_pt view);
 
-/* view read */
-extern nsp_status_t evfs_view_read_userdata(const evfs_view_pt view, void *buffer, int offset, int length);
-
-/* view write */
-extern nsp_status_t evfs_view_write_head(evfs_view_pt view);
-extern nsp_status_t evfs_view_write_userdata(const evfs_view_pt view, const void *buffer, int offset, int length);
+/* view read/write wrapper, we trans the return value to the range [0, real_read) */
+extern int evfs_view_read_userdata(const evfs_view_pt view, void *buffer, int offset, int length);
+extern int evfs_view_write_head(evfs_view_pt view);
+extern int evfs_view_write_userdata(const evfs_view_pt view, const void *buffer, int offset, int length);
 
 /* change or get the next cluster id of view */
 extern nsp_status_t evfs_view_set_next(evfs_view_pt view, const evfs_view_pt next_view);
@@ -45,7 +43,7 @@ extern int evfs_view_get_viewid(const evfs_view_pt view);
 extern void evfs_view_get_count(int *freeview, int *busyview);
 
 /* tunnel cluster property */
-extern int evfs_view_get_max_pre_userseg();
+extern int evfs_view_get_max_data_seg_size();
 
 /* exchange bytes to cluster count */
 extern int evfs_view_transfer_size_to_cluster_count(int size);

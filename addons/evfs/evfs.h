@@ -25,6 +25,8 @@
 
 typedef struct evfs_interator *evfs_iterator_pt;
 
+extern const char* evfs_simple_128bytes_cluster_data;
+
 PORTABLEAPI(nsp_status_t)                   evfs_create(const char *path, int cluster_size_format, int cluster_count_format, int cache_block_num);
 PORTABLEAPI(nsp_status_t)                   evfs_open(const char *path, int cache_block_num);
 PORTABLEAPI(void)                           evfs_close();

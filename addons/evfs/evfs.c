@@ -472,11 +472,6 @@ int evfs_write_entry(evfs_entry_handle_t handle, const char *data, int size)
     }
 
     do {
-        status = evfs_entries_lock_elements(descriptor->entry_id, descriptor->offset, size);
-        if (!NSP_SUCCESS(status)) {
-            break;
-        }
-
         wrcb = evfs_entries_write_data(descriptor->entry_id, data, descriptor->offset, size);
         if (wrcb > 0) {
             descriptor->offset += wrcb;

@@ -29,9 +29,6 @@ extern nsp_status_t evfs_entries_soft_delete(int entry_id);
 extern nsp_status_t evfs_entries_hard_delete(int entry_id);
 extern nsp_status_t evfs_entries_hard_delete_by_name(const char *key);
 
-/* calculate size in bytes of entry, get how many views inneed */
-extern nsp_status_t evfs_entries_lock_elements(int entry_id, int offset, int size);
-
 /* base I/O proc for entry
  *  truncate the entry and it didn't affect the offset of entry, this method can either expand or reduce entry occupied */
 extern int evfs_entries_write_data(int entry_id, const char *data, int offset, int size);
