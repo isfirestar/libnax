@@ -173,7 +173,7 @@ TEST(DoOpenReadWrite, OpenReadWrite)
     EXPECT_TRUE(NSP_SUCCESS(status));
 
     // entry "test.txt" shall be exist, MUST success
-    evfs_entry_handle_t handle = evfs_open_entry_bykey("test.txt");
+    evfs_entry_handle_t handle = evfs_open_entry_by_key("test.txt");
     EXPECT_GT(handle, 0);
 
     // query length and read entire data, MUST success
@@ -274,11 +274,11 @@ TEST(DoOpenCreateDelete, OpenCreateDelete)
     EXPECT_GT(handle, 0);
     evfs_close_entry(handle);
 
-    handle = evfs_open_entry_bykey("xixihaha.txt");
+    handle = evfs_open_entry_by_key("xixihaha.txt");
     EXPECT_GT(handle, 0);
     evfs_close_entry(handle);
 
-    status = evfs_earse_entry_by_name("xixihaha.txt");
+    status = evfs_earse_entry_by_key("xixihaha.txt");
     EXPECT_TRUE(NSP_SUCCESS(status));
 
     // create a new entry and write some data to it, after that, close and delete the entry, MUST success
@@ -289,7 +289,7 @@ TEST(DoOpenCreateDelete, OpenCreateDelete)
     EXPECT_EQ(written, strlen(data));
     evfs_close_entry(handle);
 
-    status = evfs_earse_entry_by_name("xixihaha.txt");
+    status = evfs_earse_entry_by_key("xixihaha.txt");
     EXPECT_TRUE(NSP_SUCCESS(status));
 
     // close the evfs file
@@ -399,9 +399,9 @@ TEST(DoTestClusterRecycleAndReuse, TestClusterRecycleAndReuse)
 
     // now delete the entry, meanwhile, all clusters in file have been recycled
     // after delete, this entry shall not be able to open again
-    status = evfs_earse_entry_by_name("xixihaha.txt");
+    status = evfs_earse_entry_by_key("xixihaha.txt");
     EXPECT_TRUE(NSP_SUCCESS(status));
-    handle = evfs_open_entry_bykey("xixihaha.txt");
+    handle = evfs_open_entry_by_key("xixihaha.txt");
     EXPECT_EQ(handle, -1);
 
     // create another entry, seek to the offset where less than 10 clusters, but didn't write data to it

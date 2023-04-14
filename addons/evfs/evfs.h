@@ -50,9 +50,9 @@ typedef int evfs_entry_handle_t;
 
 PORTABLEAPI(evfs_entry_handle_t)            evfs_create_entry(const char *key);
 PORTABLEAPI(evfs_entry_handle_t)            evfs_open_entry(int entry_id);
-PORTABLEAPI(evfs_entry_handle_t)            evfs_open_entry_bykey(const char *key);
+PORTABLEAPI(evfs_entry_handle_t)            evfs_open_entry_by_key(const char *key);
 PORTABLEAPI(nsp_status_t)                   evfs_earse_entry(evfs_entry_handle_t handle);
-PORTABLEAPI(nsp_status_t)                   evfs_earse_entry_by_name(const char *name);
+PORTABLEAPI(nsp_status_t)                   evfs_earse_entry_by_key(const char *key);
 PORTABLEAPI(void)                           evfs_close_entry(evfs_entry_handle_t handle);
 PORTABLEAPI(int)                            evfs_get_entry_size(evfs_entry_handle_t handle);
 

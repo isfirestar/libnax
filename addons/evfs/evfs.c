@@ -40,6 +40,79 @@ typedef struct evfs_interator {
     char key[MAX_ENTRY_NAME_LENGTH];
 } evfs_interator_t;
 
+enum evfs_io_task_type {
+    kEvfsIoTaskRead = 0,
+    kEvfsIoTaskWrite,
+    kEvfsIoTaskTruncate,
+    kEvfsIoTaskFlush,
+    kEvfsIoTaskFlushAll,
+    kEvfsIoTaskErase,
+    kEvfsIoTaskEraseByKey,
+    kEvfsIoTaskCreate,
+    kEvfsIoTaskSetCache,
+    kEvfsIoTaskMaximumFunction,
+};
+
+struct evfs_io_task {
+    nsp_status_t status;
+    int entry_id;
+    int offset;
+    int length;
+    union {
+        char *data;
+        const char *cdata;
+        void *ptr;
+    };
+    int type;
+    struct list_head element_of_task_list;
+    int retval;
+    lwp_event_t cond;
+    int no_wait;
+    struct evfs_entry_descriptor *descriptor;
+};
+
+static void __evfs_write_entry(struct evfs_io_task *task);
+static void __evfs_read_entry(struct evfs_io_task *task);
+static void __evfs_earse_entry_by_key(struct evfs_io_task *task);
+static void __evfs_earse_entry(struct evfs_io_task *task);
+static void __evfs_flush_entry_buffer(struct evfs_io_task *task);
+static void __evfs_flush_all(struct evfs_io_task *task);
+static void __evfs_truncate_entry(struct evfs_io_task *task);
+static void __evfs_create_entry(struct evfs_io_task *task);
+
+static const struct {
+    int io_task_type;
+    void (*io_task_handler)(struct evfs_io_task *task);
+} __evfs_io_task_exec[kEvfsIoTaskMaximumFunction] = {
+    { .io_task_type = kEvfsIoTaskRead,         .io_task_handler = __evfs_read_entry }, 
+    { .io_task_type = kEvfsIoTaskWrite,        .io_task_handler = __evfs_write_entry }, 
+    { .io_task_type = kEvfsIoTaskTruncate,     .io_task_handler = __evfs_truncate_entry }, 
+    { .io_task_type = kEvfsIoTaskFlush,        .io_task_handler = __evfs_flush_entry_buffer }, 
+    { .io_task_type = kEvfsIoTaskFlushAll,     .io_task_handler = __evfs_read_entry }, 
+    { .io_task_type = kEvfsIoTaskErase,        .io_task_handler = __evfs_earse_entry }, 
+    { .io_task_type = kEvfsIoTaskEraseByKey,   .io_task_handler = __evfs_earse_entry_by_key }, 
+    { .io_task_type = kEvfsIoTaskCreate,       .io_task_handler = __evfs_create_entry }, 
+    { .io_task_type = kEvfsIoTaskSetCache,     .io_task_handler = __evfs_read_entry }, 
+};
+
+
+struct evfs_io_background_worker {
+    int stop;
+    lwp_t thread;
+    lwp_mutex_t mutex;
+    lwp_event_t cond;
+    struct list_head head_of_tasks;
+    int count_of_tasks;
+};
+
+#if !defined EVFS_MAX_WORKER
+#define EVFS_MAX_WORKER (4)
+#endif
+
+#if !defined EVFS_MAX_IO_PENDING_COUNT
+#define EVFS_MAX_IO_PENDING_COUNT (200)
+#endif
+
 static struct {
     int ready;
     int next_handle;
@@ -47,6 +120,7 @@ static struct {
     struct list_head head_of_descriptors;
     int count_of_descriptors;
     lwp_mutex_t mutex;
+    struct evfs_io_background_worker worker[EVFS_MAX_WORKER];
 } __evfs_descriptor_mgr = {
     .ready = kEvmgrNotReady,
     .root_of_descriptors = NULL,
@@ -178,11 +252,114 @@ static nsp_boolean_t __evfs_is_legal_key(const char *key)
     return 1;
 }
 
+static void __evfs_pop_task_until_empty(struct evfs_io_background_worker *worker)
+{
+    struct evfs_io_task *task;
+
+    lwp_mutex_lock(&worker->mutex);
+    while (NULL != (task = list_first_entry_or_null(&worker->head_of_tasks, struct evfs_io_task, element_of_task_list))) {
+        list_del_init(&task->element_of_task_list);
+        worker->count_of_tasks--;
+        lwp_mutex_unlock(&worker->mutex);
+
+        __evfs_io_task_exec[task->type].io_task_handler(task);
+        if (!task->no_wait) {
+            lwp_event_awaken(&task->cond);
+        } else{
+            zfree(task);
+        }
+
+        lwp_mutex_lock(&worker->mutex);
+    }
+    lwp_mutex_unlock(&worker->mutex);
+}
+
+static void *__evfs_worker_proc(void *p)
+{
+    struct evfs_io_background_worker *worker = (struct evfs_io_background_worker *)p;
+    nsp_status_t status;
+    int stop;
+
+    while (1) {
+        lwp_mutex_lock(&worker->mutex);
+        stop = worker->stop;
+        lwp_mutex_unlock(&worker->mutex);
+        if (stop) {
+            break;
+        }
+        
+        status = lwp_event_wait(&worker->cond, -1);
+        if (!NSP_SUCCESS(status)) {
+            break;
+        }
+        lwp_event_block(&worker->cond);
+        
+        __evfs_pop_task_until_empty(worker);
+    }
+
+    __evfs_pop_task_until_empty(worker);
+    lwp_event_uninit(&worker->cond);
+    return NULL;
+}
+
+static nsp_status_t __evfs_io_push_task_and_notify_run(struct evfs_io_background_worker *worker, struct evfs_io_task *task)
+{
+    nsp_status_t status;
+
+    status = NSP_STATUS_SUCCESSFUL;
+    
+    lwp_mutex_lock(&worker->mutex);
+    do {
+        if (worker->stop) {
+            status = posix__makeerror(ENODEV);
+            break;
+        }
+        if (worker->count_of_tasks >= EVFS_MAX_IO_PENDING_COUNT) {
+            status = posix__makeerror(ENOMEM);
+            break;
+        }
+        list_add_tail(&task->element_of_task_list, &worker->head_of_tasks);
+        worker->count_of_tasks++;
+    } while(0);
+    lwp_mutex_unlock(&worker->mutex);
+
+    if (!NSP_SUCCESS(status)) {
+        return status;
+    }
+
+    if (!task->no_wait) {
+        lwp_event_init(&task->cond, LWPEC_NOTIFY);
+    }
+    lwp_event_awaken(&worker->cond);
+
+    return NSP_STATUS_SUCCESSFUL;
+}
+
+static nsp_status_t __evfs_io_wait_background_compelete(struct evfs_io_task *task, int *retval)
+{
+    nsp_status_t status;
+
+    if (task->no_wait) {
+        return NSP_STATUS_SUCCESSFUL;
+    }
+
+    lwp_event_wait(&task->cond, -1);
+    status = task->status;
+    lwp_event_uninit(&task->cond);
+    if (retval) {
+        *retval = task->retval;
+    }
+    zfree(task);
+
+    return status;
+}
+
 nsp_status_t evfs_create(const char *path, int cluster_size_format, int cluster_count_format, int cache_block_num)
 {
     nsp_status_t status;
     int expect;
     struct evfs_cache_creator creator;
+    int i;
 
     if (!path || cluster_size_format <= 0 || cluster_count_format <= 0) {
         return posix__makeerror(EINVAL);
@@ -202,15 +379,26 @@ nsp_status_t evfs_create(const char *path, int cluster_size_format, int cluster_
     }
 
     status = evfs_entries_create();
-    if (NSP_SUCCESS(status)) {
-        lwp_mutex_init(&__evfs_descriptor_mgr.mutex, 1);
-        atom_set(&__evfs_descriptor_mgr.next_handle, 0);
-        atom_set(&__evfs_descriptor_mgr.ready, kEvmgrReady);
-    } else {
+    if (!NSP_SUCCESS(status)) {
         evfs_cache_uninit();
         atom_set(&__evfs_descriptor_mgr.ready, kEvmgrNotReady);
+        return status;
     }
 
+    lwp_mutex_init(&__evfs_descriptor_mgr.mutex, 1);
+    atom_set(&__evfs_descriptor_mgr.next_handle, 0);
+
+    /* create worker thread and initial task queue */
+    for (i = 0; i < EVFS_MAX_WORKER; i++) {
+        __evfs_descriptor_mgr.worker[i].stop = 0;
+        lwp_mutex_init(&__evfs_descriptor_mgr.worker[i].mutex, 0);
+        lwp_event_init(&__evfs_descriptor_mgr.worker[i].cond, LWPEC_NOTIFY);
+        INIT_LIST_HEAD(&__evfs_descriptor_mgr.worker[i].head_of_tasks);
+        __evfs_descriptor_mgr.worker[i].count_of_tasks = 0;
+        lwp_create(&__evfs_descriptor_mgr.worker[i].thread, 0, __evfs_worker_proc, &__evfs_descriptor_mgr.worker[i]);
+    }
+
+    atom_set(&__evfs_descriptor_mgr.ready, kEvmgrReady);
     return status;
 }
 
@@ -218,6 +406,7 @@ nsp_status_t evfs_open(const char *path, int cache_block_num)
 {
     nsp_status_t status;
     int expect;
+    int i;
 
     if (!path) {
         return posix__makeerror(EINVAL);
@@ -235,26 +424,50 @@ nsp_status_t evfs_open(const char *path, int cache_block_num)
     }
 
     status = evfs_entries_load();
-    if (NSP_SUCCESS(status)) {
-        lwp_mutex_init(&__evfs_descriptor_mgr.mutex, 1);
-        atom_set(&__evfs_descriptor_mgr.next_handle, 0);
-        atom_set(&__evfs_descriptor_mgr.ready, kEvmgrReady);
-    } else {
+    if (!NSP_SUCCESS(status)) {
         evfs_cache_uninit();
         atom_set(&__evfs_descriptor_mgr.ready, kEvmgrNotReady);
+        return status;
+    } 
+
+    /* create descriptor mutex */
+    lwp_mutex_init(&__evfs_descriptor_mgr.mutex, 1);
+    atom_set(&__evfs_descriptor_mgr.next_handle, 0);
+
+    /* create worker thread and initial task queue */
+    for (i = 0; i < EVFS_MAX_WORKER; i++) {
+        __evfs_descriptor_mgr.worker[i].stop = 0;
+        lwp_mutex_init(&__evfs_descriptor_mgr.worker[i].mutex, 0);
+        lwp_event_init(&__evfs_descriptor_mgr.worker[i].cond, LWPEC_NOTIFY);
+        INIT_LIST_HEAD(&__evfs_descriptor_mgr.worker[i].head_of_tasks);
+        __evfs_descriptor_mgr.worker[i].count_of_tasks = 0;
+        lwp_create(&__evfs_descriptor_mgr.worker[i].thread, 0, __evfs_worker_proc, &__evfs_descriptor_mgr.worker[i]);
     }
     
+    atom_set(&__evfs_descriptor_mgr.ready, kEvmgrReady);
     return status;
 }
 
 void evfs_close()
 {
     struct evfs_entry_descriptor *descriptor;
+    int expect;
 
-    if ( atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
+    expect = kEvmgrReady;
+    if (!atom_compare_exchange_strong(&__evfs_descriptor_mgr.ready, &expect, kEvmgrUninitializing)) {
         return;
     }
 
+    /* stop all threads and clear task list of every worker */
+    for (int i = 0; i < EVFS_MAX_WORKER; i++) {
+        __evfs_descriptor_mgr.worker[i].stop = 1;
+        lwp_event_awaken(&__evfs_descriptor_mgr.worker[i].cond);
+        lwp_join(&__evfs_descriptor_mgr.worker[i].thread, NULL);
+        lwp_event_uninit(&__evfs_descriptor_mgr.worker[i].cond);
+        lwp_mutex_uninit(&__evfs_descriptor_mgr.worker[i].mutex);
+    }
+
+    /* destroy all descriptors */
     lwp_mutex_lock(&__evfs_descriptor_mgr.mutex);
     while (NULL != (descriptor = list_first_entry_or_null(&__evfs_descriptor_mgr.head_of_descriptors, struct evfs_entry_descriptor, element_of_descriptor_list))) {
         __evfs_close_descriptor(descriptor);
@@ -268,13 +481,37 @@ void evfs_close()
     atom_set(&__evfs_descriptor_mgr.ready, kEvmgrNotReady);
 }
 
+static void __evfs_flush_all(struct evfs_io_task *task) 
+{
+    evfs_cache_flush(1);
+}
+
 void evfs_flush()
 {
+    struct evfs_io_task *task;
+    struct evfs_io_background_worker *worker;
+
     if ( atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return;
     }
 
-    evfs_cache_flush(1);
+    worker = &__evfs_descriptor_mgr.worker[0];
+
+    /* alloc a task, the cache direct request post to worker[0] */
+    task = (struct evfs_io_task *)ztrymalloc(sizeof(*task));
+    if (!task) {
+        return;
+    }
+    task->ptr = NULL;
+    task->type = kEvfsIoTaskFlushAll;
+    task->offset = 0;
+    task->length = 0;
+    task->descriptor = NULL;
+    task->entry_id = 0;
+    task->status = 0;
+    task->no_wait = 0;
+    task->retval = 0;
+    __evfs_io_push_task_and_notify_run(worker, task);
 }
 
 nsp_status_t evfs_query_stat(evfs_stat_t *evstat)
@@ -321,10 +558,24 @@ nsp_status_t evfs_set_cache_block_num(int cache_block_num)
     return evfs_cache_set_block_num(cache_block_num);
 }
 
+static void __evfs_create_entry(struct evfs_io_task *task)
+{
+    struct evfs_entry_descriptor *descriptor;
+
+    descriptor = task->descriptor;
+    if (descriptor) {
+        task->status = evfs_entries_create_one(task->cdata, &descriptor->entry_id);
+    } else {
+        task->status = evfs_entries_create_one(task->cdata, &task->entry_id);
+    }
+}
+
 evfs_entry_handle_t evfs_create_entry(const char *key)
 {
     nsp_status_t status;
     struct evfs_entry_descriptor *descriptor;
+    struct evfs_io_task *task;
+    struct evfs_io_background_worker *worker;
 
     if (!key || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
@@ -334,25 +585,59 @@ evfs_entry_handle_t evfs_create_entry(const char *key)
         return posix__makeerror(EINVAL);
     }
 
-    descriptor = (struct evfs_entry_descriptor *)ztrycalloc(sizeof(*descriptor));
-    if (!descriptor) {
-        return posix__makeerror(ENOMEM);
-    }
-    memset(descriptor, 0, sizeof(*descriptor));
+    task = NULL;
+    descriptor = NULL;
+    do {
+        descriptor = (struct evfs_entry_descriptor *)ztrycalloc(sizeof(*descriptor));
+        if (!descriptor) {
+            break;
+        }
+        memset(descriptor, 0, sizeof(*descriptor));
 
-    status = evfs_entries_create_one(key, &descriptor->entry_id);
-    if (!NSP_SUCCESS(status)) {
+        task = (struct evfs_io_task *)ztrymalloc(sizeof(*task));
+        if (!task) {
+            break;
+        }
+
+        memset(task, 0, sizeof(*task));
+        task->cdata = key;
+        task->type = kEvfsIoTaskCreate;
+        task->offset = 0;
+        task->length = 0;
+        task->descriptor = NULL;
+        task->entry_id = 0;
+        task->status = 0;
+        task->no_wait = 0;
+        task->retval = 0;
+        task->descriptor = descriptor;
+
+        worker = &__evfs_descriptor_mgr.worker[0];
+
+        status = __evfs_io_push_task_and_notify_run(worker, task);
+        if (!NSP_SUCCESS(status)) {
+            break;
+        }
+
+        status = __evfs_io_wait_background_compelete(task, NULL);
+        task = NULL;
+
+        if (NSP_SUCCESS(status)) {
+            descriptor->handle = atom_addone(&__evfs_descriptor_mgr.next_handle);
+            descriptor->offset = 0;
+            descriptor->stat = kEvfsDescriptorActived;
+            /* queue the descriptor */
+            __evfs_queue_descriptor(descriptor);
+            return descriptor->handle;
+        }
+    } while (0);
+
+    if (task) {
+        zfree(task);
+    }
+    if (descriptor) {
         zfree(descriptor);
-        return status;
     }
-    descriptor->handle = atom_addone(&__evfs_descriptor_mgr.next_handle);
-    descriptor->offset = 0;
-    descriptor->stat = kEvfsDescriptorActived;
-
-    /* queue the descriptor */
-    __evfs_queue_descriptor(descriptor);
-
-    return descriptor->handle;
+    return -1;
 }
 
 evfs_entry_handle_t evfs_open_entry(int entry_id)
@@ -384,7 +669,7 @@ evfs_entry_handle_t evfs_open_entry(int entry_id)
     return descriptor->handle;
 }
 
-evfs_entry_handle_t evfs_open_entry_bykey(const char *key)
+evfs_entry_handle_t evfs_open_entry_by_key(const char *key)
 {
     nsp_status_t status;
     struct evfs_entry_descriptor *descriptor;
@@ -456,66 +741,196 @@ void evfs_close_entry(evfs_entry_handle_t handle)
     __evfs_close_descriptor(descriptor);
 }
 
-int evfs_write_entry(evfs_entry_handle_t handle, const char *data, int size)
+static void __evfs_write_entry(struct evfs_io_task *task)
 {
-    nsp_status_t status;
+    int cpsize;
     struct evfs_entry_descriptor *descriptor;
-    int wrcb;
+
+    descriptor = task->descriptor;
+
+    if (descriptor) {
+        cpsize = evfs_entries_write_data(descriptor->entry_id, task->cdata, descriptor->offset, task->length);
+        if (cpsize > 0) {
+            descriptor->offset += cpsize;
+        }
+    } else {
+        cpsize = evfs_entries_write_data(task->entry_id, task->cdata, 0, task->length);
+    }
+
+    task->status = NSP_STATUS_SUCCESSFUL;
+    task->retval = cpsize;
+}
+
+int evfs_write_entry(evfs_entry_handle_t handle, const char *data, int size)
+{   
+    struct evfs_io_task *task;
+    struct evfs_io_background_worker *worker;
+    nsp_status_t status;
+    int cpsize;
+    struct evfs_entry_descriptor *descriptor;
 
     if ( handle <= 0 || !data || size <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
     }
 
-    descriptor = __evfs_reference_descriptor(handle);
-    if (!descriptor) {
-        return posix__makeerror(ENOENT);
+    cpsize = 0;
+    task = NULL;
+    do {
+        descriptor = __evfs_reference_descriptor(handle);
+        if (!descriptor) {
+            break;
+        }
+
+        /* alloc io task */
+        task = (struct evfs_io_task *)ztrycalloc(sizeof(*task));
+        if (!task) {
+            return posix__makeerror(ENOMEM);
+        }
+        task->type = kEvfsIoTaskWrite;
+        task->cdata = data;
+        task->entry_id = descriptor->entry_id;
+        task->length = size;
+        task->offset = descriptor->offset;
+        task->status = EINPROGRESS;
+        task->no_wait = 0;
+        task->retval = 0;
+        task->descriptor = descriptor;
+
+        worker = &__evfs_descriptor_mgr.worker[descriptor->entry_id % EVFS_MAX_WORKER];
+
+        status = __evfs_io_push_task_and_notify_run(worker, task);
+        if (!NSP_SUCCESS(status)) {
+            zfree(task);
+            task = NULL;
+            break;
+        }
+
+        status = __evfs_io_wait_background_compelete(task, &cpsize);
+        task = NULL;
+    } while(0);
+
+    __evfs_dereference_descriptor(descriptor);
+    return cpsize;
+}
+
+static void __evfs_read_entry(struct evfs_io_task *task)
+{
+    int cpsize;
+    struct evfs_entry_descriptor *descriptor;
+
+    descriptor = task->descriptor;
+
+    if (descriptor) {
+        cpsize = evfs_entries_read_data(descriptor->entry_id, task->data, descriptor->offset, task->length);
+        if (cpsize > 0) {
+            descriptor->offset += cpsize;
+        }
+    } else {
+        cpsize = evfs_entries_read_data(task->entry_id, task->data, task->offset, task->length);
     }
 
-    do {
-        wrcb = evfs_entries_write_data(descriptor->entry_id, data, descriptor->offset, size);
-        if (wrcb > 0) {
-            descriptor->offset += wrcb;
-        }
-        status = wrcb;
-    } while(0);
-    __evfs_dereference_descriptor(descriptor);
-
-    return status;
+    task->status = NSP_STATUS_SUCCESSFUL;
+    task->retval = cpsize;
 }
 
 int evfs_read_entry(evfs_entry_handle_t handle, char *data, int size)
 {
+    struct evfs_io_task *task;
+    struct evfs_io_background_worker *worker;
+    nsp_status_t status;
+    int cpsize;
     struct evfs_entry_descriptor *descriptor;
-    int rdcb;
 
-    if (handle <= 0 || !data || size <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
+    if ( handle <= 0 || !data || size <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
     }
 
-    descriptor = __evfs_reference_descriptor(handle);
-    if (!descriptor) {
-        return posix__makeerror(ENOENT);
-    }
+    cpsize = 0;
+    task = NULL;
+    do {
+        descriptor = __evfs_reference_descriptor(handle);
+        if (!descriptor) {
+            break;
+        }
 
-    rdcb = evfs_entries_read_data(descriptor->entry_id, data, descriptor->offset, size);
-    if (rdcb > 0) {
-        descriptor->offset += rdcb;
-    }
+        /* alloc io task */
+        task = (struct evfs_io_task *)ztrycalloc(sizeof(*task));
+        if (!task) {
+            return posix__makeerror(ENOMEM);
+        }
+        task->type = kEvfsIoTaskRead;
+        task->data = data;
+        task->entry_id = descriptor->entry_id;
+        task->length = size;
+        task->offset = descriptor->offset;
+        task->status = EINPROGRESS;
+        task->no_wait = 0;
+        task->retval = 0;
+        task->descriptor = descriptor;
+
+        worker = &__evfs_descriptor_mgr.worker[descriptor->entry_id % EVFS_MAX_WORKER];
+
+        status = __evfs_io_push_task_and_notify_run(worker, task);
+        if (!NSP_SUCCESS(status)) {
+            zfree(task);
+            task = NULL;
+            break;
+        }
+
+        status = __evfs_io_wait_background_compelete(task, &cpsize);
+        task = NULL;
+    } while(0);
+
     __evfs_dereference_descriptor(descriptor);
-    return rdcb;
+    return cpsize;
 }
 
 int evfs_read_iterator_entry(const evfs_iterator_pt iterator, char *data, int size)
 {
+    struct evfs_io_task *task;
+    struct evfs_io_background_worker *worker;
+    int cpsize;
+    nsp_status_t status;
+
     if (!iterator || !data || size <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
-        return posix__makeerror(EINVAL);
+        return 0;
     }
 
     if (iterator->magic != EVFS_ITERATOR_MAGIC) {
-        return posix__makeerror(EINVAL);
+        return 0;
     }
 
-    return evfs_entries_read_data(iterator->entry_id, data, 0, size);
+    cpsize = 0;
+    task = NULL;
+    do {
+        /* alloc io task */
+        task = (struct evfs_io_task *)ztrycalloc(sizeof(*task));
+        if (!task) {
+            return posix__makeerror(ENOMEM);
+        }
+        task->type = kEvfsIoTaskRead;
+        task->data = data;
+        task->entry_id = iterator->entry_id;
+        task->length = size;
+        task->offset = 0;
+        task->status = EINPROGRESS;
+        task->no_wait = 0;
+        task->retval = 0;
+        task->descriptor = NULL;
+
+        worker = &__evfs_descriptor_mgr.worker[iterator->entry_id % EVFS_MAX_WORKER];
+
+        status = __evfs_io_push_task_and_notify_run(worker, task);
+        if (!NSP_SUCCESS(status)) {
+            zfree(task);
+            task = NULL;
+            break;
+        }
+
+        status = __evfs_io_wait_background_compelete(task, &cpsize);
+        task = NULL;
+    } while(0);
+    return cpsize;
 }
 
 int evfs_query_entry_length(evfs_entry_handle_t handle)
@@ -556,10 +971,25 @@ nsp_status_t evfs_seek_entry_offset(evfs_entry_handle_t handle, int seek)
     return NSP_STATUS_SUCCESSFUL;
 }
 
+static void __evfs_truncate_entry(struct evfs_io_task *task)
+{
+    struct evfs_entry_descriptor *descriptor;
+    
+    descriptor = task->descriptor;
+
+    if (descriptor) {
+        task->status = evfs_entries_truncate(descriptor->entry_id, task->length + MAX_ENTRY_NAME_LENGTH);
+    } else {
+        task->status = evfs_entries_truncate(task->entry_id, task->length + MAX_ENTRY_NAME_LENGTH);
+    }
+}
+
 nsp_status_t evfs_truncate_entry(evfs_entry_handle_t handle, int size)
 {
     struct evfs_entry_descriptor *descriptor;
     nsp_status_t status;
+    struct evfs_io_task *task;
+    struct evfs_io_background_worker *worker;
 
     if (handle <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady || size < 0) {
         return posix__makeerror(EINVAL);
@@ -570,14 +1000,60 @@ nsp_status_t evfs_truncate_entry(evfs_entry_handle_t handle, int size)
         return posix__makeerror(ENOENT);
     }
 
-    status = evfs_entries_truncate(descriptor->entry_id, size + MAX_ENTRY_NAME_LENGTH);
+    status = NSP_STATUS_SUCCESSFUL;
+    do {
+        task = (struct evfs_io_task *)ztrycalloc(sizeof(*task));
+        if (!task) {
+            status = posix__makeerror(ENOMEM);
+            break;
+        }
+        task->type = kEvfsIoTaskTruncate;
+        task->data = NULL;
+        task->entry_id = descriptor->entry_id;
+        task->length = size;
+        task->offset = 0;
+        task->status = EINPROGRESS;
+        task->no_wait = 0;
+        task->retval = 0;
+        task->descriptor = descriptor;
+
+        worker = &__evfs_descriptor_mgr.worker[task->entry_id % EVFS_MAX_WORKER];
+
+        status = __evfs_io_push_task_and_notify_run(worker, task);
+        if (!NSP_SUCCESS(status)) {
+            zfree(task);
+            task = NULL;
+            break;
+        }
+
+        status = __evfs_io_wait_background_compelete(task, NULL);
+        task = NULL;
+    } while(0);
+
     __evfs_dereference_descriptor(descriptor);
     return status;
+}
+
+static void __evfs_flush_entry_buffer(struct evfs_io_task *task)
+{
+    struct evfs_entry_descriptor *descriptor;
+
+    descriptor = task->descriptor;
+    if (!descriptor) {
+        evfs_entries_flush(task->entry_id);
+    } else {
+        evfs_entries_flush(descriptor->entry_id);
+    }
+
+    task->status = NSP_STATUS_SUCCESSFUL;
 }
 
 void evfs_flush_entry_buffer(evfs_entry_handle_t handle)
 {
     struct evfs_entry_descriptor *descriptor;
+    nsp_status_t status;
+    struct evfs_io_task *task;
+    struct evfs_io_background_worker *worker;
 
     if (handle <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return;
@@ -588,15 +1064,65 @@ void evfs_flush_entry_buffer(evfs_entry_handle_t handle)
         return;
     }
 
-    evfs_entries_flush(descriptor->entry_id);
+    status = NSP_STATUS_SUCCESSFUL;
+    do {
+        task = (struct evfs_io_task *)ztrycalloc(sizeof(*task));
+        if (!task) {
+            status = posix__makeerror(ENOMEM);
+            break;
+        }
+        task->type = kEvfsIoTaskFlush;
+        task->data = NULL;
+        task->entry_id = descriptor->entry_id;
+        task->length = 0;
+        task->offset = 0;
+        task->status = EINPROGRESS;
+        task->no_wait = 0;
+        task->retval = 0;
+        task->descriptor = descriptor;
+
+        worker = &__evfs_descriptor_mgr.worker[task->entry_id % EVFS_MAX_WORKER];
+
+        status = __evfs_io_push_task_and_notify_run(worker, task);
+        if (!NSP_SUCCESS(status)) {
+            zfree(task);
+            task = NULL;
+            break;
+        }
+
+        status = __evfs_io_wait_background_compelete(task, NULL);
+        task = NULL;
+    } while(0);
+
     __evfs_dereference_descriptor(descriptor);
     return;
+}
+
+static void __evfs_earse_entry(struct evfs_io_task *task)
+{
+    struct evfs_entry_descriptor *descriptor;
+    nsp_status_t status;
+
+    descriptor = task->descriptor;
+    if (!descriptor) {
+        if (task->entry_id > 0) {
+            status = evfs_entries_hard_delete(task->entry_id);
+        } else {
+            status = posix__makeerror(ENOENT);
+        }
+    } else {
+        status = evfs_entries_hard_delete(descriptor->entry_id);
+    }
+
+    task->status = status;
 }
 
 nsp_status_t evfs_earse_entry(evfs_entry_handle_t handle)
 {
     struct evfs_entry_descriptor *descriptor;
     nsp_status_t status;
+    struct evfs_io_task *task;
+    struct evfs_io_background_worker *worker;
 
     if (handle <= 0 || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
@@ -607,21 +1133,94 @@ nsp_status_t evfs_earse_entry(evfs_entry_handle_t handle)
         return posix__makeerror(ENOENT);
     }
 
-    status = evfs_entries_hard_delete(descriptor->entry_id);
-    if (NSP_SUCCESS(status)) {
-        descriptor->entry_id = -1;  /* this entry and it's descriptor are no longer usable */
-    }
+    status = NSP_STATUS_SUCCESSFUL;
+    do {
+        task = (struct evfs_io_task *)ztrycalloc(sizeof(*task));
+        if (!task) {
+            status = posix__makeerror(ENOMEM);
+            break;
+        }
+        task->type = kEvfsIoTaskErase;
+        task->data = NULL;
+        task->entry_id = descriptor->entry_id;
+        task->length = 0;
+        task->offset = 0;
+        task->status = EINPROGRESS;
+        task->no_wait = 0;
+        task->retval = 0;
+        task->descriptor = descriptor;
+
+        worker = &__evfs_descriptor_mgr.worker[task->entry_id % EVFS_MAX_WORKER];
+
+        status = __evfs_io_push_task_and_notify_run(worker, task);
+        if (!NSP_SUCCESS(status)) {
+            zfree(task);
+            task = NULL;
+            break;
+        }
+
+        status = __evfs_io_wait_background_compelete(task, NULL);
+        task = NULL;
+    } while(0);
+
     __evfs_dereference_descriptor(descriptor);
     return status;
 }
 
-nsp_status_t evfs_earse_entry_by_name(const char *name)
+static void __evfs_earse_entry_by_key(struct evfs_io_task *task)
 {
+    task->status = evfs_entries_hard_delete_by_name(task->cdata);
+}
+
+nsp_status_t evfs_earse_entry_by_key(const char *name)
+{
+    nsp_status_t status;
+    struct evfs_io_task *task;
+    struct evfs_io_background_worker *worker;
+
     if (!name || atom_get(&__evfs_descriptor_mgr.ready) != kEvmgrReady) {
         return posix__makeerror(EINVAL);
     }
+
+    task = NULL;
+    do {
+        /* alloc io task */
+        task = (struct evfs_io_task *)ztrycalloc(sizeof(*task));
+        if (!task) {
+            status = posix__makeerror(ENOMEM);
+            break;
+        }
+        task->type = kEvfsIoTaskEraseByKey;
+        task->data = NULL;
+        task->entry_id = evfs_entries_get_entry_id_by_name(name);
+        if (task->entry_id <= 0) {
+            status = posix__makeerror(ENOENT);
+            break;
+        }
+        task->length = 0;
+        task->offset = 0;
+        task->status = EINPROGRESS;
+        task->no_wait = 0;
+        task->retval = 0;
+        task->descriptor = NULL;
+        task->cdata = (char *)name;
+
+        worker = &__evfs_descriptor_mgr.worker[task->entry_id % EVFS_MAX_WORKER];
+
+        status = __evfs_io_push_task_and_notify_run(worker, task);
+        if (!NSP_SUCCESS(status)) {
+            break;
+        }
+
+        status = __evfs_io_wait_background_compelete(task, NULL);
+        task = NULL;
+    } while(0);
+
+    if (task) {
+        zfree(task);
+    }
     
-    return evfs_entries_hard_delete_by_name(name);
+    return status;
 }
 
 evfs_iterator_pt evfs_iterate_entries(evfs_iterator_pt iterator)

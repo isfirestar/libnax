@@ -1131,6 +1131,23 @@ nsp_status_t evfs_entries_hard_delete_by_name(const char *key)
     return status;
 }
 
+int evfs_entries_get_entry_id_by_name(const char *key)
+{
+    struct evfs_entry_head *entry_head;
+    nsp_status_t status;
+    int entry_id;
+
+    status = __evfs_entries_reference_head_by_name(key, &entry_head, kEvfsEntryNormal);
+    if (!entry_head || !NSP_SUCCESS(status)) {
+        return status;
+    }
+
+    entry_id = entry_head->viewid;
+
+    __evfs_entries_dereference_head(entry_head, kEvfsEntryNormal);
+    return entry_id;
+}
+
 nsp_status_t evfs_entries_soft_stat(struct evfs_entries_stat *stat)
 {
     if (!stat) {

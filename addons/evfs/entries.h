@@ -28,6 +28,7 @@ extern void evfs_entries_close_one(int entry_id);
 extern nsp_status_t evfs_entries_soft_delete(int entry_id);
 extern nsp_status_t evfs_entries_hard_delete(int entry_id);
 extern nsp_status_t evfs_entries_hard_delete_by_name(const char *key);
+extern int evfs_entries_get_entry_id_by_name(const char *key);
 
 /* base I/O proc for entry
  *  truncate the entry and it didn't affect the offset of entry, this method can either expand or reduce entry occupied */

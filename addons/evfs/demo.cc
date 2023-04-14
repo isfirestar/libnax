@@ -204,7 +204,7 @@ evfs_entry_handle_t evfs_test_open_entry(const char *pcmd)
         cursor++;
     }
 
-    handle = evfs_open_entry_bykey(cursor);
+    handle = evfs_open_entry_by_key(cursor);
     if (handle > 0) {
         printf("open entry [%s] ok, handle is: %d\n", cursor, handle);
     } else {
@@ -371,7 +371,7 @@ void evfs_test_delete_entry_by_name(char *pcmd)
         printf("usage : evfs delete [entry name]\n");
         return;
     }
-    evfs_earse_entry_by_name(target);
+    evfs_earse_entry_by_key(target);
 }
 
 void evfs_test_show_stat()
