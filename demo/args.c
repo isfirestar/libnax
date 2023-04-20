@@ -88,7 +88,7 @@ nsp_status_t arg_check_startup(int argc, char **argv)
     __startup_parameters.type = 's';
     crt_strcpy(__startup_parameters.shost, sizeof(__startup_parameters.shost), "0.0.0.0");
     crt_strcpy(__startup_parameters.chost, sizeof(__startup_parameters.chost), "0.0.0.0");
-    __startup_parameters.port = 10256;
+    __startup_parameters.port = 0;
     __startup_parameters.echo = 0;
     __startup_parameters.mute = 0;
     __startup_parameters.length = 1024;
@@ -145,6 +145,10 @@ nsp_status_t arg_check_startup(int argc, char **argv)
                 return NSP_STATUS_FATAL;
         }
         opt = getopt_long(argc, argv, shortopts, long_options, &opt_index);
+    }
+    
+    if (__startup_parameters.type == 's' && 0 == __startup_parameters.port) {
+        __startup_parameters.port = 10256;
     }
 
     return NSP_STATUS_SUCCESSFUL;
