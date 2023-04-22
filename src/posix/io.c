@@ -125,7 +125,6 @@ enum EPOLL_EVENTS
 #define EPOLLET EPOLLET
   };
 */
-
 static void _iorun(const struct epoll_event *eventptr)
 {
     ncb_t *ncb;
@@ -478,15 +477,9 @@ nsp_status_t io_setfl(int fd, int test)
     return NSP_STATUS_SUCCESSFUL;
 }
 
-nsp_status_t io_fnbio(int fd)
+nsp_status_t io_set_cloexec(int fd)
 {
     int opt;
-    nsp_status_t status;
-
-    status = io_setfl(fd, O_NONBLOCK);
-    if (!NSP_SUCCESS(status)) {
-        return status;
-    }
 
     opt = fcntl(fd, F_GETFD);
     if (opt < 0) {
@@ -505,11 +498,40 @@ nsp_status_t io_fnbio(int fd)
     return NSP_STATUS_SUCCESSFUL;
 }
 
+nsp_status_t io_set_nonblock(int fd, int set)
+{
+    int fr;
+    int opt;
+
+    opt = fcntl(fd, F_GETFL);
+    if (-1 == opt) {
+        mxx_call_ecr("Fatal syscall fcntl(2),error:%d", errno);
+        return posix__makeerror(errno);
+    }
+
+    fr = 0;
+    if (set) {
+        if ( 0 == (opt & O_NONBLOCK) ) {
+            fr = fcntl(fd, F_SETFL, opt | O_NONBLOCK);
+        }
+    } else {
+        if (opt & O_NONBLOCK) {
+            fr = fcntl(fd, F_SETFL, opt & ~O_NONBLOCK);
+        }
+    }
+
+    if (-1 == fr) {
+        mxx_call_ecr("Fatal syscall fcntl(2),error:%d", errno);
+        return posix__makeerror(errno);
+    }
+
+    return NSP_STATUS_SUCCESSFUL;
+}
+
 nsp_status_t io_attach(void *ncbptr, int mask)
 {
     struct epoll_event epevt;
     ncb_t *ncb;
-    nsp_status_t status;
     struct io_object_block *obptr;
     struct epoll_object_block *epoptr;
 
@@ -520,11 +542,10 @@ nsp_status_t io_attach(void *ncbptr, int mask)
     }
 
     do {
-        status = io_fnbio(ncb->sockfd);
-        if ( !NSP_SUCCESS(status) ) {
-            break;
-        }
-
+        io_set_cloexec(ncb->sockfd);
+#if 0   /* we don't initive mark file descriptor to nonblock when it attach to epoll */
+        io_set_nonblock(ncb->sockfd, 1);
+#endif
         memset(&epevt, 0, sizeof(epevt));
         epevt.data.u64 = (uint64_t)ncb->hld;
         epevt.events = (EPOLLET | EPOLLRDHUP | EPOLLHUP | EPOLLERR);

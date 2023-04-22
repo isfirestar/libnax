@@ -3,6 +3,7 @@
 #include "fifo.h"
 #include "io.h"
 #include "zmalloc.h"
+#include "atom.h"
 
 #include <pthread.h>
 
@@ -106,14 +107,14 @@ void ncb_deconstruct(objhld_t ignore, void *p)
     }
 
     /* free packet cache */
-    if (ncb->packet) {
-        zfree(ncb->packet);
-        ncb->packet = NULL;
+    if (ncb->rx_buffer) {
+        zfree(ncb->rx_buffer);
+        ncb->rx_buffer = NULL;
     }
 
-    if (ncb->u.tcp.rx_buffer && IPPROTO_TCP == ncb->protocol ) {
-        zfree(ncb->u.tcp.rx_buffer);
-        ncb->u.tcp.rx_buffer = NULL;
+    if (ncb->u.tcp.rx_parse_buffer && IPPROTO_TCP == ncb->protocol ) {
+        zfree(ncb->u.tcp.rx_parse_buffer);
+        ncb->u.tcp.rx_parse_buffer = NULL;
 
         if (ncb_lb_marked(ncb)) {
             zfree(ncb->u.tcp.lbdata);
@@ -376,4 +377,81 @@ void ncb_post_connected(const ncb_t *ncb)
         c_event.Ln.Tcp.Link = ncb->hld;
         ncb->nis_callback(&c_event, NULL);
     }
+}
+
+int ncb_recvdata(ncb_t *ncb, struct sockaddr *addr, socklen_t addrlen)
+{
+    int cb;
+    struct msghdr msg;
+    struct iovec iov[1];
+
+    msg.msg_name = addr;
+    msg.msg_namelen = addrlen;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = NULL;
+    msg.msg_controllen = 0;
+    msg.msg_flags = 0;
+
+    iov[0].iov_base = ncb->rx_buffer;
+    iov[0].iov_len = ncb->rx_buffer_size;
+
+    do {
+        cb = recvmsg(ncb->sockfd, &msg, 0);
+    } while (cb < 0 && errno == EINTR);
+
+    return cb < 0 ? posix__makeerror(errno) : cb;
+}
+
+int ncb_recvdata_nonblock(ncb_t *ncb, struct sockaddr *addr, socklen_t addrlen)
+{
+    int cb;
+    struct msghdr msg;
+    struct iovec iov[1];
+    int nread;
+
+    /* FIONREAD query the length of data can read in device buffer. */
+    if ( 0 == ioctl(ncb->sockfd, FIONREAD, &nread)) {
+        if (0 == nread) {
+            return posix__makeerror(EAGAIN);
+        }
+    }
+
+    msg.msg_name = addr;
+    msg.msg_namelen = addrlen;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = NULL;
+    msg.msg_controllen = 0;
+    msg.msg_flags = 0;
+
+    iov[0].iov_base = ncb->rx_buffer;
+    iov[0].iov_len = ncb->rx_buffer_size;
+
+    do {
+        cb = recvmsg(ncb->sockfd, &msg, MSG_DONTWAIT);
+    } while (cb < 0 && errno == EINTR);
+
+    return cb < 0 ? posix__makeerror(errno) : cb;
+}
+
+int ncb_setattr_r(ncb_t *ncb, int attr)
+{
+    int oldattr;
+    oldattr = atom_exchange(&ncb->attr, attr);
+
+    if ((attr & LINKATTR_NONBLOCK) && !(oldattr & LINKATTR_NONBLOCK)) {
+        io_set_nonblock(ncb->sockfd, 1);
+    }
+
+    if (!(attr & LINKATTR_NONBLOCK) && (oldattr & LINKATTR_NONBLOCK)) {
+        io_set_nonblock(ncb->sockfd, 0);
+    }
+
+    return oldattr;
+}
+
+int ncb_getattr_r(ncb_t *ncb)
+{
+    return atom_get(&ncb->attr);
 }

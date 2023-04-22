@@ -62,7 +62,7 @@ int tcp_parse_pkt(ncb_t *ncb, const unsigned char *data, int cpcb)
     /* the length of data is not enough to constitute the protocol header.
     *  All data is used to construct the protocol header and return the remaining length of 0. */
     if (ncb->u.tcp.rx_parse_offset + cpcb < ncb->u.tcp.template.cb_) {
-        memcpy(ncb->packet + ncb->u.tcp.rx_parse_offset, cpbuff, cpcb);
+        memcpy(ncb->u.tcp.rx_parse_buffer + ncb->u.tcp.rx_parse_offset, cpbuff, cpcb);
         ncb->u.tcp.rx_parse_offset += cpcb;
         return 0;
     }
@@ -75,7 +75,7 @@ int tcp_parse_pkt(ncb_t *ncb, const unsigned char *data, int cpcb)
     if (ncb->u.tcp.rx_parse_offset < ncb->u.tcp.template.cb_) {
         used += (ncb->u.tcp.template.cb_ - ncb->u.tcp.rx_parse_offset);
         overplus = cpcb - used;
-        memcpy(ncb->packet + ncb->u.tcp.rx_parse_offset, cpbuff, used);
+        memcpy(ncb->u.tcp.rx_parse_buffer + ncb->u.tcp.rx_parse_offset, cpbuff, used);
         cpbuff += used;
         ncb->u.tcp.rx_parse_offset = ncb->u.tcp.template.cb_;
     }
@@ -87,7 +87,7 @@ int tcp_parse_pkt(ncb_t *ncb, const unsigned char *data, int cpcb)
     }
 
 	/* Get the length of user segment data by interpreting routines  */
-    status = (*ncb->u.tcp.template.parser_)(ncb->packet, ncb->u.tcp.rx_parse_offset, &user_data_size);
+    status = (*ncb->u.tcp.template.parser_)(ncb->u.tcp.rx_parse_buffer, ncb->u.tcp.rx_parse_offset, &user_data_size);
     if (!NSP_SUCCESS(status)) {
         mxx_call_ecr("failed to parse template header.");
 		return -1;
@@ -125,7 +125,7 @@ int tcp_parse_pkt(ncb_t *ncb, const unsigned char *data, int cpcb)
 
     /* the remain data it's enough to build package */
     if ((ncb->u.tcp.rx_parse_offset + overplus) >= total_packet_length) {
-        memcpy(ncb->packet + ncb->u.tcp.rx_parse_offset, cpbuff, total_packet_length - ncb->u.tcp.rx_parse_offset);
+        memcpy(ncb->u.tcp.rx_parse_buffer + ncb->u.tcp.rx_parse_offset, cpbuff, total_packet_length - ncb->u.tcp.rx_parse_offset);
 
         /*The number of bytes returned to the calling thread =
             (The number of bytes remaining this time) -
@@ -133,9 +133,9 @@ int tcp_parse_pkt(ncb_t *ncb, const unsigned char *data, int cpcb)
         retcb = (overplus - (total_packet_length - ncb->u.tcp.rx_parse_offset));
 
         if (ncb->attr & LINKATTR_TCP_FULLY_RECEIVE) {
-            ncb_post_recvdata(ncb, user_data_size + ncb->u.tcp.template.cb_, ncb->packet);
+            ncb_post_recvdata(ncb, user_data_size + ncb->u.tcp.template.cb_, ncb->u.tcp.rx_parse_buffer);
         } else {
-            ncb_post_recvdata(ncb, user_data_size, ncb->packet + ncb->u.tcp.template.cb_);
+            ncb_post_recvdata(ncb, user_data_size, ncb->u.tcp.rx_parse_buffer + ncb->u.tcp.template.cb_);
         }
 
 
@@ -145,7 +145,7 @@ int tcp_parse_pkt(ncb_t *ncb, const unsigned char *data, int cpcb)
 
     /*If the number of bytes remaining is not enough to construct a complete package,
         the remain bytes are going to put into buffer and the packet resolution offset is adjusted. */
-    memmove(ncb->packet + ncb->u.tcp.rx_parse_offset, cpbuff, overplus);
+    memmove(ncb->u.tcp.rx_parse_buffer + ncb->u.tcp.rx_parse_offset, cpbuff, overplus);
     ncb->u.tcp.rx_parse_offset += overplus;
     return 0;
 }

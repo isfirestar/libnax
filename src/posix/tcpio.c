@@ -9,13 +9,13 @@
 
 static nsp_status_t _tcp_syn_try(ncb_t *ncb_server, int *clientfd)
 {
-    struct sockaddr_in addr_income;
+    struct sockaddr_in raddr;
     socklen_t addrlen;
-    int incomefd;
+    int fd;
 
-    addrlen = sizeof ( addr_income);
-    incomefd = accept(ncb_server->sockfd, (struct sockaddr *) &addr_income, &addrlen);
-    if (incomefd < 0) {
+    addrlen = sizeof ( raddr);
+    fd = accept4(ncb_server->sockfd, (struct sockaddr *) &raddr, &addrlen, SOCK_CLOEXEC | SOCK_NONBLOCK);
+    if (fd < 0) {
         switch (errno) {
         /* The system call was interrupted by a signal that was caught before a valid connection arrived, or this connection has been aborted.
             in these case , this round of operation ignore, try next round accept notified by epoll */
@@ -52,7 +52,7 @@ static nsp_status_t _tcp_syn_try(ncb_t *ncb_server, int *clientfd)
     }
 
     if (likely(clientfd)) {
-        *clientfd = incomefd;
+        *clientfd = fd;
     }
     return NSP_STATUS_SUCCESSFUL;
 }
@@ -188,22 +188,14 @@ static nsp_status_t _tcp_rx(ncb_t *ncb)
     int overplus;
     int offset;
     int cpcb;
-    int nread;
 
-    /* FIONREAD query the length of data can read in device buffer. */
-    if ( 0 == ioctl(ncb->sockfd, FIONREAD, &nread)) {
-        if (0 == nread) {
-            return posix__makeerror(EAGAIN);
-        }
-    }
-
-    recvcb = recv(ncb->sockfd, ncb->u.tcp.rx_buffer, TCP_BUFFER_SIZE, 0);
+    recvcb = ncb_recvdata_nonblock(ncb, NULL, 0);
     if (recvcb > 0) {
         cpcb = recvcb;
         overplus = recvcb;
         offset = 0;
         do {
-            overplus = tcp_parse_pkt(ncb, ncb->u.tcp.rx_buffer + offset, cpcb);
+            overplus = tcp_parse_pkt(ncb, ncb->rx_buffer + offset, cpcb);
             if (overplus < 0) {
                 /* fatal to parse low level protocol,
                     close the object immediately */
@@ -222,12 +214,10 @@ static nsp_status_t _tcp_rx(ncb_t *ncb)
 
     /* ECONNRESET 104 Connection reset by peer */
     if (recvcb < 0) {
-        /* A signal occurred before any data  was  transmitted, try again by next loop */
-        if (errno == EINTR) {
-            return NSP_STATUS_SUCCESSFUL;
+        if (!NSP_FAILED_AND_ERROR_EQUAL(recvcb, EAGAIN)) {
+            mxx_call_ecr("Fatal error occurred syscall recv(2), error:%d, link:%lld", errno, ncb->hld );
         }
-        mxx_call_ecr("Fatal error occurred syscall recv(2), error:%d, link:%lld", errno, ncb->hld );
-        return posix__makeerror(errno);
+        return recvcb;
     }
 
     return NSP_STATUS_SUCCESSFUL;
@@ -252,7 +242,7 @@ nsp_status_t tcp_txn(ncb_t *ncb, void *p)
     node = (struct tx_node *)p;
 
     while (node->offset < node->wcb) {
-        wcb = send(ncb->sockfd, node->data + node->offset, node->wcb - node->offset, MSG_NOSIGNAL);
+        wcb = send(ncb->sockfd, node->data + node->offset, node->wcb - node->offset, MSG_NOSIGNAL | MSG_DONTWAIT);
 
         /* fatal-error/connection-terminated  */
         if (0 == wcb) {

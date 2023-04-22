@@ -236,7 +236,7 @@ int nis_cntl(objhld_t link, int cmd, ...)
         return posix__makeerror(EINVAL);
     }
 
-    if (NI_SINKCTX == cmd) {
+    if (NI_RLSCTXPTR == cmd) {
         objdefr(link);
         return NSP_STATUS_SUCCESSFUL;
     }
@@ -255,8 +255,7 @@ int nis_cntl(objhld_t link, int cmd, ...)
                 (IPPROTO_UDP == ncb->protocol ? udp_setattr_r(ncb, va_arg(ap, int)) : 0);
             break;
         case NI_GETATTR:
-            IPPROTO_TCP == ncb->protocol ? tcp_getattr_r(ncb, &retval) :
-                (IPPROTO_UDP == ncb->protocol ? udp_getattr_r(ncb, &retval) : 0);
+            retval = ncb_getattr_r(ncb);
             break;
         case NI_SETCTX:
             ncb->prcontext = atom_exchange(&ncb->context, va_arg(ap, const void *));
@@ -271,7 +270,7 @@ int nis_cntl(objhld_t link, int cmd, ...)
         case NI_GETTST:
             retval = tcp_gettst_r(link, va_arg(ap, void *), NULL);
             break;
-        case NI_RISECTX:
+        case NI_REFCTXPTR:
             atom_set(&context, ncb->context);
             *(va_arg(ap, void **) ) = context;
             link = INVALID_OBJHLD;

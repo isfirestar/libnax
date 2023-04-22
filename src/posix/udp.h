@@ -21,8 +21,6 @@ extern
 nsp_status_t udp_get_boardcast(ncb_t *ncb, int *enabled);
 
 extern
-nsp_status_t udp_setattr_r(ncb_t *ncb, int attr);
-extern
-void udp_getattr_r(ncb_t *ncb, int *attr);
+void udp_setattr_r(ncb_t *ncb, int attr);
 
 #endif

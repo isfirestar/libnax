@@ -39,7 +39,7 @@ namespace nsp {
         void obtcp::settst(tst_t *tst)
         {
             if (INVALID_HTCPLINK != lnk_ && tst) {
-                ::tcp_settst(lnk_, tst);
+                ::nis_cntl(lnk_, NI_SETTST, tst);
             }
         }
 
@@ -54,9 +54,9 @@ namespace nsp {
                 if (!NSP_SUCCESS(status)) {
                     return status;
                 }
-                return ::tcp_settst(lnk_, &tst_);
+                return ::nis_cntl(lnk_, NI_SETTST, &tst_);
             }
-            
+
             endpoint ep;
             auto status = endpoint::build(epstr, ep);
             if (NSP_SUCCESS(status)) {
@@ -84,8 +84,7 @@ namespace nsp {
                 return NSP_STATUS_FATAL;
             }
 
-            ::tcp_settst(lnk_, &tst_);
-            return NSP_STATUS_SUCCESSFUL;
+            return ::nis_cntl(lnk_, NI_SETTST, &tst_);
         }
 
         nsp_status_t obtcp::create()
@@ -148,8 +147,8 @@ namespace nsp {
                 local_.ipv4("");
                 local_.port(0);
                 return status;
-            } 
-            
+            }
+
             endpoint ep;
             status = endpoint::build(epstr, ep);
             if (NSP_SUCCESS(status)) {

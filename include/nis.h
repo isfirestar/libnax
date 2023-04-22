@@ -164,19 +164,6 @@ PORTABLEAPI(nsp_status_t) tcp_getipcpath(HTCPLINK link, const char **path);
 PORTABLEAPI(nsp_status_t) tcp_setopt(HTCPLINK link, int level, int opt, const char *val, int len);
 PORTABLEAPI(nsp_status_t) tcp_getopt(HTCPLINK link, int level, int opt, char *val, int *len);
 
-/*  the following are some obsolete interface definition:
-	NOTE: New applications should use @nis_cntl interface (available since version 9.8.1),
-	which provides a much superior interface for user control operation for every link.
-	@NI_SETTST to instead @tcp_settst
-	@NI_GETTST to instead @tcp_gettst
-	@NI_SETATTR to instead @tcp_setattr
-	@NI_GETATTR to instead @tcp_getattr
-*/
-PORTABLEAPI(nsp_status_t) tcp_settst(HTCPLINK link, const tst_t *tst);
-PORTABLEAPI(nsp_status_t) tcp_gettst(HTCPLINK link, tst_t *tst);
-PORTABLEAPI(nsp_status_t) tcp_setattr(HTCPLINK link, int cmd, int enable);
-PORTABLEAPI(nsp_status_t) tcp_getattr(HTCPLINK link, int cmd, int *enabled);
-
 /* @udp_init use to initialzie UDP framework, invoke before any other UDP relate function call.
    @udp_uninit use to uninitialize UDP framework and release resource
    usually, large than or equal to zero return value indicate success, negative return value indicate error detected.
@@ -367,13 +354,13 @@ PORTABLEAPI(nsp_status_t) nis_getifmac(const char *eth_name, abuff_mac_t *phyadd
  *		get the tcp stream template of specify object current set
  *
  *	attributes added after version 991
- *	NI_RISECTX(void **)
- *	NI_SINKCTX(void)
+ *	NI_REFCTXPTR(void **)
+ *	NI_RLSCTXPTR(void)
  *		these two attributes use to resolve the problem during using  @NI_GETCTX, take account of the follow scenario:
  *		one thread call @NI_GETCTX and obtain the context pointer--with lockless, but another thread trigger the link close event.
  *		in this situation, wild pointer obtained by the first thread may cause application crash.
- *		by use @NI_RISECTX instead, framework shall automatic raise up the reference count of link and then prevent the link closed by any event.
- *		but calling thread has responsibility to explicit invoke @NI_SINKCTX to release the reference count of this link.
+ *		by use @NI_REFCTXPTR instead, framework shall automatic raise up the reference count of link and then prevent the link closed by any event.
+ *		but calling thread has responsibility to explicit invoke @NI_RLSCTXPTR to release the reference count of this link.
  *
  *	NI_GETAF()
  *		on success, return value canbe one of : AF_INET AF_INET6 AF_UNIX, otherwise, -1 returned

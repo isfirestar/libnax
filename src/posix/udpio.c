@@ -7,24 +7,14 @@ static nsp_status_t _udp_rx(ncb_t *ncb)
 {
     int recvcb;
     struct sockaddr_in remote;
-    socklen_t addrlen;
     udp_data_t c_data;
     nis_event_t c_event;
-    int nread;
 
-    /* FIONREAD query the length of data can read in device buffer. */
-    if ( 0 == ioctl(ncb->sockfd, FIONREAD, &nread)) {
-        if (0 == nread) {
-            return posix__makeerror(EAGAIN);
-        }
-    }
-
-    addrlen = sizeof (struct sockaddr_in);
-    recvcb = recvfrom(ncb->sockfd, ncb->packet, MAX_UDP_UNIT, 0, (struct sockaddr *)&remote, &addrlen);
+    recvcb = ncb_recvdata_nonblock(ncb, (struct sockaddr *)&remote, sizeof(remote));
     if (recvcb > 0) {
         c_event.Ln.Udp.Link = ncb->hld;
         c_event.Event = EVT_RECEIVEDATA;
-        c_data.e.Packet.Data = ncb->packet;
+        c_data.e.Packet.Data = ncb->rx_buffer;
         c_data.e.Packet.Size = recvcb;
         inet_ntop(AF_INET, &remote.sin_addr, c_data.e.Packet.RemoteAddress, sizeof (c_data.e.Packet.RemoteAddress));
         c_data.e.Packet.RemotePort = ntohs(remote.sin_port);
@@ -42,13 +32,10 @@ static nsp_status_t _udp_rx(ncb_t *ncb)
 
     /* ECONNRESET 104 Connection reset by peer */
     if (recvcb < 0) {
-        /* system interrupted */
-        if (EINTR == errno) {
-            return NSP_STATUS_SUCCESSFUL;
+        if (!NSP_FAILED_AND_ERROR_EQUAL(recvcb, EAGAIN)) {
+            mxx_call_ecr("fatal error occurred syscall recvfrom(2), error:%d, link:%lld", errno, ncb->hld );
         }
-
-        mxx_call_ecr("fatal error occurred syscall recvfrom(2), error:%d, link:%lld", errno, ncb->hld );
-        return posix__makeerror(errno);
+        return recvcb;
     }
 
     return NSP_STATUS_SUCCESSFUL;
@@ -58,25 +45,15 @@ static nsp_status_t _udp_rx_domain(ncb_t *ncb)
 {
     int recvcb;
     struct sockaddr_un remote;
-    socklen_t addrlen;
     udp_data_t c_data;
     nis_event_t c_event;
-    int nread;
 
-    /* FIONREAD query the length of data can read in device buffer. */
-    if ( 0 == ioctl(ncb->sockfd, FIONREAD, &nread)) {
-        if (0 == nread) {
-            return posix__makeerror(EAGAIN);
-        }
-    }
-
-    addrlen = sizeof(remote);
     remote.sun_path[0] = 0;
-    recvcb = recvfrom(ncb->sockfd, ncb->packet, MAX_UDP_UNIT, 0, (struct sockaddr *)&remote, &addrlen);
+    recvcb = ncb_recvdata_nonblock(ncb, (struct sockaddr *)&remote, sizeof(remote));
     if (recvcb > 0) {
         c_event.Ln.Udp.Link = ncb->hld;
         c_event.Event = EVT_UDP_RECEIVE_DOMAIN;
-        c_data.e.Domain.Data = ncb->packet;
+        c_data.e.Domain.Data = ncb->rx_buffer;
         c_data.e.Domain.Size = recvcb;
         c_data.e.Domain.Path = ((0 == remote.sun_path[0]) ? NULL : &remote.sun_path[0]);
         if (ncb->nis_callback) {
@@ -94,12 +71,10 @@ static nsp_status_t _udp_rx_domain(ncb_t *ncb)
     /* ECONNRESET 104 Connection reset by peer */
     if (recvcb < 0) {
         /* system interrupted */
-        if (EINTR == errno) {
-            return NSP_STATUS_SUCCESSFUL;
+        if (!NSP_FAILED_AND_ERROR_EQUAL(recvcb, EAGAIN)) {
+            mxx_call_ecr("fatal error occurred syscall recvfrom(2), error:%d, link:%lld", errno, ncb->hld );
         }
-
-        mxx_call_ecr("fatal error occurred syscall recvfrom(2), error:%d, link:%lld", errno, ncb->hld );
-        return posix__makeerror(errno);
+        return recvcb;
     }
 
     return NSP_STATUS_SUCCESSFUL;
@@ -129,10 +104,10 @@ nsp_status_t udp_txn(ncb_t *ncb, void *p)
 
     while (node->offset < node->wcb) {
         if (AF_INET == ncb->local_addr.sin_family ) {
-            wcb = sendto(ncb->sockfd, node->data + node->offset, node->wcb - node->offset, 0,
+            wcb = sendto(ncb->sockfd, node->data + node->offset, node->wcb - node->offset, MSG_DONTWAIT,
                     (const struct sockaddr *)&node->udp_target, sizeof(node->udp_target) );
         } else if (AF_UNIX == ncb->local_addr.sin_family) {
-            wcb = sendto(ncb->sockfd, node->data + node->offset, node->wcb - node->offset, 0,
+            wcb = sendto(ncb->sockfd, node->data + node->offset, node->wcb - node->offset, MSG_DONTWAIT,
                     (const struct sockaddr *)&node->domain_target, sizeof(node->domain_target) );
         } else {
             return posix__makeerror(EPROTO);

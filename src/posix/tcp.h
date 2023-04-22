@@ -23,8 +23,6 @@ nsp_status_t tcp_gettst_r(HTCPLINK link, tst_t *tst, tst_t *previous);
 extern
 void tcp_setattr_r(ncb_t *ncb, int attr);
 extern
-void tcp_getattr_r(ncb_t *ncb, int *attr);
-extern
 void tcp_relate_address(ncb_t *ncb);
 
 /* tcp io */

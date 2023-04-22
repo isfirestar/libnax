@@ -58,7 +58,8 @@ struct _ncb {
     struct list_head nl_entry;
 
     /* the actually buffer for receive */
-    unsigned char *packet;
+    unsigned char *rx_buffer;
+    size_t rx_buffer_size;
 
     /* fifo queue of pending packet for send */
     struct tx_fifo fifo;
@@ -95,8 +96,8 @@ struct _ncb {
             /* TCP packet user-parse offset when receving */
             int rx_parse_offset;
 
-            /* the actually buffer give to syscall @recv */
-            unsigned char *rx_buffer;
+            /* the parse cache of tcp */
+            unsigned char *rx_parse_buffer;
 
             /* the large-block information(TCP packets larger than 0x11000 Bytes but less than 50MBytes) */
             unsigned char* lbdata;   /* large-block data buffer */
@@ -172,5 +173,14 @@ extern
 void ncb_post_accepted(const ncb_t *ncb, HTCPLINK link);
 extern
 void ncb_post_connected(const ncb_t *ncb);
+
+extern
+int ncb_recvdata(ncb_t *ncb, struct sockaddr *addr, socklen_t addrlen);
+extern
+int ncb_recvdata_nonblock(ncb_t *ncb, struct sockaddr *addr, socklen_t addrlen);
+extern
+int ncb_setattr_r(ncb_t *ncb, int attr);
+extern
+int ncb_getattr_r(ncb_t *ncb);
 
 #endif

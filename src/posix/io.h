@@ -14,7 +14,9 @@ nsp_status_t io_init(int protocol, int nprocs);
 extern
 nsp_status_t io_setfl(int fd, int test);
 extern
-nsp_status_t io_fnbio(int fd);
+nsp_status_t io_set_cloexec(int fd);
+extern
+nsp_status_t io_set_nonblock(int fd, int set);
 extern
 void io_uninit(int protocol);
 extern

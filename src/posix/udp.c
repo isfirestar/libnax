@@ -60,6 +60,17 @@ void udp_uninit()
     _udp_invoke(wp_uninit);
 }
 
+static nsp_status_t udp_allocate_rx_buffer(ncb_t *ncb)
+{
+    ncb->rx_buffer = (unsigned char *)zmalloc(MAX_UDP_UNIT);
+    if (unlikely(!ncb->rx_buffer)) {
+        return posix__makeerror(ENOMEM);
+    }
+    ncb->rx_buffer_size = MAX_UDP_UNIT;
+
+    return NSP_STATUS_SUCCESSFUL;
+}
+
 static nsp_status_t _udp_create_domain(ncb_t *ncb, const char* domain)
 {
     int fd;
@@ -103,9 +114,8 @@ static nsp_status_t _udp_create_domain(ncb_t *ncb, const char* domain)
             }
 
             /* allocate buffer for normal packet */
-            ncb->packet = (unsigned char *)ztrymalloc(MAX_UDP_UNIT);
-            if (unlikely(!ncb->packet)) {
-                status = posix__makeerror(ENOMEM);
+            status = udp_allocate_rx_buffer(ncb);
+            if (!NSP_SUCCESS(status)) {
                 break;
             }
 
@@ -164,9 +174,8 @@ static nsp_status_t _udp_create(ncb_t *ncb, const char* ipstr, uint16_t port, in
         }
 
         /* allocate buffer for normal packet */
-        ncb->packet = (unsigned char *)ztrymalloc(MAX_UDP_UNIT);
-        if (unlikely(!ncb->packet)) {
-            status = posix__makeerror(ENOMEM);
+        status = udp_allocate_rx_buffer(ncb);
+        if (!NSP_SUCCESS(status)) {
             break;
         }
 
@@ -636,17 +645,17 @@ nsp_status_t udp_dropgrp(HUDPLINK link)
     return status;
 }
 
-nsp_status_t udp_setattr_r(ncb_t *ncb, int attr)
+void udp_setattr_r(ncb_t *ncb, int attr)
 {
-    atom_exchange(&ncb->attr, attr);
-    if (ncb->attr & LINKATTR_UDP_BAORDCAST) {
-        return udp_set_boardcast(ncb, 1);
-    } else {
-        return udp_set_boardcast(ncb, 0);
-    }
-}
+    int oldattr;
 
-void udp_getattr_r(ncb_t *ncb, int *attr)
-{
-    atom_exchange(attr, ncb->attr);
+    oldattr = ncb_setattr_r(ncb, attr);
+
+    if ((0 == (oldattr & LINKATTR_UDP_BAORDCAST)) && (ncb->attr & LINKATTR_UDP_BAORDCAST)) {
+        udp_set_boardcast(ncb, 1);
+    }
+
+    if ((oldattr & LINKATTR_UDP_BAORDCAST) && (0 == (ncb->attr & LINKATTR_UDP_BAORDCAST))) {
+        udp_set_boardcast(ncb, 0);
+    }
 }

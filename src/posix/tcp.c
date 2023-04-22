@@ -66,20 +66,21 @@ static nsp_status_t _tcprefr( objhld_t hld, ncb_t **ncb )
 nsp_status_t tcp_allocate_rx_buffer(ncb_t *ncb)
 {
     /* allocate package to save parse result */
-    if (!ncb->packet) {
-        if (NULL == (ncb->packet = (unsigned char *)ztrymalloc(TCP_BUFFER_SIZE))) {
+    if (!ncb->rx_buffer) {
+        if (NULL == (ncb->rx_buffer = (unsigned char *)ztrymalloc(TCP_BUFFER_SIZE))) {
             mxx_call_ecr("Fails allocate packet memory");
             return posix__makeerror(ENOMEM);
         }
     }
+    ncb->rx_buffer_size = TCP_BUFFER_SIZE;
 
     /* allocate package to storage Rx kernel buffer, this buffer direct post to recv(2) */
     ncb->u.tcp.rx_parse_offset = 0;
-    if (!ncb->u.tcp.rx_buffer) {
-        if (NULL == (ncb->u.tcp.rx_buffer = (unsigned char *)ztrymalloc(TCP_BUFFER_SIZE))) {
+    if (!ncb->u.tcp.rx_parse_buffer) {
+        if (NULL == (ncb->u.tcp.rx_parse_buffer = (unsigned char *)ztrymalloc(TCP_BUFFER_SIZE))) {
             mxx_call_ecr("Fails allocate Rx buffer memory");
-            zfree(ncb->packet);
-            ncb->packet = NULL;
+            zfree(ncb->rx_buffer);
+            ncb->rx_buffer = NULL;
             return posix__makeerror(ENOMEM);
         }
     }
@@ -262,32 +263,6 @@ HTCPLINK tcp_create2(tcp_io_fp callback, const char* ipstr, uint16_t port, const
     return link;
 }
 
-nsp_status_t tcp_settst(HTCPLINK link, const tst_t *tst)
-{
-    ncb_t *ncb;
-    nsp_status_t status;
-
-    if ( unlikely(!tst) ) {
-        return posix__makeerror(EINVAL);
-    }
-
-     /* size of tcp template must be less or equal to 32 bytes */
-    if ( unlikely(tst->cb_ > TCP_MAXIMUM_TEMPLATE_SIZE) ) {
-        mxx_call_ecr("Limit size of tst is 32 byte");
-        return posix__makeerror(EINVAL);
-    }
-
-    status = _tcprefr(link, &ncb);
-    if ( likely(NSP_SUCCESS(status)) ) {
-        ncb->u.tcp.template.cb_ = tst->cb_;
-        ncb->u.tcp.template.builder_ = tst->builder_;
-        ncb->u.tcp.template.parser_ = tst->parser_;
-        objdefr(link);
-    }
-
-    return status;
-}
-
 nsp_status_t tcp_settst_r(HTCPLINK link, const tst_t *tst)
 {
     ncb_t *ncb;
@@ -310,26 +285,6 @@ nsp_status_t tcp_settst_r(HTCPLINK link, const tst_t *tst)
         ncb->u.tcp.prtemplate.parser_ = atom_exchange(&ncb->u.tcp.template.parser_, tst->parser_);
         objdefr(link);
     }
-    return status;
-}
-
-nsp_status_t tcp_gettst(HTCPLINK link, tst_t *tst)
-{
-    ncb_t *ncb;
-    nsp_status_t status;
-
-    if ( unlikely(!tst) ) {
-        return posix__makeerror(EINVAL);
-    }
-
-    status = _tcprefr(link, &ncb);
-    if ( likely(NSP_SUCCESS(status)) ) {
-        tst->cb_ = ncb->u.tcp.template.cb_;
-        tst->builder_ = ncb->u.tcp.template.builder_;
-        tst->parser_ = ncb->u.tcp.template.parser_;
-        objdefr(link);
-    }
-
     return status;
 }
 
@@ -638,7 +593,7 @@ static nsp_status_t _tcp_connect2_domain(ncb_t *ncb, const char *domain)
         }
 
         /* for asynchronous connect, set file-descriptor to non-blocked mode first */
-        status = io_fnbio(ncb->sockfd);
+        status = io_set_nonblock(ncb->sockfd, 1);
         if (!NSP_SUCCESS(status)) {
             break;
         }
@@ -697,7 +652,7 @@ static nsp_status_t _tcp_connect2(ncb_t *ncb, const char* ipstr, uint16_t port)
         status = NSP_STATUS_FATAL;
 
         /* for asynchronous connect, set file-descriptor to non-blocked mode first */
-        status = io_fnbio(ncb->sockfd);
+        status = io_set_nonblock(ncb->sockfd, 1);
         if (!NSP_SUCCESS(status)) {
             break;
         }
@@ -1301,60 +1256,9 @@ nsp_status_t tcp_set_quickack(const ncb_t *ncb, int set)
     return NSP_STATUS_SUCCESSFUL;
 }
 
-nsp_status_t tcp_setattr(HTCPLINK link, int attr, int enable)
-{
-    ncb_t *ncb;
-    nsp_status_t status;
-
-    status = _tcprefr(link, &ncb);
-    if (!NSP_SUCCESS(status)) {
-        return status;
-    }
-
-    switch(attr) {
-        case LINKATTR_TCP_FULLY_RECEIVE:
-        case LINKATTR_TCP_NO_BUILD:
-        case LINKATTR_TCP_UPDATE_ACCEPT_CONTEXT:
-            (enable > 0) ? (ncb->attr |= attr) : (ncb->attr &= ~attr);
-            status = NSP_STATUS_SUCCESSFUL;
-            break;
-        default:
-            status = posix__makeerror(EINVAL);
-            break;
-    }
-
-    objdefr(link);
-    return status;
-}
-
-nsp_status_t tcp_getattr(HTCPLINK link, int attr, int *enabled)
-{
-    ncb_t *ncb;
-    nsp_status_t status;
-
-    status = _tcprefr(link, &ncb);
-    if (!NSP_SUCCESS(status)) {
-        return status;
-    }
-
-    if (ncb->attr & attr) {
-        *enabled = 1;
-    } else {
-        *enabled = 0;
-    }
-
-    objdefr(link);
-    return status;
-}
-
 void tcp_setattr_r(ncb_t *ncb, int attr)
 {
-    atom_exchange(&ncb->attr, attr);
-}
-
-void tcp_getattr_r(ncb_t *ncb, int *attr)
-{
-    atom_exchange(attr, ncb->attr);
+    ncb_setattr_r(ncb, attr);
 }
 
 void tcp_relate_address(ncb_t *ncb)
