@@ -177,7 +177,7 @@ static nsp_status_t start_udp_client(const struct argument *parameter, HLNK *out
     }
 
     /* ipc:/dev/shm/demo.sock */
-    link = udp_create(&udp_client_callback, parameter->chost, parameter->port, 0);
+    link = udp_create(&udp_client_callback, parameter->chost, 0, UDP_FLAG_NONE);
     if (INVALID_HUDPLINK == link) {
         if (resp) {
             free(resp);
