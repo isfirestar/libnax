@@ -141,6 +141,11 @@ nsp_boolean_t fifo_tx_overflow(ncb_t *ncb)
     struct tx_fifo *fifo;
     nsp_boolean_t tx_overflow;
 
+    /* synchronous file descriptor will never cause Tx overflow  */
+    if (0 == (ncb_getattr_r(ncb) & LINKATTR_NONBLOCK)) {
+        return nsp_false;
+    }
+
     fifo = &ncb->fifo;
 
     lwp_mutex_lock(&fifo->lock);

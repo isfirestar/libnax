@@ -6,8 +6,6 @@
 #include "wpool.h"
 #include "pipe.h"
 
-#include "ifos.h"
-#include "atom.h"
 #include "zmalloc.h"
 
 /*
@@ -154,7 +152,7 @@ static nsp_status_t _tcp_create_domain(ncb_t *ncb, const char* domain)
 
     /* prevent double creation */
     expect = 0;
-    if (!atom_compare_exchange_strong(&ncb->sockfd, &expect, fd)) {
+    if (!__atomic_compare_exchange_n(&ncb->sockfd, &expect, fd, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE)) {
         close(fd);
         return posix__makeerror(EEXIST);
     }
@@ -280,9 +278,9 @@ nsp_status_t tcp_settst_r(HTCPLINK link, const tst_t *tst)
 
     status = _tcprefr(link, &ncb);
     if ( likely(NSP_SUCCESS(status)) ) {
-        ncb->u.tcp.prtemplate.cb_ = atom_exchange(&ncb->u.tcp.template.cb_, tst->cb_);
-        ncb->u.tcp.prtemplate.builder_ = atom_exchange(&ncb->u.tcp.template.builder_, tst->builder_);
-        ncb->u.tcp.prtemplate.parser_ = atom_exchange(&ncb->u.tcp.template.parser_, tst->parser_);
+        ncb->u.tcp.prtemplate.cb_ = __atomic_exchange_n(&ncb->u.tcp.template.cb_, tst->cb_, __ATOMIC_ACQ_REL);
+        ncb->u.tcp.prtemplate.builder_ = __atomic_exchange_n(&ncb->u.tcp.template.builder_, tst->builder_, __ATOMIC_ACQ_REL);
+        ncb->u.tcp.prtemplate.parser_ = __atomic_exchange_n(&ncb->u.tcp.template.parser_, tst->parser_, __ATOMIC_ACQ_REL);
         objdefr(link);
     }
     return status;
@@ -300,9 +298,9 @@ nsp_status_t tcp_gettst_r(HTCPLINK link, tst_t *tst, tst_t *previous)
 
     status = _tcprefr(link, &ncb);
     if ( likely(NSP_SUCCESS(status)) ) {
-        local.cb_ = atom_exchange(&tst->cb_, ncb->u.tcp.template.cb_);
-        local.builder_ = atom_exchange(&tst->builder_, ncb->u.tcp.template.builder_);
-        local.parser_ = atom_exchange(&tst->parser_, ncb->u.tcp.template.parser_);
+        local.cb_ = __atomic_exchange_n(&tst->cb_, ncb->u.tcp.template.cb_, __ATOMIC_ACQ_REL);
+        local.builder_ = __atomic_exchange_n(&tst->builder_, ncb->u.tcp.template.builder_, __ATOMIC_ACQ_REL);
+        local.parser_ = __atomic_exchange_n(&tst->parser_, ncb->u.tcp.template.parser_, __ATOMIC_ACQ_REL);
         objdefr(link);
 
         if (previous) {
@@ -447,15 +445,17 @@ static nsp_status_t _tcp_connect_domain(ncb_t *ncb, const char *domain)
         }
 
         /* follow tcp rx/tx event */
-        atom_set(&ncb->ncb_read, &tcp_rx);
-        atom_set(&ncb->ncb_write, &tcp_tx);
+        __atomic_store_n(&ncb->ncb_read, &tcp_rx, __ATOMIC_RELEASE);
+        __atomic_store_n(&ncb->ncb_write, &tcp_tx, __ATOMIC_RELEASE);
 
-        /* focus EPOLLIN only */
-        status = io_attach(ncb, EPOLLIN);
-        if ( !NSP_SUCCESS(status) ) {
-            break;
+        /* if this link is a callback link, it should be attached to epoll */
+        if (ncb->nis_callback) {
+            status = io_attach(ncb, EPOLLIN);
+            if ( !NSP_SUCCESS(status) ) {
+                break;
+            }
         }
-
+        
         mxx_call_ecr("Link:%lld established domain:%s", ncb->hld,ncb->domain_addr.sun_path);
         ncb_post_connected(ncb);
     }while( 0 );
@@ -535,13 +535,15 @@ static nsp_status_t _tcp_connect(ncb_t *ncb, const char* ipstr, uint16_t port)
         tcp_relate_address(ncb);
 
         /* follow tcp rx/tx event */
-        atom_set(&ncb->ncb_read, &tcp_rx);
-        atom_set(&ncb->ncb_write, &tcp_tx);
+        __atomic_store_n(&ncb->ncb_read, &tcp_rx, __ATOMIC_RELEASE);
+        __atomic_store_n(&ncb->ncb_write, &tcp_tx, __ATOMIC_RELEASE);
 
-        /* focus EPOLLIN only */
-        status = io_attach(ncb, EPOLLIN);
-        if ( !NSP_SUCCESS(status) ) {
-            break;
+        /* if this link specify callback, set it into epoll */
+        if (ncb->nis_callback) {
+            status = io_attach(ncb, EPOLLIN);
+            if ( !NSP_SUCCESS(status) ) {
+                break;
+            }
         }
 
         mxx_call_ecr("Link:%lld connection established to %s:%d",
@@ -593,14 +595,14 @@ static nsp_status_t _tcp_connect2_domain(ncb_t *ncb, const char *domain)
         }
 
         /* for asynchronous connect, set file-descriptor to non-blocked mode first */
-        status = io_set_nonblock(ncb->sockfd, 1);
+        status = ncb_set_nonblock(ncb, 1);
         if (!NSP_SUCCESS(status)) {
             break;
         }
 
         /* double check the tx_syn routine, decline multithread risk */
         expect = NULL;
-        if (!atom_compare_exchange_strong( &ncb->ncb_write, &expect, &tcp_tx_syn)) {
+        if (!__atomic_compare_exchange_n(&ncb->ncb_write, &expect, &tcp_tx_syn, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE)) {
             break;
         }
 
@@ -652,10 +654,11 @@ static nsp_status_t _tcp_connect2(ncb_t *ncb, const char* ipstr, uint16_t port)
         status = NSP_STATUS_FATAL;
 
         /* for asynchronous connect, set file-descriptor to non-blocked mode first */
-        status = io_set_nonblock(ncb->sockfd, 1);
+        status = ncb_set_nonblock(ncb, 1);
         if (!NSP_SUCCESS(status)) {
             break;
         }
+        ncb->attr |= LINKATTR_NONBLOCK;
 
         /* get the socket status of tcp_info to check the socket tcp statues */
         status = tcp_save_info(ncb, &ktcp);
@@ -684,7 +687,7 @@ static nsp_status_t _tcp_connect2(ncb_t *ncb, const char* ipstr, uint16_t port)
 
         /* double check the tx_syn routine */
         expect = NULL;
-        if (!atom_compare_exchange_strong( &ncb->ncb_write, &expect, &tcp_tx_syn)) {
+        if (!__atomic_compare_exchange_n(&ncb->ncb_write, &expect, &tcp_tx_syn, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE)) {
             break;
         }
 
@@ -754,7 +757,12 @@ nsp_status_t tcp_connect2(HTCPLINK link, const char* ipstr, uint16_t port)
         return status;
     }
 
-    status = (AF_UNIX == ncb->local_addr.sin_family) ?  _tcp_connect2_domain(ncb, ipstr) : _tcp_connect2(ncb, ipstr, port);
+    if (ncb->nis_callback) {
+        status = (AF_UNIX == ncb->local_addr.sin_family) ?  _tcp_connect2_domain(ncb, ipstr) : _tcp_connect2(ncb, ipstr, port);
+    } else {
+        status = posix__makeerror(EINVAL);
+    }
+    
     objdefr(link);
     return status;
 }
@@ -765,6 +773,7 @@ nsp_status_t tcp_listen(HTCPLINK link, int block)
     struct tcp_info ktcp;
     socklen_t addrlen;
     nsp_status_t status;
+    ncb_rw_t expect;
 
     if ( unlikely(link < 0 || block < 0 || block >= 0x7FFF) ) {
         return posix__makeerror(EINVAL);
@@ -777,6 +786,13 @@ nsp_status_t tcp_listen(HTCPLINK link, int block)
 
     do {
         status = NSP_STATUS_FATAL;
+
+        /* listener non callback function specified are not permissive
+            this condition use to preserve ever link accepted from remote are all queue into IO manager */
+        if (!ncb->nis_callback) {
+            status = posix__makeerror(EINVAL);
+            break;
+        }
 
         /* cope with the domain socket situation */
         if (AF_UNIX == ncb->local_addr.sin_family ) {
@@ -820,11 +836,12 @@ nsp_status_t tcp_listen(HTCPLINK link, int block)
         }
 
         /* this NCB object is readonly， and it must be used for accept */
-        if (NULL != atom_compare_exchange(&ncb->ncb_read, NULL, &tcp_syn)) {
+        expect = NULL;
+        if (!__atomic_compare_exchange_n(&ncb->ncb_read, &expect, &tcp_syn, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE)) {
             status = posix__makeerror(EEXIST);
             break;
         }
-        atom_set(&ncb->ncb_write, NULL);
+        __atomic_store_n(&ncb->ncb_write, NULL, __ATOMIC_RELEASE);
 
         /* set file descriptor to asynchronous mode and attach to it's own epoll object,
          *  ncb object willbe destroy on fatal. */
@@ -896,16 +913,6 @@ nsp_status_t tcp_write(HTCPLINK link, const void *origin, int cb, const nis_seri
 
     do {
         status = NSP_STATUS_FATAL;
-
-        /* the following situation maybe occur when tcp_write called:
-         * immediately call @tcp_write after @tcp_create, but no connection established and no listening has yet been taken
-         * in this situation, @wpool::run_task maybe take a task, but @ncb->ncb_write is ineffectiveness.application may crashed.
-         * examine these two parameters to ensure their effectiveness
-         */
-        if (!ncb->ncb_write || !ncb->ncb_read) {
-            status = posix__makeerror(EINVAL);
-            break;
-        }
 
         /* get the socket status of tcp_info to check the socket tcp statues */
         status = tcp_save_info(ncb, &ktcp);
@@ -1027,6 +1034,25 @@ nsp_status_t tcp_write(HTCPLINK link, const void *origin, int cb, const nis_seri
     if ( !NSP_SUCCESS_OR_ERROR_EQUAL(status, EBUSY)) {
         objclos(link);
     }*/
+
+    return status;
+}
+
+nsp_status_t tcp_read(HTCPLINK link, void *data, int size)
+{
+    ncb_t *ncb;
+    nsp_status_t status;
+
+    if ( unlikely(link < 0 || !data || size <= 0 || size > TCP_MAXIMUM_PACKET_SIZE)) {
+        return posix__makeerror(EINVAL);
+    }
+
+    status = _tcprefr(link, &ncb);
+    if ( NSP_SUCCESS(status) ) {
+        /* invoke sys API here */
+        status= ( ncb_getattr_r(ncb) & LINKATTR_NONBLOCK ) ? posix__makeerror(EINVAL) : ncb_recvdata(ncb, data, size, NULL, 0);
+        objdefr(link);
+    }
 
     return status;
 }

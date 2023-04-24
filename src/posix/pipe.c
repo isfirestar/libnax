@@ -4,7 +4,6 @@
 #include <limits.h>
 
 #include "mxx.h"
-#include "atom.h"
 #include "io.h"
 #include "zmalloc.h"
 
@@ -124,8 +123,8 @@ nsp_status_t pipe_create(int protocol, int *fdw)
     ncb->protocol = protocol;
 
     /* set data handler function pointer for Rx/Tx */
-    atom_set(&ncb->ncb_read, &_pipe_rx);
-    atom_set(&ncb->ncb_write, &_pipe_tx);
+	__atomic_store_n(&ncb->ncb_read, &_pipe_rx, __ATOMIC_RELEASE);
+	__atomic_store_n(&ncb->ncb_write, &_pipe_tx, __ATOMIC_RELEASE);
 
     /* attach to epoll */
     if (!NSP_SUCCESS(io_attach(ncb, EPOLLIN))) {

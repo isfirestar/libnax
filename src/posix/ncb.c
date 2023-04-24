@@ -3,9 +3,9 @@
 #include "fifo.h"
 #include "io.h"
 #include "zmalloc.h"
-#include "atom.h"
 
 #include <pthread.h>
+#include <stdio.h>
 
 static LIST_HEAD(nl_head);
 static pthread_mutex_t nl_head_locker = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -90,7 +90,7 @@ void ncb_deconstruct(objhld_t ignore, void *p)
     /* post pre close event to calling thread, and than,
         Invalidate the user context pointer, trust calling has been already handled and free @ncb->context  */
     _ncb_post_preclose(ncb);
-    ncb->context = NULL;
+    __atomic_store_n(&ncb->context, NULL, __ATOMIC_RELEASE);
 
     /* stop network service:
      * 1. cancel relation from epoll, if related
@@ -379,42 +379,17 @@ void ncb_post_connected(const ncb_t *ncb)
     }
 }
 
-int ncb_recvdata(ncb_t *ncb, struct sockaddr *addr, socklen_t addrlen)
+int ncb_recvdata(ncb_t *ncb, void *data, size_t datalen, struct sockaddr *addr, socklen_t addrlen)
 {
     int cb;
     struct msghdr msg;
     struct iovec iov[1];
 
-    msg.msg_name = addr;
-    msg.msg_namelen = addrlen;
-    msg.msg_iov = iov;
-    msg.msg_iovlen = 1;
-    msg.msg_control = NULL;
-    msg.msg_controllen = 0;
-    msg.msg_flags = 0;
+    iov[0].iov_base = data ? data : ncb->rx_buffer;
+    iov[0].iov_len = (data && datalen > 0) ? datalen : ncb->rx_buffer_size;
 
-    iov[0].iov_base = ncb->rx_buffer;
-    iov[0].iov_len = ncb->rx_buffer_size;
-
-    do {
-        cb = recvmsg(ncb->sockfd, &msg, 0);
-    } while (cb < 0 && errno == EINTR);
-
-    return cb < 0 ? posix__makeerror(errno) : cb;
-}
-
-int ncb_recvdata_nonblock(ncb_t *ncb, struct sockaddr *addr, socklen_t addrlen)
-{
-    int cb;
-    struct msghdr msg;
-    struct iovec iov[1];
-    int nread;
-
-    /* FIONREAD query the length of data can read in device buffer. */
-    if ( 0 == ioctl(ncb->sockfd, FIONREAD, &nread)) {
-        if (0 == nread) {
-            return posix__makeerror(EAGAIN);
-        }
+    if (!iov[0].iov_base || iov[0].iov_len <= 0) {
+        return posix__makeerror(EINVAL);
     }
 
     msg.msg_name = addr;
@@ -425,27 +400,79 @@ int ncb_recvdata_nonblock(ncb_t *ncb, struct sockaddr *addr, socklen_t addrlen)
     msg.msg_controllen = 0;
     msg.msg_flags = 0;
 
-    iov[0].iov_base = ncb->rx_buffer;
-    iov[0].iov_len = ncb->rx_buffer_size;
-
     do {
-        cb = recvmsg(ncb->sockfd, &msg, MSG_DONTWAIT);
+        cb = recvmsg(ncb->sockfd, &msg, (ncb->attr & LINKATTR_NONBLOCK) ? MSG_DONTWAIT : 0 );
     } while (cb < 0 && errno == EINTR);
 
     return cb < 0 ? posix__makeerror(errno) : cb;
+}
+
+int ncb_senddata(ncb_t *ncb, const void *data, size_t datalen, const struct sockaddr *addr, socklen_t addrlen)
+{
+    int cb;
+    struct msghdr msg;
+    struct iovec iov[1];
+
+    iov[0].iov_base = (void *)data;
+    iov[0].iov_len = datalen;
+
+    if (!iov[0].iov_base || iov[0].iov_len <= 0) {
+        return posix__makeerror(EINVAL);
+    }
+
+    msg.msg_name = (void *)addr;
+    msg.msg_namelen = addrlen;
+    msg.msg_iov = iov;
+    msg.msg_iovlen = 1;
+    msg.msg_control = NULL;
+    msg.msg_controllen = 0;
+    msg.msg_flags = 0;
+
+    do {
+        cb = sendmsg(ncb->sockfd, &msg, MSG_NOSIGNAL | ((ncb->attr & LINKATTR_NONBLOCK) ? MSG_DONTWAIT : 0));
+    } while (cb < 0 && errno == EINTR);
+
+    return cb < 0 ? posix__makeerror(errno) : cb;
+}
+
+nsp_status_t ncb_set_nonblock(ncb_t *ncb, int set)
+{
+    if (set) {
+        if (ncb->nis_callback) {
+            return io_set_nonblock(ncb->sockfd, 1);
+        } else {
+            return posix__makeerror(EINVAL);
+        }
+    } else {
+        return io_set_nonblock(ncb->sockfd, 0);
+    }
 }
 
 int ncb_setattr_r(ncb_t *ncb, int attr)
 {
     int oldattr;
-    oldattr = atom_exchange(&ncb->attr, attr);
+    nsp_status_t status;
+
+    oldattr = __atomic_exchange_n(&ncb->attr, attr, __ATOMIC_ACQ_REL);
 
     if ((attr & LINKATTR_NONBLOCK) && !(oldattr & LINKATTR_NONBLOCK)) {
-        io_set_nonblock(ncb->sockfd, 1);
+        status = ncb_set_nonblock(ncb, 1);
+        if (NSP_SUCCESS(status)) {
+            __atomic_or_fetch(&ncb->attr, LINKATTR_NONBLOCK, __ATOMIC_SEQ_CST);
+        } else {
+            __atomic_and_fetch(&ncb->attr, ~LINKATTR_NONBLOCK, __ATOMIC_SEQ_CST);
+            return posix__makeerror(status);
+        }
     }
 
     if (!(attr & LINKATTR_NONBLOCK) && (oldattr & LINKATTR_NONBLOCK)) {
-        io_set_nonblock(ncb->sockfd, 0);
+        status = ncb_set_nonblock(ncb, 0);
+        if (NSP_SUCCESS(status)) {
+            __atomic_and_fetch(&ncb->attr, ~LINKATTR_NONBLOCK, __ATOMIC_SEQ_CST);
+        } else {
+            __atomic_or_fetch(&ncb->attr, LINKATTR_NONBLOCK, __ATOMIC_SEQ_CST);
+            return posix__makeerror(status);
+        }
     }
 
     return oldattr;
@@ -453,5 +480,5 @@ int ncb_setattr_r(ncb_t *ncb, int attr)
 
 int ncb_getattr_r(ncb_t *ncb)
 {
-    return atom_get(&ncb->attr);
+    return __atomic_load_n(&ncb->attr, __ATOMIC_ACQUIRE);
 }

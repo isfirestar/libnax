@@ -1,11 +1,8 @@
 #include "tcp.h"
 
-#include <poll.h>
-
 #include "mxx.h"
 #include "fifo.h"
 #include "io.h"
-#include "atom.h"
 
 static nsp_status_t _tcp_syn_try(ncb_t *ncb_server, int *clientfd)
 {
@@ -60,6 +57,7 @@ static nsp_status_t _tcp_syn_try(ncb_t *ncb_server, int *clientfd)
 static nsp_status_t _tcp_syn_dpc(ncb_t *ncb_server, ncb_t *ncb)
 {
     nsp_status_t status;
+    int attr;
 
     /* set options */
     if (AF_UNIX == ncb_server->local_addr.sin_family ) {
@@ -92,17 +90,18 @@ static nsp_status_t _tcp_syn_dpc(ncb_t *ncb_server, ncb_t *ncb)
     }
 
     /* specify data handler proc for client ncb object */
-    atom_set(&ncb->ncb_read, &tcp_rx);
-    atom_set(&ncb->ncb_write, &tcp_tx);
+    __atomic_store_n(&ncb->ncb_read, &tcp_rx, __ATOMIC_RELEASE);
+    __atomic_store_n(&ncb->ncb_write, &tcp_tx, __ATOMIC_RELEASE);
 
     /* copy the context from listen fd to accepted one in needed */
-    if (ncb_server->attr & LINKATTR_TCP_UPDATE_ACCEPT_CONTEXT) {
-        ncb->attr = ncb_server->attr;
+    attr = ncb_getattr_r(ncb_server);
+    if (attr & LINKATTR_TCP_UPDATE_ACCEPT_CONTEXT) {
+        tcp_setattr_r(ncb, attr);
         memcpy(&ncb->u.tcp.template, &ncb_server->u.tcp.template, sizeof(tst_t));
     }
 
     /* attach to epoll as early as it can to ensure the EPOLLRDHUP and EPOLLERR event not be lost,
-        BUT do NOT allow the EPOLLIN event, because receive message should NOT early than accepted message */
+    BUT do NOT allow the EPOLLIN event, because receive message should NOT early than accepted message */
     status = io_attach(ncb, 0);
     if ( !NSP_SUCCESS(status) ) {
         return status;
@@ -179,6 +178,7 @@ nsp_status_t tcp_syn(ncb_t *ncb_server)
     do {
         status = _tcp_syn(ncb_server);
     } while (NSP_SUCCESS(status));
+    
     return status;
 }
 
@@ -189,7 +189,7 @@ static nsp_status_t _tcp_rx(ncb_t *ncb)
     int offset;
     int cpcb;
 
-    recvcb = ncb_recvdata_nonblock(ncb, NULL, 0);
+    recvcb = ncb_recvdata(ncb, NULL, 0, NULL, 0);
     if (recvcb > 0) {
         cpcb = recvcb;
         overplus = recvcb;
@@ -226,9 +226,17 @@ static nsp_status_t _tcp_rx(ncb_t *ncb)
 nsp_status_t tcp_rx(ncb_t *ncb)
 {
     nsp_status_t status;
+    int available;
 
     /* read receive buffer until it's empty */
     do {
+        if (0 == ioctl(ncb->sockfd, FIONREAD, &available)) {
+            if (0 == available) {
+                status = posix__makeerror(EAGAIN);
+                break;
+            }
+        }
+
         status = _tcp_rx(ncb);
     }while( NSP_SUCCESS(status) );
     return status;
@@ -242,7 +250,7 @@ nsp_status_t tcp_txn(ncb_t *ncb, void *p)
     node = (struct tx_node *)p;
 
     while (node->offset < node->wcb) {
-        wcb = send(ncb->sockfd, node->data + node->offset, node->wcb - node->offset, MSG_NOSIGNAL | MSG_DONTWAIT);
+        wcb = ncb_senddata(ncb, node->data + node->offset, node->wcb - node->offset, NULL, 0);
 
         /* fatal-error/connection-terminated  */
         if (0 == wcb) {
@@ -251,19 +259,6 @@ nsp_status_t tcp_txn(ncb_t *ncb, void *p)
         }
 
         if (wcb < 0) {
-
-            /* A signal occurred before any data  was  transmitted
-                continue and send again */
-            if (EINTR == errno) {
-                continue;
-            }
-
-            /* EAGAIN didn't acquire a log record */
-            if (EAGAIN != errno) {
-                mxx_call_ecr("Fatal error occurred syscall send(2), error:%d, link:%lld",errno, ncb->hld );
-            }
-
-            /* other error, these errors should cause link close */
             return posix__makeerror(errno);
         }
 
@@ -359,8 +354,8 @@ nsp_status_t tcp_tx_syn(ncb_t *ncb)
             }
 
             /* follow tcp rx/tx event */
-            atom_set(&ncb->ncb_read, &tcp_rx);
-            atom_set(&ncb->ncb_write, &tcp_tx);
+            __atomic_store_n(&ncb->ncb_read, &tcp_rx, __ATOMIC_RELEASE);
+            __atomic_store_n(&ncb->ncb_write, &tcp_tx, __ATOMIC_RELEASE);
 
             /* focus EPOLLIN only */
             status = io_modify(ncb, EPOLLIN);

@@ -10,7 +10,7 @@ static nsp_status_t _udp_rx(ncb_t *ncb)
     udp_data_t c_data;
     nis_event_t c_event;
 
-    recvcb = ncb_recvdata_nonblock(ncb, (struct sockaddr *)&remote, sizeof(remote));
+    recvcb = ncb_recvdata(ncb, NULL, 0, (struct sockaddr *)&remote, sizeof(remote));
     if (recvcb > 0) {
         c_event.Ln.Udp.Link = ncb->hld;
         c_event.Event = EVT_RECEIVEDATA;
@@ -18,6 +18,7 @@ static nsp_status_t _udp_rx(ncb_t *ncb)
         c_data.e.Packet.Size = recvcb;
         inet_ntop(AF_INET, &remote.sin_addr, c_data.e.Packet.RemoteAddress, sizeof (c_data.e.Packet.RemoteAddress));
         c_data.e.Packet.RemotePort = ntohs(remote.sin_port);
+        c_data.e.Packet.Domain = &c_data.e.Packet.RemoteAddress[0];
         if (ncb->nis_callback) {
             ncb->nis_callback(&c_event, &c_data);
         }
@@ -49,13 +50,15 @@ static nsp_status_t _udp_rx_domain(ncb_t *ncb)
     nis_event_t c_event;
 
     remote.sun_path[0] = 0;
-    recvcb = ncb_recvdata_nonblock(ncb, (struct sockaddr *)&remote, sizeof(remote));
+    recvcb = ncb_recvdata(ncb, NULL, 0, (struct sockaddr *)&remote, sizeof(remote));
     if (recvcb > 0) {
         c_event.Ln.Udp.Link = ncb->hld;
-        c_event.Event = EVT_UDP_RECEIVE_DOMAIN;
-        c_data.e.Domain.Data = ncb->rx_buffer;
-        c_data.e.Domain.Size = recvcb;
-        c_data.e.Domain.Path = ((0 == remote.sun_path[0]) ? NULL : &remote.sun_path[0]);
+        c_event.Event = EVT_RECEIVEDATA;
+        c_data.e.Packet.Data = ncb->rx_buffer;
+        c_data.e.Packet.Size = recvcb;
+        c_data.e.Packet.RemoteAddress[0] = 0;
+        c_data.e.Packet.RemotePort = 0;
+        c_data.e.Packet.Domain = ((0 == remote.sun_path[0]) ? NULL : &remote.sun_path[0]);
         if (ncb->nis_callback) {
             ncb->nis_callback(&c_event, &c_data);
         }
@@ -84,9 +87,16 @@ nsp_status_t udp_rx(ncb_t *ncb)
 {
     nsp_status_t status;
     nsp_status_t (*rxfn)(ncb_t *);
+    int available;
 
     rxfn = (AF_UNIX == ncb->local_addr.sin_family) ? &_udp_rx_domain : &_udp_rx;
     do {
+        if (0 == ioctl(ncb->sockfd, FIONREAD, &available)) {
+            if (0 == available) {
+                status = posix__makeerror(EAGAIN);
+                break;
+            }
+        }
         status = rxfn(ncb);
     } while(NSP_SUCCESS(status));
     return status;
@@ -104,11 +114,9 @@ nsp_status_t udp_txn(ncb_t *ncb, void *p)
 
     while (node->offset < node->wcb) {
         if (AF_INET == ncb->local_addr.sin_family ) {
-            wcb = sendto(ncb->sockfd, node->data + node->offset, node->wcb - node->offset, MSG_DONTWAIT,
-                    (const struct sockaddr *)&node->udp_target, sizeof(node->udp_target) );
+            wcb = ncb_senddata(ncb, node->data + node->offset, node->wcb - node->offset, (struct sockaddr *)&node->udp_target, sizeof(node->udp_target));
         } else if (AF_UNIX == ncb->local_addr.sin_family) {
-            wcb = sendto(ncb->sockfd, node->data + node->offset, node->wcb - node->offset, MSG_DONTWAIT,
-                    (const struct sockaddr *)&node->domain_target, sizeof(node->domain_target) );
+            wcb = ncb_senddata(ncb, node->data + node->offset, node->wcb - node->offset, (struct sockaddr *)&node->domain_target, sizeof(node->domain_target));
         } else {
             return posix__makeerror(EPROTO);
         }
@@ -123,18 +131,12 @@ nsp_status_t udp_txn(ncb_t *ncb, void *p)
             /* the write buffer is full, active EPOLLOUT and waitting for epoll event trigger
              * at this point, we need to deal with the queue header node and restore the unprocessed node back to the queue header.
              * the way 'oneshot' focus on the write operation completion point */
-            if (EAGAIN == errno) {
+            if (NSP_FAILED_AND_ERROR_EQUAL(wcb, EAGAIN)) {
                 mxx_call_ecr("syscall sendto(2) would block cause by kernel memory overload,link:%lld", ncb->hld);
+            } else {
+                /* other error, these errors should cause link close */
+                mxx_call_ecr("fatal error occurred syscall sendto(2), error:%d, link:%lld",errno, ncb->hld );
             }
-
-            /* A signal occurred before any data  was  transmitted
-                continue and send again */
-            if (EINTR == errno) {
-                continue;
-            }
-
-             /* other error, these errors should cause link close */
-            mxx_call_ecr("fatal error occurred syscall sendto(2), error:%d, link:%lld",errno, ncb->hld );
             return posix__makeerror(errno);
         }
 

@@ -3,8 +3,6 @@
 #include "object.h"
 
 #include "threading.h"
-#include "atom.h"
-#include "ifos.h"
 
 #include "ncb.h"
 #include "tcp.h"
@@ -121,7 +119,7 @@ static nsp_status_t _wp_exec(struct wptask *task)
     }
 
     status = NSP_STATUS_FATAL;
-    ncb_write = atom_get(&ncb->ncb_write);
+    ncb_write = __atomic_load_n(&ncb->ncb_write, __ATOMIC_ACQUIRE);
     if (ncb_write) {
         /*
          * if the return value of @ncb_write equal to -1, that means system call maybe error, this link will be close
@@ -236,7 +234,7 @@ void wp_uninit(int protocol)
     }
 
     poolptr = *locate;
-    if (!atom_compare_exchange_strong(locate, poolptr, NULL)) {
+    if (!__atomic_compare_exchange_n(locate, poolptr, NULL, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE)) {
         return;
     }
 
@@ -273,7 +271,7 @@ nsp_status_t wp_init(int protocol)
     ref_init(&poolptr->ref, &_wp_close_protocol);
 
     expect = NULL;
-    if (!atom_compare_exchange_strong( locate, &expect, poolptr)) {
+    if (!__atomic_compare_exchange_n(locate, &expect, poolptr, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE)) {
         zfree(poolptr);
         return EALREADY;
     }
@@ -281,7 +279,7 @@ nsp_status_t wp_init(int protocol)
     lwp_mutex_lock(&_wpmgr.mutex);
     status = _wp_init(poolptr);
     if (unlikely(!NSP_SUCCESS(status))) {
-        atom_set(locate, NULL);
+        __atomic_store_n(locate, NULL, __ATOMIC_RELEASE);
         ref_close(&poolptr->ref);
     }
     lwp_mutex_unlock(&_wpmgr.mutex);

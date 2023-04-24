@@ -50,9 +50,6 @@ typedef abuff_type(112) abuff_ipc_path_t;   /* a string with maximum length to h
 #define EVT_TCP_ACCEPTED    (0x0013)   /* has been Accepted */
 #define EVT_TCP_CONNECTED   (0x0014)  /* success connect to remote */
 
-/* UDP events */
-#define EVT_UDP_RECEIVE_DOMAIN (0x0021) /* UDP received data from a UNIX domian IPC */
-
 /* option to get link address */
 #define LINK_ADDR_LOCAL   (1)   /* get local using endpoint pair */
 #define LINK_ADDR_REMOTE  (2)   /* get remote using endpoint pair */
@@ -61,25 +58,25 @@ typedef abuff_type(112) abuff_ipc_path_t;   /* a string with maximum length to h
 #define LINKATTR_TCP_FULLY_RECEIVE                      (1) /* receive fully packet include low-level head */
 #define LINKATTR_TCP_NO_BUILD                           (2) /* not use @tst::builder when calling @tcp_write */
 #define LINKATTR_TCP_UPDATE_ACCEPT_CONTEXT              (4) /* copy tst and attr to accepted link when syn */
-#define LINKATTR_NONBLOCK                               (8) /* set nonblock mode */
 
 /* optional  attributes of UDP link */
 #define LINKATTR_UDP_BAORDCAST                          (1)
 #define LINKATTR_UDP_MULTICAST                          (2)
 
+/* optional attributes for both TCP/UDP */
+#define LINKATTR_NONBLOCK                               (8) /* set nonblock mode */
+
 /* the definition control types for @nis_cntl */
-#define NI_SETATTR          (1)    /* set attributes */
+#define NI_SETATTR          (1)     /* set attributes */
 #define NI_GETATTR          (2)     /* get attributes */
 #define NI_SETCTX           (3)     /* set context pointer, calling thread has resposibility to preserve the life cycle of context pointer */
 #define NI_GETCTX           (4)     /* get context pointer */
 #define NI_SETTST           (5)     /* set TCP build/parse template */
 #define NI_GETTST           (6)
 #define NI_DUPCTX           (7)	    /* not used */
-#define NI_REFCTXPTR        (8)     /* directly reference context pointer, this operation shall cause reference count increase of link object */
-#define NI_RLSCTXPTR        (9)     /* directly release context pointer, this operation shall cause reference count decrease of link object */
-#define NI_GETAF            (10)    /* obtain address family */
-#define NI_GETPROTO         (11)    /* obtain protocol dependency */
-#define NI_GETRXTID         (12)    /* obtain Rx thread id(which managed in epoll or IOCP)  */
+#define NI_GETAF            (8)     /* obtain address family */
+#define NI_GETPROTO         (9)     /* obtain protocol dependency */
+#define NI_GETRXTID         (10)    /* obtain Rx thread id(which managed in epoll or IOCP)  */
 
 /* the dotted decimal notation for IPv4 or IPv6 */
 struct nis_inet_addr {
@@ -193,14 +190,9 @@ struct nis_udp_data {
             const unsigned char *Data;
             int Size;
             char RemoteAddress[16];
+            const char *Domain;
             unsigned short RemotePort;
         } Packet;
-
-        struct {
-            const unsigned char *Data;
-            int Size;
-            const char *Path; /* this field will be NULL in the case of client didn't binding with any IPC file */
-        } Domain;
 
         /* only used in case of EVT_PRE_CLOSE,
             @Context  pointer to user defined context of each link object */

@@ -33,6 +33,11 @@ PORTABLEAPI(void) tcp_uninit();
 
 	parameters:
 	@callback input the callback function address to respond the TCP network event, see "common network events" in @nisdef.h
+			    framework didn't support any other opportunity to change the callback function address.
+				particularly, when you create a TCP client by invoke @tcp_create or @tcp_create2, this parameter can be option to NULL, 
+					in this case, you shall explicit call tcp_read to read data from remote peer manually.
+					in this case, you shall NOT call @tcp_connect2 any time.
+					
 	@ipstr specify the local IPv4 address format with "dotted decimal notation" specify the initial address which this link expect to bind on.
 			if "NULL" specified, framework will use default address "0.0.0.0" assicoated with any network-adpater
 	@port specify the port which this link expect to bind on, if 0 specified, framework will use "random-selection" by underlying-system
@@ -127,6 +132,27 @@ PORTABLEAPI(nsp_status_t) tcp_listen(HTCPLINK link, int block);
 */
 PORTABLEAPI(nsp_status_t) tcp_write(HTCPLINK link, const void *origin, int size, const nis_serializer_fp serializer);
 
+/* this is a optional but not recommended function, it's only use for some special case.
+ *	1. the @link shall be a synchronous TCP object which created by @tcp_create or @tcp_create2
+ *  2. calling thread ignore the tst function to parse the incoming data, it's MUST be a complete frame.
+ *  3. when read request explicit invoke by caller, the callback function which specified by @tcp_create or @tcp_create2 will NOT be trigger.
+ *  4. never call this function in callback function which specified by @tcp_create or @tcp_create2, it will cause dead-lock.
+ *  5. but, in many case of madatory synchronous request-response situation, this function is very useful.
+ * 
+ * parameters:
+ * @link is the TCP object symbol which have TCP_ESTABLISHED state.
+ * @data is the user data buffer which acquire to receive data from target host.
+ * @size indicate the length in bytes which @data buffer can contain
+ * 
+ * return:
+ * on success, the return value should be either a positive integer indicate the received size of direct-completed inner syscall
+ * on fatal, negative integer will return, potential errors including:
+ * -EINVAL : the input parameter illegal or the link is not a synchronous file object
+ * -EPROTOTYPE : @link not a TCP object
+ * -ENOENT : @link are already closed or states are not available
+ */
+PORTABLEAPI(nsp_status_t) tcp_read(HTCPLINK link, void *data, int size);
+
 /* @tcp_awaken schedules the pointer to @pipedata of @cb bytes of user data to receive thread which assign to @link,
 	this implement is helpful for thread merge and/or lockless design in some complex program.
 	parameters:
@@ -205,6 +231,12 @@ PORTABLEAPI(void) udp_uninit();
 PORTABLEAPI(HUDPLINK) udp_create(udp_io_fp user_callback, const char* ipstr, uint16_t port, int flag);
 PORTABLEAPI(void) udp_destroy(HUDPLINK link);
 
+/* calling thread can use this macro to check the udp received data is from a UNIX socket or from a IPv4 network
+ *	@udpdata is a structure pointer to @nis_udp_data, so, this macro shall be used in callback function of any UDP object
+ *	test !udp_not_domain_received(udpdata) can obtain the received data are from UNIX domain peer
+ */
+#define udp_not_domain_received(udpdata)	( (0 != (udpdata)->RemoteAddress[0]) && ((udpdata)->Domain == (udpdata)->RemoteAddress) )
+
 /* @udp_write send @size bytes of user datagram @origin from local address tuple associated by @link to remote target host @ipstr and it's UDP port @port.
 		@udp_write using synchronous model but NOT-blocking calling thread and return immediately,
 		framework guarantee request post to system kernel at the time point of function returned.
@@ -240,6 +272,28 @@ PORTABLEAPI(void) udp_destroy(HUDPLINK link);
 	notes that when udp received data from IPC channel, callback type is EVT_UDP_RECEIVE_DOMAIN and associated with structure nis_udp_data::e::Domain
 */
 PORTABLEAPI(nsp_status_t) udp_write(HUDPLINK link, const void *origin, unsigned int size, const char* ipstr, uint16_t port, const nis_serializer_fp serializer);
+
+/* this is a optional but not recommended function, it's only use for some special case.
+ *	1. the @link shall be a synchronous UDP object which created by @udp_create or @udp_create2
+ *  2. when read request explicit invoke by caller, the callback function which specified by @udp_create or @udp_create2 will NOT be trigger.
+ *  3. never call this function in callback function which specified by @udp_create or @udp_create2, it will cause dead-lock.
+ *  4. but, in many case of madatory synchronous request-response situation, this function is very useful.
+ * 
+ * parameters:
+ * @link is the UDP object symbol
+ * @data is the user data buffer which acquire to receive data from target host.
+ * @size indicate the length in bytes which @data buffer can contain
+ * @radr is the remote target host IPv4 address, if this parameter is NULL means calling thread ignore incoming address information
+ * @rport is the remote target host UDP port, if this parameter is NULL means calling thread ignore incoming port information
+ * 
+ * return:
+ * on success, the return value should be either a positive integer indicate the received size of direct-completed inner syscall
+ * on fatal, negative integer will return, potential errors including:
+ * -EINVAL : the input parameter illegal or the link is not a synchronous file object
+ * -EPROTOTYPE : @link not a TCP object
+ * -ENOENT : @link are already closed or states are not available
+ */
+PORTABLEAPI(nsp_status_t) udp_read(HTCPLINK link, void *data, int size, struct nis_inet_addr *raddr, uint16_t *rport);
 
 /* @udp_awaken schedules the pointer to @pipedata of @cb bytes of user data to receive thread which assign to @link,
 	this implement is helpful for thread merge and/or lockless design in some complex program.

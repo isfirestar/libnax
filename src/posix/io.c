@@ -6,7 +6,6 @@
 #include <signal.h>
 
 #include "threading.h"
-#include "atom.h"
 #include "ifos.h"
 #include "zmalloc.h"
 #include "refs.h"
@@ -170,7 +169,7 @@ static void _iorun(const struct epoll_event *eventptr)
 
         /* system width input cache change from empty to readable */
         if (eventptr->events & EPOLLIN) {
-            ncb_read = atom_get(&ncb->ncb_read);
+            ncb_read = __atomic_load_n(&ncb->ncb_read, __ATOMIC_ACQUIRE);
             if ( likely(ncb_read) ) {
                 status = ncb_read(ncb);
                 if (!NSP_SUCCESS_OR_ERROR_EQUAL(status, EAGAIN)) {
@@ -419,7 +418,7 @@ nsp_status_t io_init(int protocol, int nprocs)
     }
 
     expect = NULL;
-    if (!atom_compare_exchange_strong(locate, &expect, obptr)) {
+    if (!__atomic_compare_exchange_n(locate, &expect, obptr, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE)) {
         zfree(obptr);
         return EEXIST; /* not a error */
     }
@@ -428,7 +427,7 @@ nsp_status_t io_init(int protocol, int nprocs)
     lwp_mutex_lock(&_iomgr.mutex);
     status = _io_init(obptr);
     if ( unlikely(!NSP_SUCCESS(status)) ) {
-        atom_set(locate, NULL);
+        __atomic_store_n(locate, NULL, __ATOMIC_RELEASE);
         ref_close(&obptr->ref);
     }
     lwp_mutex_unlock(&_iomgr.mutex);
@@ -446,7 +445,7 @@ void io_uninit(int protocol)
     }
 
     obptr = *locate;
-    if (!atom_compare_exchange_strong(locate, obptr, NULL)) {
+    if (!__atomic_compare_exchange_n(locate, obptr, NULL, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE)) {
         return;
     }
 

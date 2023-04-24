@@ -6,7 +6,6 @@
 #include "wpool.h"
 #include "pipe.h"
 
-#include "atom.h"
 #include "zmalloc.h"
 
 static nsp_status_t _udprefr( objhld_t hld, ncb_t **ncb )
@@ -62,9 +61,11 @@ void udp_uninit()
 
 static nsp_status_t udp_allocate_rx_buffer(ncb_t *ncb)
 {
-    ncb->rx_buffer = (unsigned char *)zmalloc(MAX_UDP_UNIT);
-    if (unlikely(!ncb->rx_buffer)) {
-        return posix__makeerror(ENOMEM);
+    if (likely(!ncb->rx_buffer)) {
+        ncb->rx_buffer = (unsigned char *)zmalloc(MAX_UDP_UNIT);
+        if (unlikely(!ncb->rx_buffer)) {
+            return posix__makeerror(ENOMEM);
+        }
     }
     ncb->rx_buffer_size = MAX_UDP_UNIT;
 
@@ -85,7 +86,7 @@ static nsp_status_t _udp_create_domain(ncb_t *ncb, const char* domain)
 
     /* prevent double creation */
     expect = 0;
-    if (!atom_compare_exchange_strong(&ncb->sockfd, &expect, fd)) {
+    if (!__atomic_compare_exchange_n(&ncb->sockfd, &expect, fd, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE)) {
         close(fd);
         return posix__makeerror(EEXIST);
     }
@@ -119,18 +120,20 @@ static nsp_status_t _udp_create_domain(ncb_t *ncb, const char* domain)
                 break;
             }
 
-            atom_set(&ncb->ncb_read, &udp_rx);
+            __atomic_store_n(&ncb->ncb_read, &udp_rx, __ATOMIC_RELEASE);
         }
 
         /* set data handler function pointer for Rx/Tx */
-        atom_set(&ncb->ncb_write, &udp_tx);
+        __atomic_store_n(&ncb->ncb_write, &udp_tx, __ATOMIC_RELEASE);
 
         /* attach to epoll */
-        status = io_attach(ncb, EPOLLIN);
-        if (!NSP_SUCCESS(status)) {
-            break;
+        if (ncb->nis_callback) {
+            status = io_attach(ncb, EPOLLIN);
+            if (!NSP_SUCCESS(status)) {
+                break;
+            }
         }
-
+        
         mxx_call_ecr("success allocate link:%lld, sockfd:%d, binding on domain %s", ncb->hld, ncb->sockfd, domain);
         return ncb->hld;
     } while (0);
@@ -153,7 +156,7 @@ static nsp_status_t _udp_create(ncb_t *ncb, const char* ipstr, uint16_t port, in
     }
 
     expect = 0;
-    if (!atom_compare_exchange_strong(&ncb->sockfd, &expect, fd)) {
+    if (!__atomic_compare_exchange_n(&ncb->sockfd, &expect, fd, 0, __ATOMIC_SEQ_CST, __ATOMIC_ACQUIRE)) {
         close(fd);
         return posix__makeerror(EEXIST);
     }
@@ -197,13 +200,15 @@ static nsp_status_t _udp_create(ncb_t *ncb, const char* ipstr, uint16_t port, in
         getsockname(ncb->sockfd, (struct sockaddr *) &ncb->local_addr, &addrlen);
 
         /* set data handler function pointer for Rx/Tx */
-        atom_set(&ncb->ncb_read, &udp_rx);
-        atom_set(&ncb->ncb_write, &udp_tx);
+        __atomic_store_n(&ncb->ncb_read, &udp_rx, __ATOMIC_RELEASE);
+        __atomic_store_n(&ncb->ncb_write, &udp_tx, __ATOMIC_RELEASE);
 
         /* attach to epoll */
-        status = io_attach(ncb, EPOLLIN);
-        if (!NSP_SUCCESS(status)) {
-            break;
+        if (ncb->nis_callback) {
+            status = io_attach(ncb, EPOLLIN);
+            if (!NSP_SUCCESS(status)) {
+                break;
+            }
         }
 
         mxx_call_ecr("success allocate link:%lld, sockfd:%d, binding on %s:%d",
@@ -416,6 +421,49 @@ nsp_status_t udp_write(HUDPLINK link, const void *origin, unsigned int cb, const
     return status;
 }
 
+nsp_status_t udp_read(HTCPLINK link, void *data, int size, struct nis_inet_addr *raddr, uint16_t *rport)
+{
+    ncb_t *ncb;
+    nsp_status_t status;
+    struct sockaddr_in addr;
+    socklen_t addrlen;
+
+    if ( unlikely(link < 0 || !data || size <= 0)) {
+        return posix__makeerror(EINVAL);
+    }
+
+    status = _udprefr(link, &ncb);
+    if ( !NSP_SUCCESS(status) ) {
+        return status;
+    }
+    
+    do {
+        /* we didn't allow directly request on a asynchronous target */
+        if (ncb_getattr_r(ncb) & LINKATTR_NONBLOCK) {
+            status = posix__makeerror(EINVAL);
+            break;
+        }
+
+        /* invoke sys API here */
+        addrlen = sizeof(addr);
+        status = ncb_recvdata(ncb, data, size, (struct sockaddr *)&addr, addrlen);
+        if (!NSP_SUCCESS(status)) {
+            break;
+        }
+
+        if (raddr) {
+            inet_ntop(AF_INET, &addr.sin_addr, raddr->i_addr, sizeof(raddr->i_addr));
+        }
+        if (rport) {
+            *rport = ntohs(addr.sin_port);
+        }
+    } while (0);
+
+    objdefr(link);
+    return status;
+}
+
+
 nsp_status_t udp_getaddr(HUDPLINK link, uint32_t *ipv4, uint16_t *port)
 {
     ncb_t *ncb;
@@ -500,7 +548,7 @@ nsp_status_t udp_getopt(HUDPLINK link, int level, int opt, char *val, unsigned i
 
 nsp_status_t udp_set_boardcast(ncb_t *ncb, int enable)
 {
-    if (0 == setsockopt(ncb->sockfd, SOL_SOCKET, SO_BROADCAST, (const void *) &enable, sizeof (enable))) {
+    if (0 == setsockopt(ncb->sockfd, SOL_SOCKET, SO_BROADCAST, (const void *)&enable, sizeof(enable))) {
         return NSP_STATUS_SUCCESSFUL;
     }
 

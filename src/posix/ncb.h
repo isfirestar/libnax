@@ -175,12 +175,14 @@ extern
 void ncb_post_connected(const ncb_t *ncb);
 
 extern
-int ncb_recvdata(ncb_t *ncb, struct sockaddr *addr, socklen_t addrlen);
+int ncb_recvdata(ncb_t *ncb, void *data, size_t datalen, struct sockaddr *addr, socklen_t addrlen);
 extern
-int ncb_recvdata_nonblock(ncb_t *ncb, struct sockaddr *addr, socklen_t addrlen);
+int ncb_senddata(ncb_t *ncb, const void *data, size_t datalen, const struct sockaddr *addr, socklen_t addrlen);
 extern
 int ncb_setattr_r(ncb_t *ncb, int attr);
 extern
 int ncb_getattr_r(ncb_t *ncb);
+extern
+nsp_status_t ncb_set_nonblock(ncb_t *ncb, int set);
 
 #endif

@@ -2,7 +2,6 @@
 
 #include "abuff.h"
 #include "ifos.h"
-#include "atom.h"
 #include "clist.h"
 #include "zmalloc.h"
 
@@ -489,10 +488,10 @@ int ifos_random(const int range_min, const int range_max)
     int u;
     int r;
 
-    if (1 == atom_addone(&rand_begin)) {
+    if (1 == __atomic_add_fetch(&rand_begin, 1, __ATOMIC_SEQ_CST)) {
         srand((unsigned int) time(NULL));
     } else {
-        atom_subone(&rand_begin);
+        __atomic_sub_fetch(&rand_begin, 1, __ATOMIC_SEQ_CST);
     }
 
     r = rand();

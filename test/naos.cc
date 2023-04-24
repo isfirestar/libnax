@@ -22,62 +22,93 @@ TEST(DoTestByteOrderChange, ByteOrderChange)
     EXPECT_EQ(((changed_w >> 8) & 0xff), (word & 0xff));
 }
 
-TEST(DoIpv4Check, Ipv4Check)
-{
-    nsp_boolean_t successful;
+class CIllegalInetAddressCheck {
+    std::string str_ipaddr_;
 
-    successful = naos_is_legal_ipv4("");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("1");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("255.255.255.255.");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4(".255.255.255.255");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("255.255.255.2a5");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("256.0.0.1");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("255.256.0.1");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("255.255.256.1");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("255.255.255.256");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("-1.0.0.3");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("192.168.0.-1");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("1.2.3.4.5");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("192..168.0.1");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("192.168..0.1");
-    EXPECT_EQ(successful, nsp_false);
-    successful = naos_is_legal_ipv4("32-7.5.4");
+public:
+    CIllegalInetAddressCheck(const char *ipstr) : str_ipaddr_(ipstr) {
+        ;
+    }
+
+    std::string GetInetAddr() const {
+        return str_ipaddr_;
+    }
+};
+
+class TestSuiteIllegalInetAddr : public ::testing::TestWithParam<CIllegalInetAddressCheck> {
+    
+};
+
+INSTANTIATE_TEST_SUITE_P(instance, TestSuiteIllegalInetAddr, ::testing::Values(
+    CIllegalInetAddressCheck(""),
+    CIllegalInetAddressCheck("1"),
+    CIllegalInetAddressCheck("255.255.255.255."),
+    CIllegalInetAddressCheck(".255.255.255.255"),
+    CIllegalInetAddressCheck("255.255.255.2a5"),
+    CIllegalInetAddressCheck("256.0.0.1"),
+    CIllegalInetAddressCheck("255.256.0.1"),
+    CIllegalInetAddressCheck("255.255.256.1"),
+    CIllegalInetAddressCheck("255.255.255.256"),
+    CIllegalInetAddressCheck("-1.0.0.3"),
+    CIllegalInetAddressCheck("192.168.0.-1"),
+    CIllegalInetAddressCheck("1.2.3.4.5"),
+    CIllegalInetAddressCheck("192..168.0.1"),
+    CIllegalInetAddressCheck("192.168..0.1"),
+    CIllegalInetAddressCheck("32-7.5.4")
+));
+
+TEST_P(TestSuiteIllegalInetAddr, IllegalIpv4Check)
+{
+    CIllegalInetAddressCheck arg = GetParam();
+
+    nsp_boolean_t successful = naos_is_legal_ipv4(arg.GetInetAddr().c_str());
     EXPECT_EQ(successful, nsp_false);
 }
 
-TEST(DoIpv4ToU, Ipv4ToU)
-{
-    uint32_t value;
+class CIpv4ToUCheck {
+    std::string str_ipaddr_;
+    uint32_t u32_ipaddr_;
+    enum byte_order_t byte_order_;
 
-    value = naos_ipv4tou("222.173.215.69", kByteOrder_LittleEndian);
-    EXPECT_EQ(value, 0xdeadd745);
-    value = naos_ipv4tou("222.173.215.69", kByteOrder_BigEndian);
-    EXPECT_EQ(value, 0x45d7adde);
-    value = naos_ipv4tou(" 222.173.215.69", kByteOrder_LittleEndian);
-    EXPECT_EQ(value, 0);
-    value = naos_ipv4tou("222. 173.215.69", kByteOrder_BigEndian);
-    EXPECT_EQ(value, 0);
-    value = naos_ipv4tou("222.173. 215.69", kByteOrder_LittleEndian);
-    EXPECT_EQ(value, 0);
-    value = naos_ipv4tou("222.173.215. 69", kByteOrder_BigEndian);
-    EXPECT_EQ(value, 0);
-    value = naos_ipv4tou("222.173.215.69 ", kByteOrder_LittleEndian);
-    EXPECT_EQ(value, 0);
-    value = naos_ipv4tou("262.173.215.69", kByteOrder_BigEndian);
-    EXPECT_EQ(value, 0);
+public:
+    CIpv4ToUCheck(const char *ipstr, uint32_t ipaddr, enum byte_order_t byte_order) : str_ipaddr_(ipstr), u32_ipaddr_(ipaddr), byte_order_(byte_order) {
+        ;
+    }
+
+    std::string GetInetAddr() const {
+        return str_ipaddr_;
+    }
+
+    uint32_t GetU32InetAddr() const {
+        return u32_ipaddr_;
+    }
+
+    enum byte_order_t GetByteOrder() const {
+        return byte_order_;
+    }
+};
+
+class TestSuiteIpv4ToU : public ::testing::TestWithParam<CIpv4ToUCheck> {
+    
+};
+
+INSTANTIATE_TEST_SUITE_P(instanceTestIpv4ToU, TestSuiteIpv4ToU, ::testing::Values(
+    CIpv4ToUCheck("222.173.215.69", 0xdeadd745, kByteOrder_LittleEndian),
+    CIpv4ToUCheck("222.173.215.69", 0x45d7adde, kByteOrder_BigEndian),
+    CIpv4ToUCheck(" 222.173.215.69", 0, kByteOrder_LittleEndian),
+    CIpv4ToUCheck("222. 173.215.69", 0, kByteOrder_BigEndian),
+    CIpv4ToUCheck("222.173. 215.69", 0, kByteOrder_LittleEndian),
+    CIpv4ToUCheck("222.173.215. 69", 0, kByteOrder_BigEndian),
+    CIpv4ToUCheck("222.173.215.69 ", 0, kByteOrder_LittleEndian),
+    CIpv4ToUCheck("262.173.215.69", 0, kByteOrder_BigEndian)
+));
+
+TEST_P(TestSuiteIpv4ToU, Ipv4ToU)
+{
+    CIpv4ToUCheck arg = GetParam();
+
+    uint32_t value = naos_ipv4tou(arg.GetInetAddr().c_str(), arg.GetByteOrder());
+    EXPECT_EQ(value, arg.GetU32InetAddr());
 }
 
 TEST(DpIpv4ToS, Ipv4ToS)

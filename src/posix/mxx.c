@@ -16,7 +16,6 @@
 
 #include "tcp.h"
 #include "udp.h"
-#include "atom.h"
 
 /* use command: strings nshost.so.9.9.1 | grep 'COMPILE DATE'
     to query the compile date of specify ELF file */
@@ -136,7 +135,7 @@ static nis_event_callback_fp _ecr = NULL;
 
 nis_event_callback_fp nis_checr(const nis_event_callback_fp ecr)
 {
-    return atom_exchange(&_ecr, ecr);
+    return __atomic_exchange_n(&_ecr, ecr, __ATOMIC_ACQ_REL);
 }
 
 /* the ecr usually use for diagnose low-level error */
@@ -160,7 +159,7 @@ void nis_call_ecr(const char *fmt,...)
     logstr[retval] = 0;
 
     /* double check the callback address */
-    ecr = atom_get(&_ecr);
+    ecr = __atomic_load_n(&_ecr, __ATOMIC_ACQUIRE);
     if (ecr) {
         ecr(logstr, NULL, 0);
     }
@@ -236,11 +235,6 @@ int nis_cntl(objhld_t link, int cmd, ...)
         return posix__makeerror(EINVAL);
     }
 
-    if (NI_RLSCTXPTR == cmd) {
-        objdefr(link);
-        return NSP_STATUS_SUCCESSFUL;
-    }
-
     ncb = objrefr(link);
     if (!ncb) {
         return posix__makeerror(ENOENT);
@@ -251,17 +245,22 @@ int nis_cntl(objhld_t link, int cmd, ...)
     va_start(ap, cmd);
     switch (cmd) {
         case NI_SETATTR:
-            IPPROTO_TCP == ncb->protocol ? tcp_setattr_r(ncb, va_arg(ap, int)) :
-                (IPPROTO_UDP == ncb->protocol ? udp_setattr_r(ncb, va_arg(ap, int)) : 0);
+            if (ncb->protocol == IPPROTO_TCP) {
+                tcp_setattr_r(ncb, va_arg(ap, int));
+            } else if (ncb->protocol == IPPROTO_UDP) {
+                udp_setattr_r(ncb, va_arg(ap, int));
+            } else {
+                retval = -1;
+            }
             break;
         case NI_GETATTR:
             retval = ncb_getattr_r(ncb);
             break;
         case NI_SETCTX:
-            ncb->prcontext = atom_exchange(&ncb->context, va_arg(ap, const void *));
+            ncb->prcontext = __atomic_exchange_n(&ncb->context, va_arg(ap, const void *), __ATOMIC_ACQ_REL);
             break;
         case NI_GETCTX:
-            atom_set(&context, ncb->context);
+            __atomic_store_n(&context, ncb->context, __ATOMIC_RELEASE);
             *(va_arg(ap, void **) ) = context;
             break;
         case NI_SETTST:
@@ -269,11 +268,6 @@ int nis_cntl(objhld_t link, int cmd, ...)
             break;
         case NI_GETTST:
             retval = tcp_gettst_r(link, va_arg(ap, void *), NULL);
-            break;
-        case NI_REFCTXPTR:
-            atom_set(&context, ncb->context);
-            *(va_arg(ap, void **) ) = context;
-            link = INVALID_OBJHLD;
             break;
         case NI_GETAF:
             retval = ncb->local_addr.sin_family;
