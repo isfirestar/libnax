@@ -85,6 +85,8 @@ void ncb_deconstruct(objhld_t ignore, void *p)
 {
     ncb_t *ncb;
 
+    ILLEGAL_PARAMETER_STOP(!p);
+
     ncb = (ncb_t *) p;
 
     /* post pre close event to calling thread, and than,
@@ -150,8 +152,7 @@ nsp_status_t ncb_set_rcvtimeo(const ncb_t *ncb, long long ms)
     tv.tv_sec = ms / 1000;
     tv.tv_usec = (ms % 1000) * 1000;
 
-    return ( 0 == setsockopt(ncb->sockfd, SOL_SOCKET, SO_RCVTIMEO, (const void *)&tv, sizeof(tv)) ) ?
-        NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
+    return SYSCALL_ZERO_SUCCESS_CHECK(setsockopt(ncb->sockfd, SOL_SOCKET, SO_RCVTIMEO, (const void *)&tv, sizeof(tv)));
 }
 
 nsp_status_t ncb_set_sndtimeo(const ncb_t *ncb, long long ms)
@@ -161,8 +162,7 @@ nsp_status_t ncb_set_sndtimeo(const ncb_t *ncb, long long ms)
     tv.tv_sec = ms / 1000;
     tv.tv_usec = (ms % 1000) * 1000;
 
-    return ( 0 == setsockopt(ncb->sockfd, SOL_SOCKET, SO_SNDTIMEO, (const void *)&tv, sizeof(tv)) ) ?
-        NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
+    return SYSCALL_ZERO_SUCCESS_CHECK(setsockopt(ncb->sockfd, SOL_SOCKET, SO_SNDTIMEO, (const void *)&tv, sizeof(tv)));
 }
 
 nsp_status_t ncb_get_rcvtimeo(const ncb_t *ncb)
@@ -170,8 +170,7 @@ nsp_status_t ncb_get_rcvtimeo(const ncb_t *ncb)
     socklen_t optlen;
 
     optlen = sizeof(ncb->rcvtimeo);
-    return ( 0 == getsockopt(ncb->sockfd, SOL_SOCKET, SO_RCVTIMEO, (void *__restrict)&ncb->rcvtimeo, &optlen) ) ?
-        NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
+    return SYSCALL_ZERO_SUCCESS_CHECK(getsockopt(ncb->sockfd, SOL_SOCKET, SO_RCVTIMEO, (void *)&ncb->rcvtimeo, &optlen));
 }
 
 nsp_status_t ncb_get_sndtimeo(const ncb_t *ncb)
@@ -179,20 +178,16 @@ nsp_status_t ncb_get_sndtimeo(const ncb_t *ncb)
     socklen_t optlen;
 
     optlen = sizeof(ncb->sndtimeo);
-    return ( 0 == getsockopt(ncb->sockfd, SOL_SOCKET, SO_SNDTIMEO, (void *__restrict)&ncb->sndtimeo, &optlen) ) ?
-        NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
+    return SYSCALL_ZERO_SUCCESS_CHECK(getsockopt(ncb->sockfd, SOL_SOCKET, SO_SNDTIMEO, (void *)&ncb->sndtimeo, &optlen));
 }
 
 nsp_status_t ncb_set_iptos(const ncb_t *ncb, int tos)
 {
     unsigned char type_of_service = (unsigned char )tos;
 
-    if ( unlikely(0 == tos)) {
-        return posix__makeerror(EINVAL);
-    }
+    ILLEGAL_PARAMETER_CHECK(0 == tos);
 
-    return  (0 == setsockopt(ncb->sockfd, SOL_IP, IP_TOS, (const void *)&type_of_service, sizeof(type_of_service)) ) ?
-        NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
+    return SYSCALL_ZERO_SUCCESS_CHECK(setsockopt(ncb->sockfd, SOL_IP, IP_TOS, (const void *)&type_of_service, sizeof(type_of_service)));
 }
 
 nsp_status_t ncb_get_iptos(const ncb_t *ncb)
@@ -200,14 +195,13 @@ nsp_status_t ncb_get_iptos(const ncb_t *ncb)
     socklen_t optlen;
 
     optlen = sizeof(ncb->iptos);
-    return  ( 0 == getsockopt(ncb->sockfd, SOL_IP, IP_TOS, (void *__restrict)&ncb->iptos, &optlen) ) ?
-        NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
+
+    return SYSCALL_ZERO_SUCCESS_CHECK(getsockopt(ncb->sockfd, SOL_IP, IP_TOS, (void *__restrict)&ncb->iptos, &optlen));
 }
 
 nsp_status_t ncb_set_window_size(const ncb_t *ncb, int dir, int size)
 {
-    return  (0 == setsockopt(ncb->sockfd, SOL_SOCKET, dir, (const void *)&size, sizeof(size))) ?
-        NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
+    return SYSCALL_ZERO_SUCCESS_CHECK( setsockopt(ncb->sockfd, SOL_SOCKET, dir, (const void *)&size, sizeof(size)));
 }
 
 nsp_status_t ncb_get_window_size(const ncb_t *ncb, int dir, int *size)
@@ -215,8 +209,7 @@ nsp_status_t ncb_get_window_size(const ncb_t *ncb, int dir, int *size)
     socklen_t optlen;
 
     optlen = sizeof(int);
-    return ( 0 == getsockopt(ncb->sockfd, SOL_SOCKET, dir, (void *__restrict)size, &optlen) ) ?
-        NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
+    return SYSCALL_ZERO_SUCCESS_CHECK(getsockopt(ncb->sockfd, SOL_SOCKET, dir, (void *__restrict)size, &optlen));
 }
 
 nsp_status_t ncb_set_linger(const ncb_t *ncb)
@@ -226,18 +219,20 @@ nsp_status_t ncb_set_linger(const ncb_t *ncb)
     lgr.l_onoff = 1;
     lgr.l_linger = 0;
 
-    return (0 == setsockopt(ncb->sockfd, SOL_SOCKET, SO_LINGER, (char *) &lgr, sizeof ( struct linger))) ?
-        NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
+    return SYSCALL_ZERO_SUCCESS_CHECK(setsockopt(ncb->sockfd, SOL_SOCKET, SO_LINGER, (char *)&lgr, sizeof (struct linger)));
 }
 
 nsp_status_t ncb_get_linger(const ncb_t *ncb, int *onoff, int *lin)
 {
     struct linger lgr;
     socklen_t optlen;
+    nsp_status_t status;
 
     optlen = sizeof (lgr);
-    if ( 0 != getsockopt(ncb->sockfd, SOL_SOCKET, SO_LINGER, (void *__restrict) & lgr, &optlen) ) {
-        return posix__makeerror(errno);
+
+    status = SYSCALL_ZERO_SUCCESS_CHECK(getsockopt(ncb->sockfd, SOL_SOCKET, SO_LINGER, (void *__restrict) & lgr, &optlen));
+    if (!NSP_SUCCESS(status)) {
+        return status;
     }
 
     if (onoff) {
@@ -248,7 +243,7 @@ nsp_status_t ncb_get_linger(const ncb_t *ncb, int *onoff, int *lin)
         *lin = lgr.l_linger;
     }
 
-    return NSP_STATUS_SUCCESSFUL;
+    return status;
 }
 
 void ncb_set_buffsize(const ncb_t *ncb)
@@ -281,8 +276,7 @@ nsp_status_t ncb_set_reuseaddr(const ncb_t *ncb)
     int reuse;
 
     reuse = 1;
-    return (0 == setsockopt(ncb->sockfd, SOL_SOCKET, SO_REUSEADDR, &reuse, sizeof(reuse))) ?
-        NSP_STATUS_SUCCESSFUL : posix__makeerror(errno);
+    return SYSCALL_ZERO_SUCCESS_CHECK(setsockopt(ncb->sockfd, SOL_SOCKET, SO_REUSEADDR, (const void *)&reuse, sizeof(reuse)));
 }
 
 nsp_status_t ncb_query_link_error(const ncb_t *ncb, int *err)
@@ -308,23 +302,23 @@ static void _ncb_post_preclose(const ncb_t *ncb)
     nis_event_t c_event;
     tcp_data_t c_data;
 
-    if (likely(ncb->nis_callback)) {
-        c_event.Ln.Tcp.Link = ncb->hld;
-        c_event.Event = EVT_PRE_CLOSE;
-        c_data.e.PreClose.Context = ncb->context;
-        ncb->nis_callback(&c_event, &c_data);
-    }
+    ILLEGAL_PARAMETER_STOP(!ncb->nis_callback);
+
+    c_event.Ln.Tcp.Link = ncb->hld;
+    c_event.Event = EVT_PRE_CLOSE;
+    c_data.e.PreClose.Context = ncb->context;
+    ncb->nis_callback(&c_event, &c_data);
 }
 
 static void _ncb_post_closed(const ncb_t *ncb)
 {
     nis_event_t c_event;
 
-    if (likely(ncb->nis_callback)) {
-        c_event.Ln.Tcp.Link = ncb->hld;
-        c_event.Event = EVT_CLOSED;
-        ncb->nis_callback(&c_event, NULL);
-    }
+    ILLEGAL_PARAMETER_STOP(!ncb->nis_callback);
+
+    c_event.Ln.Tcp.Link = ncb->hld;
+    c_event.Event = EVT_CLOSED;
+    ncb->nis_callback(&c_event, NULL);
 }
 
 void ncb_post_recvdata(const ncb_t *ncb,  int cb, const unsigned char *data)
@@ -332,13 +326,13 @@ void ncb_post_recvdata(const ncb_t *ncb,  int cb, const unsigned char *data)
     nis_event_t c_event;
     tcp_data_t c_data;
 
-    if (likely(ncb->nis_callback)) {
-        c_event.Ln.Tcp.Link = (HTCPLINK) ncb->hld;
-        c_event.Event = EVT_RECEIVEDATA;
-        c_data.e.Packet.Size = cb;
-        c_data.e.Packet.Data = data;
-        ncb->nis_callback(&c_event, &c_data);
-    }
+    ILLEGAL_PARAMETER_STOP(!ncb->nis_callback);
+
+    c_event.Ln.Tcp.Link = (HTCPLINK) ncb->hld;
+    c_event.Event = EVT_RECEIVEDATA;
+    c_data.e.Packet.Size = cb;
+    c_data.e.Packet.Data = data;
+    ncb->nis_callback(&c_event, &c_data);
 }
 
 void ncb_post_pipedata(const ncb_t *ncb,  int cb, const unsigned char *data)
@@ -346,13 +340,13 @@ void ncb_post_pipedata(const ncb_t *ncb,  int cb, const unsigned char *data)
     nis_event_t c_event;
     tcp_data_t c_data;
 
-    if (likely(ncb->nis_callback)) {
-        c_event.Ln.Tcp.Link = (HTCPLINK) ncb->hld;
-        c_event.Event = EVT_PIPEDATA;
-        c_data.e.Packet.Size = cb;
-        c_data.e.Packet.Data = data;
-        ncb->nis_callback(&c_event, &c_data);
-    }
+    ILLEGAL_PARAMETER_STOP(!ncb->nis_callback);
+
+    c_event.Ln.Tcp.Link = (HTCPLINK) ncb->hld;
+    c_event.Event = EVT_PIPEDATA;
+    c_data.e.Packet.Size = cb;
+    c_data.e.Packet.Data = data;
+    ncb->nis_callback(&c_event, &c_data);
 }
 
 void ncb_post_accepted(const ncb_t *ncb, HTCPLINK link)
@@ -360,23 +354,23 @@ void ncb_post_accepted(const ncb_t *ncb, HTCPLINK link)
     nis_event_t c_event;
     tcp_data_t c_data;
 
-    if (likely(ncb->nis_callback)) {
-        c_event.Event = EVT_TCP_ACCEPTED;
-        c_event.Ln.Tcp.Link = ncb->hld;
-        c_data.e.Accept.AcceptLink = link;
-        ncb->nis_callback(&c_event, &c_data);
-    }
+    ILLEGAL_PARAMETER_STOP(!ncb->nis_callback);
+
+    c_event.Event = EVT_TCP_ACCEPTED;
+    c_event.Ln.Tcp.Link = ncb->hld;
+    c_data.e.Accept.AcceptLink = link;
+    ncb->nis_callback(&c_event, &c_data);
 }
 
 void ncb_post_connected(const ncb_t *ncb)
 {
     nis_event_t c_event;
 
-    if (likely(ncb->nis_callback)) {
-        c_event.Event = EVT_TCP_CONNECTED;
-        c_event.Ln.Tcp.Link = ncb->hld;
-        ncb->nis_callback(&c_event, NULL);
-    }
+    ILLEGAL_PARAMETER_STOP(!ncb->nis_callback);
+
+    c_event.Event = EVT_TCP_CONNECTED;
+    c_event.Ln.Tcp.Link = ncb->hld;
+    ncb->nis_callback(&c_event, NULL);
 }
 
 int ncb_recvdata(ncb_t *ncb, void *data, size_t datalen, struct sockaddr *addr, socklen_t addrlen)
@@ -388,9 +382,7 @@ int ncb_recvdata(ncb_t *ncb, void *data, size_t datalen, struct sockaddr *addr, 
     iov[0].iov_base = data ? data : ncb->rx_buffer;
     iov[0].iov_len = (data && datalen > 0) ? datalen : ncb->rx_buffer_size;
 
-    if (!iov[0].iov_base || iov[0].iov_len <= 0) {
-        return posix__makeerror(EINVAL);
-    }
+    ILLEGAL_PARAMETER_CHECK(!iov[0].iov_base || iov[0].iov_len <= 0);
 
     msg.msg_name = addr;
     msg.msg_namelen = addrlen;
@@ -400,9 +392,7 @@ int ncb_recvdata(ncb_t *ncb, void *data, size_t datalen, struct sockaddr *addr, 
     msg.msg_controllen = 0;
     msg.msg_flags = 0;
 
-    do {
-        cb = recvmsg(ncb->sockfd, &msg, (ncb->attr & LINKATTR_NONBLOCK) ? MSG_DONTWAIT : 0 );
-    } while (cb < 0 && errno == EINTR);
+    SYSCALL_WHILE_EINTR(cb, recvmsg(ncb->sockfd, &msg, (ncb->attr & LINKATTR_NONBLOCK) ? MSG_DONTWAIT : 0 ));
 
     return cb < 0 ? posix__makeerror(errno) : cb;
 }
@@ -416,9 +406,7 @@ int ncb_senddata(ncb_t *ncb, const void *data, size_t datalen, const struct sock
     iov[0].iov_base = (void *)data;
     iov[0].iov_len = datalen;
 
-    if (!iov[0].iov_base || iov[0].iov_len <= 0) {
-        return posix__makeerror(EINVAL);
-    }
+    ILLEGAL_PARAMETER_CHECK(!iov[0].iov_base || iov[0].iov_len <= 0);
 
     msg.msg_name = (void *)addr;
     msg.msg_namelen = addrlen;
@@ -428,9 +416,7 @@ int ncb_senddata(ncb_t *ncb, const void *data, size_t datalen, const struct sock
     msg.msg_controllen = 0;
     msg.msg_flags = 0;
 
-    do {
-        cb = sendmsg(ncb->sockfd, &msg, MSG_NOSIGNAL | ((ncb->attr & LINKATTR_NONBLOCK) ? MSG_DONTWAIT : 0));
-    } while (cb < 0 && errno == EINTR);
+    SYSCALL_WHILE_EINTR(cb, sendmsg(ncb->sockfd, &msg, MSG_NOSIGNAL | ((ncb->attr & LINKATTR_NONBLOCK) ? MSG_DONTWAIT : 0)));
 
     return cb < 0 ? posix__makeerror(errno) : cb;
 }

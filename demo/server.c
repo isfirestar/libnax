@@ -173,10 +173,6 @@ static void STDCALL udp_server_callback(const struct nis_event *event, const voi
             on_udp_received(event->Ln.Udp.Link, udpdata->e.Packet.Data, udpdata->e.Packet.Size,
                 udpdata->e.Packet.RemoteAddress, udpdata->e.Packet.RemotePort);
             break;
-        case EVT_UDP_RECEIVE_DOMAIN:
-            on_udp_domain_received(event->Ln.Udp.Link, udpdata->e.Packet.Data, udpdata->e.Packet.Size,
-                udpdata->e.Packet.Domain);
-            break;
         case EVT_PRE_CLOSE:
             if (udpdata->e.PreClose.Context) {
                 zfree(udpdata->e.PreClose.Context);

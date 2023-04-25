@@ -226,15 +226,8 @@ static void *_epoll_proc(void *argv)
     epoptr->tid = ifos_gettid();
 
     while (YES == epoptr->actived) {
-        sigcnt = epoll_wait(epoptr->epfd, evts, EPOLL_SIZE, EP_TIMEDOUT);
+        SYSCALL_WHILE_EINTR(sigcnt, epoll_wait(epoptr->epfd, evts, EPOLL_SIZE, EP_TIMEDOUT));
         if (sigcnt < 0) {
-    	    /* The call was interrupted by a signal handler before either :
-    	     * (1) any of the requested events occurred or
-    	     * (2) the timeout expired; */
-            if (EINTR == errno) {
-                continue;
-            }
-
             mxx_call_ecr("Fatal syscall epoll_wait(2), epfd:%d, error:%d", epoptr->epfd, errno);
             break;
         }
@@ -313,13 +306,8 @@ static void _io_uninit(struct io_object_block *obptr)
     int i;
     struct epoll_object_block *epoptr;
 
-    if (!obptr) {
-        return;
-    }
-
-    if (!obptr->epoptr) {
-        return;
-    }
+    ILLEGAL_PARAMETER_STOP(!obptr);
+    ILLEGAL_PARAMETER_STOP(!obptr->epoptr);
 
     for (i = 0; i < obptr->nprocs; i++) {
         _io_exit_epo(&obptr->epoptr[i]);

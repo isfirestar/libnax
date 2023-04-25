@@ -33,16 +33,11 @@ static nsp_status_t _pipe_rx(ncb_t *ncb)
 	int m;
 
 	while (1) {
-		n = read(ncb->sockfd, pipebuf, sizeof(pipebuf));
+		SYSCALL_WHILE_EINTR(n, read(ncb->sockfd, pipebuf, sizeof(pipebuf)));
 		if (n <= 0) {
 			if ( (0 == errno) || (EAGAIN == errno) || (EWOULDBLOCK == errno) ) {
 				return 0;
 			}
-
-			/* system interrupted */
-	        if (EINTR == errno) {
-	        	continue;
-	        }
 
 			return NSP_STATUS_FATAL;
 		}

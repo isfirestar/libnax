@@ -522,12 +522,8 @@ int ifos_random_block(unsigned char *buffer, int size)
 
     offset = 0;
     while (offset < size) {
-        n = read(fd, buffer + offset, size - offset);
+        SYSCALL_WHILE_EINTR(n, read(fd, buffer + offset, size - offset));
         if (n < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-
             return posix__makeerror(errno);
         }
 
@@ -598,13 +594,9 @@ int ifos_file_read(file_descriptor_t fd, void *buffer, int size)
     offset = 0;
     p = (unsigned char *)buffer;
     while (offset < size) {
-        n = read(fd, p + offset, size - offset);
+        SYSCALL_WHILE_EINTR(n, read(fd, p + offset, size - offset));
         if (n < 0) {
-            if (errno == EINTR) {
-                continue;
-            } else {
-                return posix__makeerror(errno);
-            }
+            return posix__makeerror(errno);
         }
 
         if (0 == n) {
@@ -629,12 +621,8 @@ int ifos_file_write(file_descriptor_t fd, const void *buffer, int size)
     offset = 0;
     p = (const unsigned char *)buffer;
     while (offset < size) {
-        n = write(fd, p + offset, size - offset);
+        SYSCALL_WHILE_EINTR(n, write(fd, p + offset, size - offset));
         if (n < 0) {
-            if (errno == EINTR) {
-                continue;
-            }
-
             /* no space for write more data into hard disk,
                 this NOT means a error, but MUST break now */
             if (errno == ENOSPC) {

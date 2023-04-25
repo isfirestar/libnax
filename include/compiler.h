@@ -145,6 +145,34 @@ typedef int nsp_boolean_t;
     #endif
 #endif
 
+#define SYSCALL_WHILE_EINTR(res, sys)    do {    \
+    (res) = (sys); \
+} while (res < 0 && EINTR == errno)
+
+#define SYSCALL_ZERO_SUCCESS_CHECK(sys) ((0 == (sys)) ? NSP_STATUS_SUCCESSFUL : posix__makeerror(errno))
+
+#define NSPCALL_FATAL_CHECK(res, fun) do {    \
+    (res) = (fun); \
+    if (res < 0) return res;    \
+} while (0)
+
+#define NSPCALL_FATAL_STOP(res, fun) do {    \
+    (res) = (fun); \
+    if (res < 0) return;    \
+} while (0)
+
+#define ILLEGAL_PARAMETER_CHECK(expr)   do {    \
+    if (unlikely(!(expr))) {    \
+        return -EINVAL;    \
+    }   \
+} while (0)
+
+#define ILLEGAL_PARAMETER_STOP(expr)   do {    \
+    if (unlikely(!(expr))) {    \
+        return;    \
+    }   \
+} while (0)
+
 #define PORTABLEAPI(__type)  __extern__ __export__ __type STDCALL
 #define PORTABLEIMPL(__type)   __type STDCALL
 
@@ -214,15 +242,15 @@ typedef int nsp_boolean_t;
 static __always_inline int logarithm2(int x)
 {
 	int n;
-	
+
 	if (1 == x) {
 		return 0;
 	}
-	
+
 	if (!is_powerof_2(x)) {
 		return -1;
 	}
-	
+
 	n = 0;
 	while (x) {
 		x >>= 1;

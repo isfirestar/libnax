@@ -108,11 +108,7 @@ static void STDCALL udp_client_callback(const struct nis_event *event, const voi
 
     switch(event->Event) {
         case EVT_RECEIVEDATA:
-        case EVT_UDP_RECEIVE_DOMAIN:
             on_udp_received(event->Ln.Udp.Link, udpdata->e.Packet.Data, udpdata->e.Packet.Size);
-            break;
-
-            //on_udp_domain_received(event->Ln.Udp.Link, udpdata->e.Domain.Data, udpdata->e.Domain.Size);
             break;
         case EVT_PRE_CLOSE:
             assert(udpdata->e.PreClose.Context);

@@ -51,9 +51,7 @@ nsp_status_t nis_getver(swnet_version_t *version)
 #endif
 nsp_status_t nis_lgethost(abuff_64_t *name)
 {
-    if (!name) {
-        return posix__makeerror(EINVAL);
-    }
+    ILLEGAL_PARAMETER_CHECK(!name);
 
     if (0 == gethostname(name->st, sizeof(*name))) {
         return NSP_STATUS_SUCCESSFUL;
@@ -71,9 +69,7 @@ nsp_status_t nis_gethost(const char *name, uint32_t *ipv4)
     char buf[1024];
     int fr;
 
-    if (!name || !ipv4) {
-        return posix__makeerror(EINVAL);
-    }
+    ILLEGAL_PARAMETER_CHECK (!name || !ipv4);
 
     *ipv4 = 0;
     remote = NULL;
@@ -146,9 +142,7 @@ void nis_call_ecr(const char *fmt,...)
     char logstr[1280];
     int retval;
 
-    if (!_ecr) {
-        return;
-    }
+    ILLEGAL_PARAMETER_STOP(!_ecr);
 
     va_start(ap, fmt);
     retval = vsnprintf(logstr, sizeof_array(logstr) - 1, fmt, ap);
@@ -172,16 +166,11 @@ int nis_getifmisc(ifmisc_t *ifv, int *cbifv)
     int i;
     int cbacquire;
 
+    ILLEGAL_PARAMETER_CHECK(!cbifv);
+    ILLEGAL_PARAMETER_CHECK(*cbifv > 0 && !ifv);
+
     ifa = NULL;
     count = 0;
-
-    if (!cbifv) {
-        return -EINVAL;
-    }
-
-    if (*cbifv > 0 && !ifv) {
-        return -EINVAL;
-    }
 
     if (getifaddrs(&ifs) < 0) {
         return posix__makeerror(errno);
@@ -231,9 +220,7 @@ int nis_cntl(objhld_t link, int cmd, ...)
     va_list ap;
     void *context;
 
-    if (link < 0) {
-        return posix__makeerror(EINVAL);
-    }
+    ILLEGAL_PARAMETER_CHECK(link < 0);
 
     ncb = objrefr(link);
     if (!ncb) {
@@ -293,9 +280,7 @@ nsp_status_t nis_getifmac(const char *eth_name, abuff_mac_t *phyaddr)
     struct ifreq ifr;
     int fd;
 
-    if (!eth_name || !phyaddr) {
-        return posix__makeerror(EINVAL);
-    }
+    ILLEGAL_PARAMETER_CHECK(!eth_name || !phyaddr);
 
     fd = socket(AF_INET, SOCK_DGRAM, 0);
     if(fd > 0) {

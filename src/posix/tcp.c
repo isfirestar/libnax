@@ -425,11 +425,8 @@ static nsp_status_t _tcp_connect_domain(ncb_t *ncb, const char *domain)
             strncpy(ncb->domain_addr.sun_path, &domain[4], sizeof(ncb->domain_addr.sun_path) - 1);
         }
 
-        /* syscall @connect can be interrupted by other signal. */
-        do {
-            retval = connect(ncb->sockfd, (const struct sockaddr *) &ncb->domain_addr, sizeof(ncb->domain_addr));
-        } while((errno == EINTR) && (retval < 0));
-
+        /* syscall @connect to target host */
+        SYSCALL_WHILE_EINTR(retval, connect(ncb->sockfd, (const struct sockaddr *)&ncb->domain_addr, sizeof(ncb->domain_addr)));
         if (retval < 0) {
             /* if this socket is already connected, or it is in listening states, sys-call failed with error EISCONN  */
             mxx_call_ecr("Fatal syscall connect(2) for link:%lld,domain:\"%s\",error:%u", ncb->hld, ncb->domain_addr.sun_path, errno);
@@ -455,7 +452,7 @@ static nsp_status_t _tcp_connect_domain(ncb_t *ncb, const char *domain)
                 break;
             }
         }
-        
+
         mxx_call_ecr("Link:%lld established domain:%s", ncb->hld,ncb->domain_addr.sun_path);
         ncb_post_connected(ncb);
     }while( 0 );
@@ -509,11 +506,8 @@ static nsp_status_t _tcp_connect(ncb_t *ncb, const char* ipstr, uint16_t port)
         addr_to.sin_port = htons(port);
         addr_to.sin_addr.s_addr = inet_addr(ipstr);
 
-        /* syscall @connect can be interrupted by other signal. */
-        do {
-            retval = connect(ncb->sockfd, (const struct sockaddr *) &addr_to, sizeof (struct sockaddr));
-        } while((errno == EINTR) && (retval < 0));
-
+        /* syscall connect(2) to target host */
+        SYSCALL_WHILE_EINTR(retval, connect(ncb->sockfd, (const struct sockaddr *)&addr_to, sizeof (struct sockaddr)));
         if (retval < 0) {
             /* if this socket is already connected, or it is in listening states, sys-call failed with error EISCONN  */
             mxx_call_ecr("Fatal syscall connect(2) for link:%lld,endpoint:\"%s:%u\",error:%u", link, ipstr, port, errno);
@@ -606,10 +600,7 @@ static nsp_status_t _tcp_connect2_domain(ncb_t *ncb, const char *domain)
             break;
         }
 
-        do {
-            retval = connect(ncb->sockfd, (const struct sockaddr *)&ncb->domain_addr, sizeof(ncb->domain_addr));
-        }while((EINTR == errno) && (retval < 0));
-
+        SYSCALL_WHILE_EINTR(retval, connect(ncb->sockfd, (const struct sockaddr *)&ncb->domain_addr, sizeof(ncb->domain_addr)));
         /* immediate success, some BSD/SystemV maybe happen */
         if ( 0 == retval) {
             mxx_call_ecr("Link:%lld established domain:%s", ncb->hld, ncb->domain_addr.sun_path);
@@ -695,10 +686,8 @@ static nsp_status_t _tcp_connect2(ncb_t *ncb, const char* ipstr, uint16_t port)
         ncb->remot_addr.sin_port = htons(port);
         ncb->remot_addr.sin_addr.s_addr = inet_addr(ipstr);
 
-        do {
-            retval = connect(ncb->sockfd, (const struct sockaddr *) &ncb->remot_addr, sizeof (struct sockaddr));
-        }while((EINTR == errno) && (retval < 0));
 
+        SYSCALL_WHILE_EINTR(retval, connect(ncb->sockfd, (const struct sockaddr *)&ncb->remot_addr, sizeof(ncb->remot_addr)));
         /* immediate success, some BSD/SystemV maybe happen */
         if ( 0 == retval) {
             mxx_call_ecr("Link:%lld connection established to %s:%d",
@@ -762,7 +751,7 @@ nsp_status_t tcp_connect2(HTCPLINK link, const char* ipstr, uint16_t port)
     } else {
         status = posix__makeerror(EINVAL);
     }
-    
+
     objdefr(link);
     return status;
 }
