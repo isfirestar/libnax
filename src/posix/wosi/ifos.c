@@ -204,7 +204,15 @@ nsp_status_t ifos_rm(const char *const target)
 
 nsp_status_t ifos_fullpath_current(ifos_path_buffer_t *holder)
 {
-    return readlink("/proc/self/exe", holder->st, abuff_size(holder)) < 0 ? posix__makeerror(errno) : NSP_STATUS_SUCCESSFUL;
+    ssize_t n;
+
+    n = readlink("/proc/self/exe", holder->st, abuff_size(holder));
+    if (n < 0) {
+        return posix__makeerror(errno);
+    }
+
+    holder->st[n] = 0;
+    return NSP_STATUS_SUCCESSFUL;
 }
 
 nsp_status_t ifos_getpedir(ifos_path_buffer_t *holder)
