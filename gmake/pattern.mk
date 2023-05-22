@@ -43,7 +43,7 @@ endif
 ifeq ($(BUILD), debug)
 CFLAGS += -g3 -fno-omit-frame-pointer -fno-optimize-sibling-calls -DDEBUG=1 $(STACK_PROT)
 else
-CFLAGS += -O2 -g -funroll-loops -D NO_DEBUG -fkeep-inline-functions -Winline -ftree-vectorize
+CFLAGS += -O2 -g -funroll-loops -D NO_DEBUG -DNDEBUG=1 -fkeep-inline-functions -Winline -ftree-vectorize
 endif
 ifeq ($(ARCH), $(filter $(ARCH), X86 x86 i386))
 CFLAGS  += -m32 -D_X86 -DX86 -D_FILE_OFFSET_BITS=32 -DFILE_OFFSET_BITS=32
