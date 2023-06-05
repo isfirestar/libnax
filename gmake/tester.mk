@@ -23,7 +23,7 @@ SRC_DIRS += $(SOLUTION_DIR)addons/matrix2d/
 
 # add source directory, this variable allow framework force traverse and include all source files in entire directoy and it's sub directory
 # path MUST end with slash
-SRC_ENTIRE_DIRS := 
+SRC_ENTIRE_DIRS :=
 
 # add some source file which didn't in any of $(SRC_DIRS)
 SRC_ADDON :=
@@ -46,8 +46,14 @@ CROSS_COMPILER_PREFIX :=
 # user define complie-time options
 CFLAGS_ADDON := -D__USE_MISC
 
+# application additional link-time library path
+LIBRARY_PATH_ADDON := ./
+
+# application link-time library
+LIBRARYS := pthread rt dl crypt m nax gtest gtest_main
+
 # user define link-time options
-LDFALGS_ADDON := -pthread -lrt -lcrypt -lm -lgtest -lgtest_main -L ./ -lnax
+LDFALGS_ADDON :=
 
 # target architecture, can be one of  (X64/X8664/IA64/X86_64, X86/I386, ARM/ARM32, ARM64)
 ARCH := X64

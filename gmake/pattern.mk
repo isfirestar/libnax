@@ -19,6 +19,8 @@ endif
 ifeq ($(ARCH), $(filter $(ARCH), X86 x86 i386))
 LDFLAGS += -m32
 endif
+LDFLAGS += $(addprefix -L, $(LIBRARY_PATH_ADDON))
+LDFLAGS += $(addprefix -l, $(LIBRARYS))
 LDFLAGS += $(LDFALGS_ADDON)
 
 # compile options

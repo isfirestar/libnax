@@ -18,7 +18,7 @@ SRC_DIRS :=
 
 # add source directory, this variable allow framework force traverse and include all source files in entire directoy and it's sub directory
 # path MUST end with slash
-SRC_ENTIRE_DIRS := 
+SRC_ENTIRE_DIRS :=
 
 # add some source file which didn't in any of $(SRC_DIRS)
 SRC_ADDON :=
@@ -41,6 +41,12 @@ CROSS_COMPILER_PREFIX :=
 # user define complie-time options
 CFLAGS_ADDON :=
 
+# application additional link-time library path
+LIBRARY_PATH_ADDON :=
+
+# application link-time library
+LIBRARYS :=
+
 # user define link-time options
 LDFALGS_ADDON :=
 
@@ -49,7 +55,7 @@ ARCH :=
 
 # directory to save intermediate file and output target ( ./build/ by default), path MUST end with slash
 BUILD_DIR :=
- 
+
 # invoke other makefile or subdirs, using this field in the top make entry
 INVOKE := libnax.mk demo.mk tester.mk demo-c++.mk
 

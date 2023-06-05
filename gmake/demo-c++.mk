@@ -42,8 +42,14 @@ CROSS_COMPILER_PREFIX :=
 # user define complie-time options
 CFLAGS_ADDON := -D__USE_MISC
 
+# application additional link-time library path
+LIBRARY_PATH_ADDON := ./
+
+# application link-time library
+LIBRARYS := pthread rt dl crypt m nax
+
 # user define link-time options
-LDFALGS_ADDON := -pthread -lrt -ldl -lcrypt -lm -L ./ -lnax
+LDFALGS_ADDON :=
 
 # target architecture, can be one of  (X64/X8664/IA64/X86_64, X86/I386, ARM/ARM32, ARM64)
 ARCH := X64

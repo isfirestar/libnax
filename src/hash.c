@@ -124,54 +124,57 @@ PORTABLEIMPL(uint32_t) crc32(uint32_t crc, const unsigned char *string, uint32_t
 /*--------------------------------------------BASE64--------------------------------------------*/
 static const char base64char[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
 
-PORTABLEIMPL(int) base64_encode_len(int binlength)
+PORTABLEIMPL(int) base64_encode_len(int length)
 {
     int cnt_symbol_add;
 
     cnt_symbol_add = 0;
-    if (0 != (binlength % 3)) {
-        cnt_symbol_add = 3 - (binlength % 3);
+    if (0 != (length % 3)) {
+        cnt_symbol_add = 3 - (length % 3);
     }
-    return (binlength + cnt_symbol_add) / 3 * 4;
+    return (length + cnt_symbol_add) / 3 * 4;
 }
 
-PORTABLEIMPL(char *) base64_encode(const char *bindata, int binlength, char *base64)
+PORTABLEIMPL(char *) base64_encode(const char *input, int length, char *output)
 {
     int i, j;
     char current;
 
-    if (unlikely(!bindata || !base64 || binlength <= 0)) {
+    if (unlikely(!input || !output || length <= 0)) {
         return NULL;
     }
 
-    for ( i = 0, j = 0 ; i < binlength ; i += 3 ) {
-        current = (bindata[i] >> 2) ;
+    for (i = 0, j = 0; i < length; i += 3, j += 4) {
+        current = (input[i] >> 2);
         current &= (char)0x3F;
-        base64[j++] = base64char[(int)current];
+        output[j] = base64char[(int)current];
 
-        current = ( (char)(bindata[i] << 4 ) ) & ( (char)0x30 ) ;
-        if ( i + 1 >= binlength ) {
-            base64[j++] = base64char[(int)current];
-            base64[j++] = '=';
-            base64[j++] = '=';
+        current = ((char)(input[i] << 4)) & ((char)0x30);
+        if (i + 1 >= length) {
+            output[j + 1] = base64char[(int)current];
+            output[j + 2] = '=';
+            output[j + 3] = '=';
             break;
         }
-        current |= ( (char)(bindata[i+1] >> 4) ) & ( (char) 0x0F );
-        base64[j++] = base64char[(int)current];
+        current |= ((char)(input[i + 1] >> 4)) & ((char)0x0F);
+        output[j + 1] = base64char[(int)current];
 
-        current = ( (char)(bindata[i+1] << 2) ) & ( (char)0x3C ) ;
-        if ( i + 2 >= binlength ) {
-            base64[j++] = base64char[(int)current];
-            base64[j++] = '=';
+        current = ((char)(input[i + 1] << 2)) & ((char)0x3C);
+        if (i + 2 >= length) {
+            output[j + 2] = base64char[(int)current];
+            output[j + 3] = '=';
             break;
         }
-        current |= ( (char)(bindata[i+2] >> 6) ) & ( (char) 0x03 );
-        base64[j++] = base64char[(int)current];
+        current |= ((char)(input[i + 2] >> 6)) & ((char)0x03);
+        output[j + 2] = base64char[(int)current];
 
-        current = ( (char)bindata[i+2] ) & ( (char)0x3F ) ;
-        base64[j++] = base64char[(int)current];
+        current = ((char)input[i + 2]) & ((char)0x3F);
+        output[j + 3] = base64char[(int)current];
     }
-    return base64;
+
+    output[j] = '\0'; // add null terminator
+
+    return output;
 }
 
 PORTABLEIMPL(int) base64_decode_len(const char *base64, int base64_len)
