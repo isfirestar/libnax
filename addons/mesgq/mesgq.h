@@ -10,7 +10,19 @@
 
 /* mq_setattr(3)
  * The only attribute that can be modified is the setting of the  O_NONBLOCK  flag  in  mq_flags.
- * so, msgsize and maxmsg filed MUST be set when the first time open the MQ object
+ * so, msgsize and maxmsg filed MUST be set when the first time open the MQ object.
+ * see fragment kernel code do_mq_getsetattr in ipc/mqueue.c
+ * if (new) {
+ *		audit_mq_getsetattr(mqdes, new);
+ *		spin_lock(&f.file->f_lock);
+ *		if (new->mq_flags & O_NONBLOCK)
+ *			f.file->f_flags |= O_NONBLOCK;
+ *		else
+ *			f.file->f_flags &= ~O_NONBLOCK;
+ *		spin_unlock(&f.file->f_lock);
+ *
+ *		inode->i_atime = inode->i_ctime = current_time(inode);
+ *	}
  */
 
 enum mesgq_open_method
