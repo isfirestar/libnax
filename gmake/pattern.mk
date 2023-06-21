@@ -85,7 +85,7 @@ BUILD_DIR := ./build/
 endif
 
 # define the middle directory for build
-OBJS_DIR = $(BUILD_DIR)objs/
+OBJS_DIR = $(BUILD_DIR)objs/$(TARGET)/
 TAGS_DIR = $(BUILD_DIR)bin/
 
 # expand SRC_DIRS
