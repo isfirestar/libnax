@@ -84,4 +84,7 @@ PORTABLEAPI(struct avltree_node_t *) avlgetmin(struct avltree_node_t *tree);
 PORTABLEAPI(struct avltree_node_t *) avlgetmax(struct avltree_node_t *tree);
 
 
+PORTABLEAPI(struct avltree_node_t *) avllowerbound(avltree_node_t *tree, avltree_node_t *node, int( *compare)(const void *, const void *));
+PORTABLEAPI(struct avltree_node_t *) avlupperbound(avltree_node_t *tree, avltree_node_t *node, int( *compare)(const void *, const void *));
+
 #endif /*_AVLTREE_HEADER_ANDERSON_20120216*/

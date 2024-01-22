@@ -333,3 +333,41 @@ static struct avltree_node_t *_avldoublerotateright(struct avltree_node_t *tree)
     newtree->height = MAX(HEIGHT(newtree->lchild), HEIGHT(newtree->rchild)) + 1;
     return newtree;
 }
+
+struct avltree_node_t * avllowerbound(avltree_node_t *tree, avltree_node_t *node, int( *compare)(const void *, const void *))
+{
+    int ret;
+    struct avltree_node_t *cursor;
+
+    if (!tree) {
+        return tree;
+    }
+
+    ret = compare(node, tree);
+    if (ret < 0) {
+        cursor = avllowerbound(tree->lchild, node, compare);
+        return cursor ? cursor : tree;
+    } else if (ret > 0) {
+        return avllowerbound(tree->rchild, node, compare);
+    } else {
+        return tree;
+    }
+}
+
+struct avltree_node_t * avlupperbound(avltree_node_t *tree, avltree_node_t *node, int( *compare)(const void *, const void *))
+{
+    int ret;
+    struct avltree_node_t *cursor;
+
+    if (!tree) {
+        return tree;
+    }
+
+    ret = compare(node, tree);
+    if (ret < 0) {
+        cursor = avlupperbound(tree->lchild, node, compare);
+        return cursor ? cursor : tree;
+    }
+
+    return avlupperbound(tree->rchild, node, compare);
+}

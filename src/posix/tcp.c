@@ -834,6 +834,10 @@ nsp_status_t tcp_listen(HTCPLINK link, int block)
 
         /* set file descriptor to asynchronous mode and attach to it's own epoll object,
          *  ncb object willbe destroy on fatal. */
+        status = io_set_nonblock(ncb, 1);
+        if (!NSP_SUCCESS(status)) {
+            break;
+        }
         status = io_attach(ncb, EPOLLIN);
         if ( !NSP_SUCCESS(status) ) {
             break;
